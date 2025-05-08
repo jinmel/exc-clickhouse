@@ -44,11 +44,11 @@ pub struct BookTickerEvent {
     pub best_bid: String,
 
     #[serde(rename = "B")]
-    pub best_bid_qty: String,
+    pub best_bid_quantity: String,
 
     #[serde(rename = "a")]
     pub best_ask: String,
 
     #[serde(rename = "A")]
-    pub best_ask_qty: String,
+    pub best_ask_quantity: String,
 }

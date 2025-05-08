@@ -31,12 +31,10 @@ impl<T: Send + 'static> ExchangeStream<T> {
     where
         F: Fn(&str) -> Result<T, ExchangeStreamError> + Send + Sync + 'static,
     {
-        let (ws, resp) = connect_async(url)
+        let (ws, _) = connect_async(url)
             .await
             .map_err(|e| ExchangeStreamError::StreamError(e.to_string()))?;
-
         tracing::info!("Connected to {}", url);
-        tracing::info!("Response: {:?}", resp);
 
         let (tx, rx) = tokio::sync::mpsc::channel(100);
         let handle = tokio::spawn(async move {
