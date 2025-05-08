@@ -6,10 +6,10 @@ use std::{
 
 use clickhouse::Client;
 use futures::Future;
-
+use eyre::WrapErr;
 use crate::models::NormalizedEvent;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ClickHouseConfig {
     pub url:      String,
     pub port:     String,
@@ -19,30 +19,27 @@ pub struct ClickHouseConfig {
 }
 
 impl ClickHouseConfig {
+    fn get_env_var(key: &str) -> eyre::Result<String> {
+        std::env::var(key).wrap_err(format!("Clickhouse config: {key} environment variable is not set"))
+    }
+
     pub fn from_env() -> eyre::Result<Self> {
         Ok(Self {
-            url:      std::env::var("CLICKHOUSE_URL")?,
-            port:     std::env::var("CLICKHOUSE_PORT")?,
-            user:     std::env::var("CLICKHOUSE_USER")?,
-            database: std::env::var("CLICKHOUSE_DATABASE")?,
-            password: std::env::var("CLICKHOUSE_PASS")?,
+            url:      Self::get_env_var("CLICKHOUSE_URL")?,
+            port:     Self::get_env_var("CLICKHOUSE_PORT")?,
+            user:     Self::get_env_var("CLICKHOUSE_USER")?,
+            database: Self::get_env_var("CLICKHOUSE_DATABASE")?,
+            password: Self::get_env_var("CLICKHOUSE_PASS")?,
         })
     }
 
     pub fn url(&self) -> String {
-        format!("http://{}:{}", self.url, self.port)
+        format!("{}:{}", self.url, self.port)
     }
 }
+#[derive(Clone)]
 pub struct ClickHouseService {
     client: Client,
-}
-
-impl Clone for ClickHouseService {
-    fn clone(&self) -> Self {
-        Self {
-            client: self.client.clone(),
-        }
-    }
 }
 
 impl ClickHouseService {
@@ -95,7 +92,6 @@ impl tower::Service<Vec<NormalizedEvent>> for ClickHouseService {
     type Future   = Pin<Box<dyn Future<Output = Result<(), Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        // we’re always ready
         Poll::Ready(Ok(()))
     }
 
