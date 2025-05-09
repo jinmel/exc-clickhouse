@@ -17,6 +17,7 @@ use crate::{
 mod clickhouse;
 mod models;
 mod streams;
+mod ethereum;
 
 const BATCH_SIZE: usize = 500;
 
@@ -59,7 +60,8 @@ async fn main() -> eyre::Result<()> {
 
     tracing::info!("Spawning binance stream for symbols: {:?}", symbols);
     set.spawn(binance_stream_task(evt_tx.clone(), symbols));
-    set.spawn(clickhouse_writer_task(evt_rx));
+    set.spawn(clickhouse_cex_writer_task(evt_rx));
+    set.spawn(ethereum::block_metadata_task("wss://40.160.26.179:8547"));
 
     tokio::select! {
         _ = async {
@@ -125,11 +127,10 @@ async fn binance_stream_task(
     Ok(())
 }
 
-async fn clickhouse_writer_task(
+async fn clickhouse_cex_writer_task(
     rx: mpsc::Receiver<Vec<Result<NormalizedEvent, ExchangeStreamError>>>,
 ) -> eyre::Result<()> {
     let cfg = ClickHouseConfig::from_env()?;
-    println!("cfg: {cfg:?}");
     let writer = ClickHouseService::new(cfg);
 
     let batch_stream = ReceiverStream::new(rx)

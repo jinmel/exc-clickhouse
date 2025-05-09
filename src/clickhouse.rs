@@ -7,7 +7,7 @@ use std::{
 use clickhouse::Client;
 use futures::Future;
 use eyre::WrapErr;
-use crate::models::NormalizedEvent;
+use crate::{ethereum::BlockMetadata, models::NormalizedEvent};
 
 #[derive(Debug, Clone)]
 pub struct ClickHouseConfig {
@@ -50,6 +50,12 @@ impl ClickHouseService {
             .with_password(config.password)
             .with_database(config.database);
         Self { client }
+    }
+
+    pub async fn write_block_metadata(&self, metadata: BlockMetadata) -> eyre::Result<()> {
+        let mut insert = self.client.insert("block_metadata")?;
+        insert.write(&metadata).await?;
+        insert.end().await.wrap_err("failed to write block metadata")
     }
 
     async fn write_batch(&self, events: Vec<NormalizedEvent>) -> eyre::Result<()> {
