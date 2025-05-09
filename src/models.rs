@@ -15,10 +15,31 @@ pub enum ExchangeName {
     Kraken,
 }
 
+impl ToString for ExchangeName {
+    fn to_string(&self) -> String {
+        match self {
+            ExchangeName::Binance => "binance".to_string(),
+            ExchangeName::Bybit => "bybit".to_string(),
+            ExchangeName::Okx => "okx".to_string(),
+            ExchangeName::Coinbase => "coinbase".to_string(),
+            ExchangeName::Kraken => "kraken".to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Copy, Clone)]
 pub enum TradeSide {
     Buy, 
     Sell
+}
+
+impl ToString for TradeSide {
+    fn to_string(&self) -> String {
+        match self {
+            TradeSide::Buy => "buy".to_string(),
+            TradeSide::Sell => "sell".to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Copy, Clone)]
@@ -38,19 +59,11 @@ pub struct NormalizedTrade {
     pub amount: f64,
 }
 
-impl TradeSide {
-    pub fn as_bytes(&self) -> &[u8] {
-        match self {
-            TradeSide::Buy => b"buy",
-            TradeSide::Sell => b"sell",
-        }
-    }
-}
 #[derive(Debug, Serialize, Deserialize, Copy, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct NormalizedQuote {
-    pub exchange: [u8; 20],
-    pub symbol: [u8; 20],
+    pub exchange: ExchangeName,
+    pub symbol: ArrayString<20>,
     pub timestamp: u64,
     pub ask_amount: f64,
     pub ask_price: f64,
@@ -60,25 +73,20 @@ pub struct NormalizedQuote {
 
 impl NormalizedTrade {
     pub fn new(
-        exchange: &str,
+        exchange: ExchangeName,
         symbol: &str,
         timestamp: u64,
         side: TradeSide,
         price: f64,
         amount: f64,
     ) -> Self {
-        let mut exchange_bytes = [0u8; 20];
-        let mut symbol_bytes = [0u8; 20];
-        exchange_bytes[..exchange.len().min(20)].copy_from_slice(exchange.as_bytes());
-        symbol_bytes[..symbol.len().min(20)].copy_from_slice(symbol.as_bytes());
-        let mut side_bytes = [0u8; 5];
-        side_bytes[..side.as_bytes().len()].copy_from_slice(side.as_bytes());
-
+        let symbol = ArrayString::from(symbol).expect("Symbol is too long");
+        
         Self {
-            exchange: exchange_bytes,
-            symbol: symbol_bytes,
+            exchange,
+            symbol,
             timestamp,
-            side: side_bytes,
+            side,
             price,
             amount,
         }
@@ -87,7 +95,7 @@ impl NormalizedTrade {
 
 impl NormalizedQuote {
     pub fn new(
-        exchange: &str,
+        exchange: ExchangeName,
         symbol: &str,
         timestamp: u64,
         ask_amount: f64,
@@ -95,14 +103,11 @@ impl NormalizedQuote {
         bid_price: f64,
         bid_amount: f64,
     ) -> Self {
-        let mut exchange_bytes = [0u8; 20];
-        let mut symbol_bytes = [0u8; 20];
-        exchange_bytes[..exchange.len().min(20)].copy_from_slice(exchange.as_bytes());
-        symbol_bytes[..symbol.len().min(20)].copy_from_slice(symbol.as_bytes());
+        let symbol = ArrayString::from(symbol).expect("Symbol is too long");
 
         Self {
-            exchange: exchange_bytes,
-            symbol: symbol_bytes,
+            exchange,
+            symbol,
             timestamp,
             ask_amount,
             ask_price,

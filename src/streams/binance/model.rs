@@ -1,9 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    models::{NormalizedQuote, NormalizedTrade},
+    models::{ExchangeName, NormalizedQuote, NormalizedTrade, TradeSide},
     streams::ExchangeStreamError,
-    models::TradeSide,
 };
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -49,7 +48,7 @@ impl TryInto<NormalizedTrade> for TradeEvent {
             .map_err(|e| ExchangeStreamError::ParseError(format!("Invalid quantity value: {e}")))?;
 
         Ok(NormalizedTrade::new(
-            "binance",
+            ExchangeName::Binance,
             &self.symbol,
             self.event_time * 1000, // Convert milliseconds to microseconds
             if self.is_buyer_maker { TradeSide::Sell } else { TradeSide::Buy },
@@ -104,7 +103,7 @@ impl TryInto<NormalizedQuote> for BookTickerEvent {
             .map_err(|e| ExchangeStreamError::ParseError(format!("Invalid bid quantity value: {e}")))?;
 
         Ok(NormalizedQuote::new(
-            "binance",
+            ExchangeName::Binance,
             &self.symbol,
             timestamp,
             ask_amount,

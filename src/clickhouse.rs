@@ -59,27 +59,9 @@ struct ClickhouseQuote {
 
 impl From<NormalizedQuote> for ClickhouseQuote {
     fn from(quote: NormalizedQuote) -> Self {
-        let exchange = String::from_utf8(
-            quote
-                .exchange
-                .iter()
-                .take_while(|&&b| b != 0)
-                .copied()
-                .collect(),
-        )
-        .unwrap();
-        let symbol = String::from_utf8(
-            quote
-                .symbol
-                .iter()
-                .take_while(|&&b| b != 0)
-                .copied()
-                .collect(),
-        )
-        .unwrap();
         Self {
-            exchange,
-            symbol,
+            exchange: quote.exchange.to_string(),
+            symbol: quote.symbol.to_string(),
             timestamp: quote.timestamp,
             ask_amount: quote.ask_amount,
             ask_price: quote.ask_price,
@@ -101,15 +83,11 @@ struct ClickhouseTrade {
 
 impl From<NormalizedTrade> for ClickhouseTrade {
     fn from(trade: NormalizedTrade) -> Self {
-        let exchange = String::from_utf8(trade.exchange.to_vec()).unwrap();
-        let symbol = String::from_utf8(trade.symbol.to_vec()).unwrap();
-        let side = String::from_utf8(trade.side.to_vec()).unwrap();
-
         Self {
-            exchange,
-            symbol,
+            exchange: trade.exchange.to_string(),
+            symbol: trade.symbol.to_string(),
             timestamp: trade.timestamp,
-            side,
+            side: trade.side.to_string(),
             price: trade.price,
             amount: trade.amount,
         }
