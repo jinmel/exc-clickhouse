@@ -11,7 +11,7 @@ use tracing_subscriber::FmtSubscriber;
 use crate::{
     clickhouse::{ClickHouseConfig, ClickHouseService},
     models::NormalizedEvent,
-    streams::{Exchange, ExchangeStreamError, binance::BinanceClient, CombinedStream},
+    streams::{ExchangeStreamError, binance::BinanceClient, CombinedStream},
 };
 
 mod clickhouse;
@@ -120,7 +120,7 @@ async fn clickhouse_writer_task(
     rx: mpsc::Receiver<Vec<Result<NormalizedEvent, ExchangeStreamError>>>,
 ) -> eyre::Result<()> {
     let cfg = ClickHouseConfig::from_env()?;
-    println!("cfg: {:?}", cfg);
+    println!("cfg: {cfg:?}");
     let writer = ClickHouseService::new(cfg);
 
     let batch_stream = ReceiverStream::new(rx)

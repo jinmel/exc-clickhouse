@@ -45,7 +45,7 @@ impl<T: Send + 'static> ExchangeStream<T> {
                             Some(parser(&text))
                         }
                         Ok(Message::Close(frame)) => {
-                            Some(Err(ExchangeStreamError::StreamNotConnected(format!("Close frame: {:?}", frame))))
+                            Some(Err(ExchangeStreamError::StreamNotConnected(format!("Close frame: {frame:?}"))))
                         }
                         // Ping/pong handled automatically
                         Ok(_) => {

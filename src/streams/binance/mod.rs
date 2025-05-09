@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 
 use crate::{
-    models::{NormalizedEvent, NormalizedQuote, NormalizedTrade},
-    streams::{CombinedStream, Exchange, ExchangeStream, ExchangeStreamError},
+    models::NormalizedEvent,
+    streams::{CombinedStream, ExchangeStream, ExchangeStreamError},
 };
 
 /// Default WebSocket URL for Binance
@@ -28,11 +28,11 @@ impl BinanceClient {
         let stream_name_part = self.symbols.iter().flat_map(|symbol| {
             let mut stream_names = vec![];
             if self.enable_quote {
-                stream_names.push(format!("{}@bookTicker", symbol));
+                stream_names.push(format!("{symbol}@bookTicker"));
             }
 
             if self.enable_trade {
-                stream_names.push(format!("{}@trade", symbol));
+                stream_names.push(format!("{symbol}@trade"));
             }
 
             stream_names
