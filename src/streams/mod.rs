@@ -87,7 +87,7 @@ impl<T: Send + 'static> Drop for ExchangeStream<T> {
 }
 
 #[async_trait]
-pub trait Exchange {
+pub trait ExchangeClient {
     type TradeStream: Stream<Item = Result<NormalizedTrade, ExchangeStreamError>> + Send + Unpin + 'static;
     type QuoteStream: Stream<Item = Result<NormalizedQuote, ExchangeStreamError>> + Send + Unpin + 'static;
 

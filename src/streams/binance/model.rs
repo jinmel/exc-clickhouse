@@ -51,7 +51,7 @@ impl TryInto<NormalizedTrade> for TradeEvent {
         Ok(NormalizedTrade::new(
             "binance",
             &self.symbol,
-            self.event_time,
+            self.event_time * 1000, // Convert milliseconds to microseconds
             if self.is_buyer_maker { TradeSide::Sell } else { TradeSide::Buy },
             price,
             amount,

@@ -21,8 +21,8 @@ pub struct BinanceClient {
 
 impl BinanceClient {
     /// Creates a new BinanceBuilder with default values
-    pub fn builder() -> BinanceBuilder {
-        BinanceBuilder::default()
+    pub fn builder() -> BinanceClientBuilder {
+        BinanceClientBuilder::default()
     }
 
     fn build_multi_stream_url(&self) -> Result<String, ExchangeStreamError> {
@@ -56,14 +56,14 @@ impl CombinedStream for BinanceClient {
 }
 
 /// Builder for the Binance struct
-pub struct BinanceBuilder {
+pub struct BinanceClientBuilder {
     symbols: Vec<String>,
     base_url: String,
     enable_quote: bool,
     enable_trade: bool,
 }
 
-impl Default for BinanceBuilder {
+impl Default for BinanceClientBuilder {
     fn default() -> Self {
         Self {
             symbols: vec![],
@@ -74,7 +74,7 @@ impl Default for BinanceBuilder {
     }
 }
 
-impl BinanceBuilder {
+impl BinanceClientBuilder {
     pub fn add_symbol(mut self, symbol: impl Into<String>) -> Self {
         self.symbols.push(symbol.into());
         self
