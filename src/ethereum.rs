@@ -1,5 +1,4 @@
 use alloy::providers::{Provider, ProviderBuilder, WsConnect};
-use alloy::primitives::B256;
 use clickhouse::Row;
 use futures::StreamExt;
 use serde::{Serialize, Deserialize};
@@ -9,7 +8,7 @@ use crate::clickhouse::{ClickHouseConfig, ClickHouseService};
 pub struct BlockMetadata {
   // TODO: add more block metadata if possible.
   block_number: u64,
-  block_hash: B256,
+  block_hash: String,
   block_timestamp: u64,
   valid: bool,
 }
@@ -22,8 +21,9 @@ pub async fn block_metadata_task(rpc_url: &str) -> eyre::Result<()> {
   let mut metadata_stream = block_stream.map(|block| {
     BlockMetadata {
       block_number: block.number,
-      block_hash: block.hash,
+      block_hash: block.hash.to_string(),
       block_timestamp: block.timestamp,
+      // FIXME: this is probably for handling uncles, which may complicate our insertion logic quite a bit. 
       valid: true,
     }
   });
