@@ -1,17 +1,17 @@
 use dotenv::dotenv;
+use eyre::WrapErr;
 use futures::stream::StreamExt;
+use std::fs::File;
+use std::io::{self, BufRead};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tower::ServiceExt;
 use tracing_subscriber::FmtSubscriber;
-use std::fs::File;
-use std::io::{self, BufRead};
-use eyre::WrapErr;
 
 use crate::{
     clickhouse::{ClickHouseConfig, ClickHouseService},
     models::NormalizedEvent,
-    streams::{binance::Binance, Exchange, ExchangeStreamError},
+    streams::{Exchange, ExchangeStreamError, binance::BinanceClient, CombinedStream},
 };
 
 mod clickhouse;
@@ -31,15 +31,15 @@ async fn main() -> eyre::Result<()> {
         .finish();
     tracing::subscriber::set_global_default(subscriber)?;
 
-    let (evt_tx, evt_rx) = mpsc::channel::<Vec<Result<NormalizedEvent, ExchangeStreamError>>>(10000);
+    let (evt_tx, evt_rx) =
+        mpsc::channel::<Vec<Result<NormalizedEvent, ExchangeStreamError>>>(10000);
 
     let mut set = tokio::task::JoinSet::new();
 
     // Read symbols from file
-    let file = File::open("symbols.txt")
-        .wrap_err("Failed to open symbols.txt")?;
+    let file = File::open("symbols.txt").wrap_err("Failed to open symbols.txt")?;
     let reader = io::BufReader::new(file);
-    
+
     let symbols: Vec<String> = reader
         .lines()
         .filter_map(|line| {
@@ -47,12 +47,9 @@ async fn main() -> eyre::Result<()> {
             Some(symbol)
         })
         .collect();
-    
-    for symbol in symbols {
-        tracing::info!("Spawning binance stream for symbol: {}", symbol);
-        set.spawn(binance_stream_task(evt_tx.clone(), symbol));
-    }
 
+    tracing::info!("Spawning binance stream for symbols: {:?}", symbols);
+    set.spawn(binance_stream_task(evt_tx.clone(), symbols));
     set.spawn(clickhouse_writer_task(evt_rx));
 
     tokio::select! {
@@ -96,19 +93,15 @@ async fn main() -> eyre::Result<()> {
 
 async fn binance_stream_task(
     evt_tx: mpsc::Sender<Vec<Result<NormalizedEvent, ExchangeStreamError>>>,
-    symbol: String,
+    symbols: Vec<String>,
 ) -> eyre::Result<()> {
-    let binance = Binance::builder().symbol(symbol).build()?;
-    let trades = binance
-        .normalized_trades()
-        .await?
-        .map(|result| result.map(NormalizedEvent::Trade));
-    let quotes = binance
-        .normalized_quotes()
-        .await?
-        .map(|result| result.map(NormalizedEvent::Quote));
-    let merged = futures::stream::select(trades, quotes);
-    let chunks = merged.chunks(BATCH_SIZE);
+    let binance = BinanceClient::builder()
+        .add_symbols(symbols)
+        .with_quotes(true)
+        .with_trades(true)
+        .build()?;
+    let combined_stream = binance.combined_stream().await?;
+    let chunks = combined_stream.chunks(BATCH_SIZE);
 
     chunks
         .for_each_concurrent(10, |batch| {

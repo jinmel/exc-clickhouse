@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 
 use crate::{
-    models::{NormalizedQuote, NormalizedTrade, NormalizedEvent},
-    streams::{Exchange, ExchangeStream, ExchangeStreamError, CombinedStream},
+    models::{NormalizedEvent, NormalizedQuote, NormalizedTrade},
+    streams::{CombinedStream, Exchange, ExchangeStream, ExchangeStreamError},
 };
 
 /// Default WebSocket URL for Binance
@@ -11,76 +11,100 @@ pub const DEFAULT_BINANCE_WS_URL: &str = "wss://stream.binance.com:9443/ws";
 pub mod model;
 pub mod parser;
 
-pub struct Binance {
-    symbol:   String,
+pub struct BinanceClient {
+    symbols: Vec<String>,
     base_url: String,
+    enable_quote: bool,
+    enable_trade: bool,
 }
 
-impl Binance {
+impl BinanceClient {
     /// Creates a new BinanceBuilder with default values
     pub fn builder() -> BinanceBuilder {
         BinanceBuilder::default()
     }
+
+    fn build_multi_stream_url(&self) -> String {
+        let stream_name_part = self.symbols.iter().flat_map(|symbol| {
+            let mut stream_names = vec![];
+            if self.enable_quote {
+                stream_names.push(format!("{}@bookTicker", symbol));
+            }
+
+            if self.enable_trade {
+                stream_names.push(format!("{}@trade", symbol));
+            }
+
+            stream_names
+        }).collect::<Vec<String>>().join("/");
+
+        format!("{}/{}", self.base_url, stream_name_part)
+    }
 }
 
 #[async_trait]
-impl Exchange for Binance {
-    type QuoteStream = ExchangeStream<NormalizedQuote>;
-    type TradeStream = ExchangeStream<NormalizedTrade>;
-
-    async fn normalized_trades(&self) -> Result<Self::TradeStream, ExchangeStreamError> {
-        let url = format!("{}/{}@trade", self.base_url, self.symbol);
-        ExchangeStream::new(&url, parser::parse_binance_trade).await
-    }
-
-    async fn normalized_quotes(&self) -> Result<Self::QuoteStream, ExchangeStreamError> {
-        let url = format!("{}/{}@bookTicker", self.base_url, self.symbol);
-        ExchangeStream::new(&url, parser::parse_binance_quote).await
-    }
-}
-
-#[async_trait]
-impl CombinedStream for Binance {
+impl CombinedStream for BinanceClient {
     type CombinedStream = ExchangeStream<NormalizedEvent>;
 
     async fn combined_stream(&self) -> Result<Self::CombinedStream, ExchangeStreamError> {
-        let url = format!("{}/{}@bookTicker", self.base_url, self.symbol);
+        let url = self.build_multi_stream_url();
         ExchangeStream::new(&url, parser::parse_binance_combined).await
     }
 }
 
-
 /// Builder for the Binance struct
 pub struct BinanceBuilder {
-    symbol:   Option<String>,
+    symbols: Vec<String>,
     base_url: String,
+    enable_quote: bool,
+    enable_trade: bool,
 }
 
 impl Default for BinanceBuilder {
     fn default() -> Self {
-        Self { symbol: None, base_url: DEFAULT_BINANCE_WS_URL.to_string() }
+        Self {
+            symbols: vec![],
+            base_url: DEFAULT_BINANCE_WS_URL.to_string(),
+            enable_quote: false,
+            enable_trade: false,
+        }
     }
 }
 
 impl BinanceBuilder {
-    /// Set the trading symbol
-    pub fn symbol(mut self, symbol: impl Into<String>) -> Self {
-        self.symbol = Some(symbol.into());
+    pub fn add_symbol(mut self, symbol: impl Into<String>) -> Self {
+        self.symbols.push(symbol.into());
+        self
+    }
+
+    pub fn add_symbols(mut self, symbols: Vec<impl Into<String>>) -> Self {
+        self.symbols.extend(symbols.into_iter().map(|s| s.into()));
         self
     }
 
     /// Set the base URL
-    pub fn base_url(mut self, url: impl Into<String>) -> Self {
+    pub fn with_base_url(mut self, url: impl Into<String>) -> Self {
         self.base_url = url.into();
         self
     }
 
-    /// Build the Binance instance
-    pub fn build(self) -> eyre::Result<Binance> {
-        let symbol = self
-            .symbol
-            .ok_or_else(|| eyre::eyre!("Symbol is required"))?;
+    pub fn with_quotes(mut self, enable: bool) -> Self {
+        self.enable_quote = enable;
+        self
+    }
 
-        Ok(Binance { symbol, base_url: self.base_url })
+    pub fn with_trades(mut self, enable: bool) -> Self {  
+        self.enable_trade = enable;
+        self
+    }
+
+    /// Build the Binance instance
+    pub fn build(self) -> eyre::Result<BinanceClient> {
+        Ok(BinanceClient {
+            symbols: self.symbols,
+            base_url: self.base_url,
+            enable_quote: self.enable_quote,
+            enable_trade: self.enable_trade,
+        })
     }
 }
