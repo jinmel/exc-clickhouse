@@ -11,7 +11,7 @@ use tracing_subscriber::FmtSubscriber;
 use crate::{
     clickhouse::{ClickHouseConfig, ClickHouseService},
     models::NormalizedEvent,
-    streams::{ExchangeStreamError, binance::BinanceClient, CombinedStream},
+    streams::{CombinedStream, ExchangeStreamError, binance::BinanceClient},
 };
 
 mod clickhouse;
@@ -19,6 +19,25 @@ mod models;
 mod streams;
 
 const BATCH_SIZE: usize = 500;
+
+fn read_symbols(filename: &str) -> eyre::Result<Vec<String>> {
+    let file = File::open(filename).wrap_err("Failed to open symbols.txt")?;
+    let reader = io::BufReader::new(file);
+    reader
+        .lines()
+        .enumerate()
+        .map(|(idx, line)| {
+            line.wrap_err(format!("Failed to read line {}", idx + 1))
+                .and_then(|line| {
+                    if line.is_empty() {
+                        Err(eyre::eyre!("Empty line at {}", idx + 1))
+                    } else {
+                        Ok(line.trim().to_lowercase())
+                    }
+                })
+        })
+        .collect::<eyre::Result<Vec<String>>>()
+}
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
@@ -36,17 +55,7 @@ async fn main() -> eyre::Result<()> {
 
     let mut set = tokio::task::JoinSet::new();
 
-    // Read symbols from file
-    let file = File::open("symbols.txt").wrap_err("Failed to open symbols.txt")?;
-    let reader = io::BufReader::new(file);
-
-    let symbols: Vec<String> = reader
-        .lines()
-        .filter_map(|line| {
-            let symbol = line.ok()?.trim().to_lowercase();
-            Some(symbol)
-        })
-        .collect();
+    let symbols = read_symbols("symbols.txt")?;
 
     tracing::info!("Spawning binance stream for symbols: {:?}", symbols);
     set.spawn(binance_stream_task(evt_tx.clone(), symbols));

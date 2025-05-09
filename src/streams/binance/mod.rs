@@ -78,7 +78,7 @@ impl BinanceBuilder {
     }
 
     pub fn add_symbols(mut self, symbols: Vec<impl Into<String>>) -> Self {
-        self.symbols.extend(symbols.into_iter().map(|s| s.into()));
+        self.symbols.extend(symbols.into_iter().map(|s| s.into().to_lowercase()));
         self
     }
 
