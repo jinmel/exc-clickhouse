@@ -4,6 +4,9 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tower::ServiceExt;
 use tracing_subscriber::FmtSubscriber;
+use std::fs::File;
+use std::io::{self, BufRead};
+use eyre::WrapErr;
 
 use crate::{
     clickhouse::{ClickHouseConfig, ClickHouseService},
@@ -15,7 +18,7 @@ mod clickhouse;
 mod models;
 mod streams;
 
-const BATCH_SIZE: usize = 100;
+const BATCH_SIZE: usize = 500;
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
@@ -28,11 +31,28 @@ async fn main() -> eyre::Result<()> {
         .finish();
     tracing::subscriber::set_global_default(subscriber)?;
 
-    let (evt_tx, evt_rx) = mpsc::channel::<Vec<Result<NormalizedEvent, ExchangeStreamError>>>(1000);
+    let (evt_tx, evt_rx) = mpsc::channel::<Vec<Result<NormalizedEvent, ExchangeStreamError>>>(10000);
 
     let mut set = tokio::task::JoinSet::new();
 
-    set.spawn(binance_stream_task(evt_tx.clone()));
+    // Read symbols from file
+    let file = File::open("symbols.txt")
+        .wrap_err("Failed to open symbols.txt")?;
+    let reader = io::BufReader::new(file);
+    
+    let symbols: Vec<String> = reader
+        .lines()
+        .filter_map(|line| {
+            let symbol = line.ok()?.trim().to_lowercase();
+            Some(symbol)
+        })
+        .collect();
+    
+    for symbol in symbols {
+        tracing::info!("Spawning binance stream for symbol: {}", symbol);
+        set.spawn(binance_stream_task(evt_tx.clone(), symbol));
+    }
+
     set.spawn(clickhouse_writer_task(evt_rx));
 
     tokio::select! {
@@ -76,8 +96,9 @@ async fn main() -> eyre::Result<()> {
 
 async fn binance_stream_task(
     evt_tx: mpsc::Sender<Vec<Result<NormalizedEvent, ExchangeStreamError>>>,
+    symbol: String,
 ) -> eyre::Result<()> {
-    let binance = Binance::builder().symbol("btcusdt").build()?;
+    let binance = Binance::builder().symbol(symbol).build()?;
     let trades = binance
         .normalized_trades()
         .await?

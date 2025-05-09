@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 
 use crate::{
-    models::{NormalizedQuote, NormalizedTrade},
-    streams::{Exchange, ExchangeStream, ExchangeStreamError},
+    models::{NormalizedQuote, NormalizedTrade, NormalizedEvent},
+    streams::{Exchange, ExchangeStream, ExchangeStreamError, CombinedStream},
 };
 
 /// Default WebSocket URL for Binance
@@ -38,6 +38,18 @@ impl Exchange for Binance {
         ExchangeStream::new(&url, parser::parse_binance_quote).await
     }
 }
+
+#[async_trait]
+impl CombinedStream for Binance {
+    type CombinedStream = ExchangeStream<NormalizedEvent>;
+
+    async fn combined_stream(&self) -> Result<Self::CombinedStream, ExchangeStreamError> {
+        let url = format!("{}/{}@bookTicker", self.base_url, self.symbol);
+        ExchangeStream::new(&url, parser::parse_binance_combined).await
+    }
+}
+
+
 /// Builder for the Binance struct
 pub struct BinanceBuilder {
     symbol:   Option<String>,

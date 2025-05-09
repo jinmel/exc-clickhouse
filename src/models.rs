@@ -1,7 +1,7 @@
 use clickhouse::Row;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize, Copy, Clone)]
 pub enum NormalizedEvent {
     Trade(NormalizedTrade),
     Quote(NormalizedQuote),
@@ -72,18 +72,6 @@ impl NormalizedTrade {
             amount,
         }
     }
-
-    pub fn exchange(&self) -> &str {
-        std::str::from_utf8(&self.exchange)
-            .unwrap_or("")
-            .trim_end_matches('\0')
-    }
-
-    pub fn symbol(&self) -> &str {
-        std::str::from_utf8(&self.symbol)
-            .unwrap_or("")
-            .trim_end_matches('\0')
-    }
 }
 
 impl NormalizedQuote {
@@ -110,17 +98,5 @@ impl NormalizedQuote {
             bid_price,
             bid_amount,
         }
-    }
-
-    pub fn exchange(&self) -> &str {
-        std::str::from_utf8(&self.exchange)
-            .unwrap_or("")
-            .trim_end_matches('\0')
-    }
-
-    pub fn symbol(&self) -> &str {
-        std::str::from_utf8(&self.symbol)
-            .unwrap_or("")
-            .trim_end_matches('\0')
     }
 }

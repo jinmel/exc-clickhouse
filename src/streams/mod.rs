@@ -1,7 +1,7 @@
 pub mod binance;
 
 use tokio_stream::wrappers::ReceiverStream;
-use crate::models::{NormalizedTrade, NormalizedQuote};
+use crate::models::{NormalizedTrade, NormalizedQuote, NormalizedEvent};
 use futures::stream::{Stream, StreamExt};
 use async_trait::async_trait;
 use tokio_tungstenite::connect_async;
@@ -34,7 +34,6 @@ impl<T: Send + 'static> ExchangeStream<T> {
         let (ws, _) = connect_async(url)
             .await
             .map_err(|e| ExchangeStreamError::StreamError(e.to_string()))?;
-        tracing::info!("Connected to {}", url);
 
         let (tx, rx) = tokio::sync::mpsc::channel(100);
         let handle = tokio::spawn(async move {
@@ -94,4 +93,11 @@ pub trait Exchange {
 
     async fn normalized_trades(&self) -> Result<Self::TradeStream, ExchangeStreamError>;
     async fn normalized_quotes(&self) -> Result<Self::QuoteStream, ExchangeStreamError>;
+}
+
+#[async_trait]
+pub trait CombinedStream {
+    type CombinedStream: Stream<Item = Result<NormalizedEvent, ExchangeStreamError>> + Send + Unpin + 'static;
+
+    async fn combined_stream(&self) -> Result<Self::CombinedStream, ExchangeStreamError>;
 }
