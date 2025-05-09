@@ -14,7 +14,6 @@ pub struct ClickHouseConfig {
     pub url:      String,
     pub port:     String,
     pub user:     String,
-    pub database: String,
     pub password: String,
 }
 
@@ -28,7 +27,6 @@ impl ClickHouseConfig {
             url:      Self::get_env_var("CLICKHOUSE_URL")?,
             port:     Self::get_env_var("CLICKHOUSE_PORT")?,
             user:     Self::get_env_var("CLICKHOUSE_USER")?,
-            database: Self::get_env_var("CLICKHOUSE_DATABASE")?,
             password: Self::get_env_var("CLICKHOUSE_PASS")?,
         })
     }
@@ -47,28 +45,27 @@ impl ClickHouseService {
         let client = Client::default()
             .with_url(config.url())
             .with_user(config.user)
-            .with_password(config.password)
-            .with_database(config.database);
+            .with_password(config.password);
         Self { client }
     }
 
     pub async fn write_block_metadata(&self, metadata: BlockMetadata) -> eyre::Result<()> {
-        let mut insert = self.client.insert("block_metadata")?;
+        let mut insert = self.client.insert("ethereum.blocks")?;
         insert.write(&metadata).await?;
         insert.end().await.wrap_err("failed to write block metadata")
     }
 
-    async fn write_batch(&self, events: Vec<NormalizedEvent>) -> eyre::Result<()> {
+    async fn write_events(&self, events: Vec<NormalizedEvent>) -> eyre::Result<()> {
         let mut trade_inserter = self
             .client
-            .inserter("normalized_trades")?
+            .inserter("cex.normalized_trades")?
             .with_max_rows(100)
             .with_period(Some(Duration::from_secs(1)))
             .with_period_bias(0.1);
 
         let mut quote_inserter = self
             .client
-            .inserter("normalized_quotes")?
+            .inserter("cex.normalized_quotes")?
             .with_max_rows(100)
             .with_period(Some(Duration::from_secs(1)))
             .with_period_bias(0.1);
@@ -105,7 +102,7 @@ impl tower::Service<Vec<NormalizedEvent>> for ClickHouseService {
         let svc = self.clone();
         Box::pin(async move {
             // if write_batch fails, this returns Err(eyre::Error)
-            svc.write_batch(batch).await
+            svc.write_events(batch).await
               .map_err(|e| eyre::eyre!("clickhouse write failed: {}", e))?;
             // on success:
             Ok(())

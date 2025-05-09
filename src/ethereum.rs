@@ -7,9 +7,10 @@ use crate::clickhouse::{ClickHouseConfig, ClickHouseService};
 
 #[derive(Debug, Clone, Row, Serialize, Deserialize)]
 pub struct BlockMetadata {
-  number: u64,
-  hash: B256,
-  timestamp: u64,
+  // TODO: add more block metadata if possible.
+  block_number: u64,
+  block_hash: B256,
+  block_timestamp: u64,
   valid: bool,
 }
 
@@ -20,9 +21,9 @@ pub async fn block_metadata_task(rpc_url: &str) -> eyre::Result<()> {
   let clickhouse = ClickHouseService::new(ClickHouseConfig::from_env()?);
   let mut metadata_stream = block_stream.map(|block| {
     BlockMetadata {
-      number: block.number,
-      hash: block.hash,
-      timestamp: block.timestamp,
+      block_number: block.number,
+      block_hash: block.hash,
+      block_timestamp: block.timestamp,
       valid: true,
     }
   });

@@ -61,7 +61,7 @@ async fn main() -> eyre::Result<()> {
     tracing::info!("Spawning binance stream for symbols: {:?}", symbols);
     set.spawn(binance_stream_task(evt_tx.clone(), symbols));
     set.spawn(clickhouse_cex_writer_task(evt_rx));
-    set.spawn(ethereum::block_metadata_task("wss://40.160.26.179:8547"));
+    set.spawn(ethereum::block_metadata_task("ws://40.160.26.179:8548"));
 
     tokio::select! {
         _ = async {
