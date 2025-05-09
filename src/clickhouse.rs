@@ -8,6 +8,10 @@ use clickhouse::Client;
 use futures::Future;
 use eyre::WrapErr;
 use crate::{ethereum::BlockMetadata, models::NormalizedEvent};
+use crate::models::NormalizedQuote;
+use crate::models::NormalizedTrade;
+use serde::{Serialize, Deserialize};
+use clickhouse::Row;
 
 #[derive(Debug, Clone)]
 pub struct ClickHouseConfig {
@@ -38,6 +42,60 @@ impl ClickHouseConfig {
 #[derive(Clone)]
 pub struct ClickHouseService {
     client: Client,
+}
+
+#[derive(Debug, Clone, Row, Serialize, Deserialize)]
+struct ClickhouseQuote {
+    pub exchange: String,
+    pub symbol: String,
+    pub timestamp: u64,
+    pub ask_amount: f64,
+    pub ask_price: f64,
+    pub bid_price: f64,
+    pub bid_amount: f64,
+}
+
+impl From<NormalizedQuote> for ClickhouseQuote {
+    fn from(quote: NormalizedQuote) -> Self {
+        let exchange = String::from_utf8(quote.exchange.to_vec()).unwrap();
+        let symbol = String::from_utf8(quote.symbol.to_vec()).unwrap();
+        Self {
+            exchange,
+            symbol,
+            timestamp: quote.timestamp,
+            ask_amount: quote.ask_amount,
+            ask_price: quote.ask_price,
+            bid_price: quote.bid_price,
+            bid_amount: quote.bid_amount,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Row, Serialize, Deserialize)]
+struct ClickhouseTrade {
+    pub exchange: String,
+    pub symbol: String,
+    pub timestamp: u64,
+    pub side: String,
+    pub price: f64,
+    pub amount: f64,
+}
+
+impl From<NormalizedTrade> for ClickhouseTrade {
+    fn from(trade: NormalizedTrade) -> Self {
+        let exchange = String::from_utf8(trade.exchange.to_vec()).unwrap();
+        let symbol = String::from_utf8(trade.symbol.to_vec()).unwrap();
+        let side = String::from_utf8(trade.side.to_vec()).unwrap();
+
+        Self {
+            exchange,
+            symbol,
+            timestamp: trade.timestamp,
+            side,
+            price: trade.price,
+            amount: trade.amount,
+        }
+    }
 }
 
 impl ClickHouseService {
@@ -73,10 +131,12 @@ impl ClickHouseService {
         for event in events {
             match event {
                 NormalizedEvent::Trade(trade) => {
+                    let trade: ClickhouseTrade = trade.into();
                     trade_inserter.write(&trade)?;
                     trade_inserter.commit().await?;
                 }
                 NormalizedEvent::Quote(quote) => {
+                    let quote: ClickhouseQuote = quote.into();
                     quote_inserter.write(&quote)?;
                     quote_inserter.commit().await?;
                 }

@@ -10,8 +10,8 @@ pub enum NormalizedEvent {
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, Row)]
 #[serde(rename_all = "camelCase")]
 pub struct NormalizedTrade {
-    pub exchange: [u8; 16],
-    pub symbol: [u8; 16],
+    pub exchange: [u8; 20],
+    pub symbol: [u8; 20],
     pub timestamp: u64,
     pub side: [u8; 5],
     pub price: f64,
@@ -38,8 +38,8 @@ impl TradeSide {
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, Row)]
 #[serde(rename_all = "camelCase")]
 pub struct NormalizedQuote {
-    pub exchange: [u8; 16],
-    pub symbol: [u8; 16],
+    pub exchange: [u8; 20],
+    pub symbol: [u8; 20],
     pub timestamp: u64,
     pub ask_amount: f64,
     pub ask_price: f64,
@@ -56,10 +56,10 @@ impl NormalizedTrade {
         price: f64,
         amount: f64,
     ) -> Self {
-        let mut exchange_bytes = [0u8; 16];
-        let mut symbol_bytes = [0u8; 16];
-        exchange_bytes[..exchange.len().min(16)].copy_from_slice(exchange.as_bytes());
-        symbol_bytes[..symbol.len().min(16)].copy_from_slice(symbol.as_bytes());
+        let mut exchange_bytes = [0u8; 20];
+        let mut symbol_bytes = [0u8; 20];
+        exchange_bytes[..exchange.len().min(20)].copy_from_slice(exchange.as_bytes());
+        symbol_bytes[..symbol.len().min(20)].copy_from_slice(symbol.as_bytes());
         let mut side_bytes = [0u8; 5];
         side_bytes[..side.as_bytes().len()].copy_from_slice(side.as_bytes());
 
@@ -84,10 +84,10 @@ impl NormalizedQuote {
         bid_price: f64,
         bid_amount: f64,
     ) -> Self {
-        let mut exchange_bytes = [0u8; 16];
-        let mut symbol_bytes = [0u8; 16];
-        exchange_bytes[..exchange.len().min(16)].copy_from_slice(exchange.as_bytes());
-        symbol_bytes[..symbol.len().min(16)].copy_from_slice(symbol.as_bytes());
+        let mut exchange_bytes = [0u8; 20];
+        let mut symbol_bytes = [0u8; 20];
+        exchange_bytes[..exchange.len().min(20)].copy_from_slice(exchange.as_bytes());
+        symbol_bytes[..symbol.len().min(20)].copy_from_slice(symbol.as_bytes());
 
         Self {
             exchange: exchange_bytes,
