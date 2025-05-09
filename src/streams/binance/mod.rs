@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use url::Url;
 
 use crate::{
     models::NormalizedEvent,
@@ -6,7 +7,7 @@ use crate::{
 };
 
 /// Default WebSocket URL for Binance
-pub const DEFAULT_BINANCE_WS_URL: &str = "wss://stream.binance.com:9443/ws";
+pub const DEFAULT_BINANCE_WS_URL: &str = "wss://stream.binance.com:9443/stream";
 
 pub mod model;
 pub mod parser;
@@ -24,7 +25,7 @@ impl BinanceClient {
         BinanceBuilder::default()
     }
 
-    fn build_multi_stream_url(&self) -> String {
+    fn build_multi_stream_url(&self) -> Result<String, ExchangeStreamError> {
         let stream_name_part = self.symbols.iter().flat_map(|symbol| {
             let mut stream_names = vec![];
             if self.enable_quote {
@@ -38,7 +39,9 @@ impl BinanceClient {
             stream_names
         }).collect::<Vec<String>>().join("/");
 
-        format!("{}/{}", self.base_url, stream_name_part)
+        Url::parse_with_params(&self.base_url, &[("streams", &stream_name_part)])
+            .map_err(|e| ExchangeStreamError::ParseError(format!("Failed to parse URL: {e}")))
+            .map(|url| url.to_string())
     }
 }
 
@@ -47,7 +50,7 @@ impl CombinedStream for BinanceClient {
     type CombinedStream = ExchangeStream<NormalizedEvent>;
 
     async fn combined_stream(&self) -> Result<Self::CombinedStream, ExchangeStreamError> {
-        let url = self.build_multi_stream_url();
+        let url = self.build_multi_stream_url()?;
         ExchangeStream::new(&url, parser::parse_binance_combined).await
     }
 }
