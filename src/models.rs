@@ -7,7 +7,7 @@ pub enum NormalizedEvent {
     Quote(NormalizedQuote),
 }
 
-#[derive(Debug, Serialize, Deserialize, Copy, Clone, Row)]
+#[derive(Debug, Serialize, Deserialize, Copy, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct NormalizedTrade {
     pub exchange: [u8; 20],
@@ -35,7 +35,7 @@ impl TradeSide {
         }
     }
 }
-#[derive(Debug, Serialize, Deserialize, Copy, Clone, Row)]
+#[derive(Debug, Serialize, Deserialize, Copy, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct NormalizedQuote {
     pub exchange: [u8; 20],
