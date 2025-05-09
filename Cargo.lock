@@ -1524,6 +1524,7 @@ name = "exc-clickhouse"
 version = "0.1.0"
 dependencies = [
  "alloy",
+ "arrayvec",
  "async-trait",
  "clickhouse",
  "dotenv",

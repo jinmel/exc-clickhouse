@@ -4,33 +4,35 @@ use std::{
     time::Duration,
 };
 
-use clickhouse::Client;
-use futures::Future;
-use eyre::WrapErr;
-use crate::{ethereum::BlockMetadata, models::NormalizedEvent};
 use crate::models::NormalizedQuote;
 use crate::models::NormalizedTrade;
-use serde::{Serialize, Deserialize};
+use crate::{ethereum::BlockMetadata, models::NormalizedEvent};
+use clickhouse::Client;
 use clickhouse::Row;
+use eyre::WrapErr;
+use futures::Future;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
 pub struct ClickHouseConfig {
-    pub url:      String,
-    pub port:     String,
-    pub user:     String,
+    pub url: String,
+    pub port: String,
+    pub user: String,
     pub password: String,
 }
 
 impl ClickHouseConfig {
     fn get_env_var(key: &str) -> eyre::Result<String> {
-        std::env::var(key).wrap_err(format!("Clickhouse config: {key} environment variable is not set"))
+        std::env::var(key).wrap_err(format!(
+            "Clickhouse config: {key} environment variable is not set"
+        ))
     }
 
     pub fn from_env() -> eyre::Result<Self> {
         Ok(Self {
-            url:      Self::get_env_var("CLICKHOUSE_URL")?,
-            port:     Self::get_env_var("CLICKHOUSE_PORT")?,
-            user:     Self::get_env_var("CLICKHOUSE_USER")?,
+            url: Self::get_env_var("CLICKHOUSE_URL")?,
+            port: Self::get_env_var("CLICKHOUSE_PORT")?,
+            user: Self::get_env_var("CLICKHOUSE_USER")?,
             password: Self::get_env_var("CLICKHOUSE_PASS")?,
         })
     }
@@ -57,8 +59,24 @@ struct ClickhouseQuote {
 
 impl From<NormalizedQuote> for ClickhouseQuote {
     fn from(quote: NormalizedQuote) -> Self {
-        let exchange = String::from_utf8(quote.exchange.to_vec()).unwrap();
-        let symbol = String::from_utf8(quote.symbol.to_vec()).unwrap();
+        let exchange = String::from_utf8(
+            quote
+                .exchange
+                .iter()
+                .take_while(|&&b| b != 0)
+                .copied()
+                .collect(),
+        )
+        .unwrap();
+        let symbol = String::from_utf8(
+            quote
+                .symbol
+                .iter()
+                .take_while(|&&b| b != 0)
+                .copied()
+                .collect(),
+        )
+        .unwrap();
         Self {
             exchange,
             symbol,
@@ -110,7 +128,10 @@ impl ClickHouseService {
     pub async fn write_block_metadata(&self, metadata: BlockMetadata) -> eyre::Result<()> {
         let mut insert = self.client.insert("ethereum.blocks")?;
         insert.write(&metadata).await?;
-        insert.end().await.wrap_err("failed to write block metadata")
+        insert
+            .end()
+            .await
+            .wrap_err("failed to write block metadata")
     }
 
     async fn write_events(&self, events: Vec<NormalizedEvent>) -> eyre::Result<()> {
@@ -148,11 +169,10 @@ impl ClickHouseService {
     }
 }
 
-
 impl tower::Service<Vec<NormalizedEvent>> for ClickHouseService {
     type Response = ();
-    type Error    = eyre::Error;
-    type Future   = Pin<Box<dyn Future<Output = Result<(), Self::Error>> + Send>>;
+    type Error = eyre::Error;
+    type Future = Pin<Box<dyn Future<Output = Result<(), Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
@@ -162,8 +182,9 @@ impl tower::Service<Vec<NormalizedEvent>> for ClickHouseService {
         let svc = self.clone();
         Box::pin(async move {
             // if write_batch fails, this returns Err(eyre::Error)
-            svc.write_events(batch).await
-              .map_err(|e| eyre::eyre!("clickhouse write failed: {}", e))?;
+            svc.write_events(batch)
+                .await
+                .map_err(|e| eyre::eyre!("clickhouse write failed: {}", e))?;
             // on success:
             Ok(())
         })

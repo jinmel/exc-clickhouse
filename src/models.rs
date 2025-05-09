@@ -1,5 +1,25 @@
-use clickhouse::Row;
 use serde::{Deserialize, Serialize};
+use arrayvec::ArrayString;
+
+#[derive(Debug, Serialize, Deserialize, Copy, Clone)]
+pub enum ExchangeName {
+    #[serde(rename = "binance")]
+    Binance,
+    #[serde(rename = "bybit")]
+    Bybit,
+    #[serde(rename = "okx")]
+    Okx,
+    #[serde(rename = "coinbase")]
+    Coinbase,
+    #[serde(rename = "kraken")]
+    Kraken,
+}
+
+#[derive(Debug, Serialize, Deserialize, Copy, Clone)]
+pub enum TradeSide {
+    Buy, 
+    Sell
+}
 
 #[derive(Debug, Serialize, Deserialize, Copy, Clone)]
 pub enum NormalizedEvent {
@@ -10,21 +30,12 @@ pub enum NormalizedEvent {
 #[derive(Debug, Serialize, Deserialize, Copy, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct NormalizedTrade {
-    pub exchange: [u8; 20],
-    pub symbol: [u8; 20],
+    pub exchange: ExchangeName,
+    pub symbol: ArrayString<20>,
     pub timestamp: u64,
-    pub side: [u8; 5],
+    pub side: TradeSide,
     pub price: f64,
     pub amount: f64,
-}
-
-#[derive(Debug, Serialize, Deserialize, Copy, Clone)]
-#[serde(rename_all = "camelCase")]
-pub enum TradeSide {
-    #[serde(rename = "buy")]
-    Buy,
-    #[serde(rename = "sell")]
-    Sell,
 }
 
 impl TradeSide {
