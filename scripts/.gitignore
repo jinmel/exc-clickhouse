@@ -1,1 +1,3 @@
 chain-config.yaml
+*.tsv
+*.json

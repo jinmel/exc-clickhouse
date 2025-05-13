@@ -40,12 +40,14 @@ def main(args):
     with open(args.chain_config, 'r') as f:
         chain_config = yaml.safe_load(f)
 
+    print(f"Loaded chain config from {args.chain_config}")
+
     address_symbols = []
     tokens = chain_config['tokens']
     native_token = tokens['native']
 
     address_symbols.append(TokenInfo(
-        symbol=native_token['symbol'],
+        symbol=native_token['symbol'].upper(),
         address=native_token['address'],
         unwrapped_symbol=''
     ))
@@ -53,22 +55,23 @@ def main(args):
     wrapped_natives = tokens['wrappedNatives']
     for wrapped_native in wrapped_natives:
         address_symbols.append(TokenInfo(
-            symbol=wrapped_native['symbol'],
+            symbol=wrapped_native['symbol'].upper(),
             address=wrapped_native['address'],
-            unwrapped_symbol=unwrap_symbol(native_token['symbol'])
+            unwrapped_symbol=unwrap_symbol(native_token['symbol']).upper()
         ))
 
     for token in tokens['others']:
         address_symbols.append(TokenInfo(
-            symbol=token['symbol'],
+            symbol=token['symbol'].upper(),
             address=token['address'],
-            unwrapped_symbol=unwrap_symbol(token['symbol'])
+            unwrapped_symbol=unwrap_symbol(token['symbol']).upper()
         ))
 
     with open(args.output_tsv, 'w') as f:
         f.write("symbol\taddress\tunwrapped_symbol\n")
         for address_symbol in address_symbols:
             f.write(f"{address_symbol.symbol}\t{address_symbol.address}\t{address_symbol.unwrapped_symbol}\n")
+        print(f"Address symbols written to {args.output_tsv}")
 
 
 if __name__ == "__main__":

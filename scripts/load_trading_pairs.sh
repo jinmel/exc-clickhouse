@@ -20,9 +20,10 @@ curl -sS "$BINANCE_API" -o exchangeInfo.json
 echo "⟳ Generating trading_pairs.tsv…"
 jq -r --arg ex "$BINANCE_EXCHANGE_NAME" '
   .symbols[]
-  | . as $orig                                      # save the full object
-  | $orig.permissionSets[0]                         # take its first permission-set array
-    | map(select(test("^TRD_") | not))[]           # filter out TRD_* and explode
+  | select(.status == "TRADING")            # only keep symbols that are actively trading
+  | . as $orig                              # save the full object
+  | $orig.permissionSets[0]                 # take its first permission-set array
+    | map(select(test("^TRD_") | not))[]   # filter out TRD_* flags and explode the array
   | [ $ex, ., $orig.symbol, $orig.baseAsset, $orig.quoteAsset ]
   | @tsv
 ' exchangeInfo.json > trading_pairs.tsv
@@ -38,7 +39,4 @@ clickhouse client \
   --query="INSERT INTO cex.trading_pairs (exchange, trading_type, pair, base_asset, quote_asset) FORMAT TabSeparated" \
   < trading_pairs.tsv
 
-rm trading_pairs.tsv exchangeInfo.json
-
 echo "✔ Done."
-
