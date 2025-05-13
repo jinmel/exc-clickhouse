@@ -6,7 +6,6 @@ CLICKHOUSE_HOST=${CLICKHOUSE_HOST:-localhost}
 CLICKHOUSE_PORT=${CLICKHOUSE_PORT:-9000}
 CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}
 CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-}
-CLICKHOUSE_DATABASE=${CLICKHOUSE_DATABASE:-default}
 
 BINANCE_EXCHANGE_NAME="binance"
 BINANCE_API="https://api.binance.com/api/v3/exchangeInfo"
@@ -35,7 +34,6 @@ clickhouse client \
   --port     "$CLICKHOUSE_PORT" \
   --user     "$CLICKHOUSE_USER" \
   ${CLICKHOUSE_PASSWORD:+--password="$CLICKHOUSE_PASSWORD"} \
-  --database "$CLICKHOUSE_DATABASE" \
   --query="INSERT INTO cex.trading_pairs (exchange, trading_type, pair, base_asset, quote_asset) FORMAT TabSeparated" \
   < trading_pairs.tsv
 
