@@ -7,10 +7,11 @@ use std::{
 use crate::models::NormalizedQuote;
 use crate::models::NormalizedTrade;
 use crate::{ethereum::BlockMetadata, models::NormalizedEvent};
-use clickhouse::Client;
 use clickhouse::Row;
+use clickhouse::{Client, inserter::Quantities};
 use eyre::WrapErr;
-use futures::Future;
+use futures::pin_mut;
+use futures::{Future, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
@@ -103,10 +104,22 @@ impl ClickHouseService {
         Self { client }
     }
 
-    pub async fn write_block_metadata(&self, metadata: BlockMetadata) -> eyre::Result<()> {
-        let mut insert = self.client.insert("ethereum.blocks")?;
-        insert.write(&metadata).await?;
-        insert
+    pub async fn write_block_metadata_stream(
+        &self,
+        stream: impl Stream<Item = BlockMetadata>,
+    ) -> eyre::Result<Quantities> {
+        let mut inserter = self
+            .client
+            .inserter("ethereum.blocks")?
+            .with_max_rows(100)
+            .with_period(Some(Duration::from_secs(1)))
+            .with_period_bias(0.1);
+        pin_mut!(stream);
+        while let Some(metadata) = stream.next().await {
+            inserter.write(&metadata)?;
+            inserter.commit().await?;
+        }
+        inserter
             .end()
             .await
             .wrap_err("failed to write block metadata")
@@ -127,7 +140,7 @@ impl ClickHouseService {
             .with_period(Some(Duration::from_secs(1)))
             .with_period_bias(0.1);
 
-        for event in events {
+        for event in events.into_iter() {
             match event {
                 NormalizedEvent::Trade(trade) => {
                     let trade: ClickhouseTrade = trade.into();

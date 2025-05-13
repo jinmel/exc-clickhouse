@@ -18,7 +18,7 @@ pub async fn block_metadata_task(rpc_url: String) -> eyre::Result<()> {
   let provider = ProviderBuilder::new().connect_ws(ws).await?;
   let block_stream = provider.subscribe_blocks().await?.into_stream();
   let clickhouse = ClickHouseService::new(ClickHouseConfig::from_env()?);
-  let mut metadata_stream = block_stream.map(|block| {
+  let metadata_stream = block_stream.map(|block| {
     BlockMetadata {
       block_number: block.number,
       block_hash: block.hash.to_string(),
@@ -27,12 +27,7 @@ pub async fn block_metadata_task(rpc_url: String) -> eyre::Result<()> {
       valid: true,
     }
   });
-
-  while let Some(block) = metadata_stream.next().await {
-    let res = clickhouse.write_block_metadata(block).await;
-    if let Err(e) = res {
-      tracing::error!("Error writing block metadata to ClickHouse: {:?}", e);
-    }
-  }
+  let count = clickhouse.write_block_metadata_stream(metadata_stream).await?;
+  tracing::info!("Wrote {} block metadata to clickhouse", count.rows);
   Ok(())
 } 

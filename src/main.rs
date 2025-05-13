@@ -3,7 +3,7 @@ use eyre::WrapErr;
 use futures::stream::StreamExt;
 use std::fs::File;
 use std::io::{self, BufRead};
-use tokio::sync::mpsc;
+use tokio::sync::mpsc::{self, unbounded_channel};
 use tokio_stream::wrappers::ReceiverStream;
 use tower::ServiceExt;
 use tracing_subscriber::FmtSubscriber;
@@ -52,20 +52,46 @@ async fn main() -> eyre::Result<()> {
     tracing::subscriber::set_global_default(subscriber)?;
 
     let (evt_tx, evt_rx) =
-        mpsc::channel::<Vec<Result<NormalizedEvent, ExchangeStreamError>>>(10000);
+        mpsc::channel::<Vec<Result<NormalizedEvent, ExchangeStreamError>>>(50000);
 
     let mut set = tokio::task::JoinSet::new();
 
     let symbols = read_symbols("symbols.txt")?;
 
     tracing::info!("Spawning binance stream for symbols: {:?}", symbols);
-    set.spawn(binance_stream_task(evt_tx.clone(), symbols));
-    set.spawn(clickhouse_cex_writer_task(evt_rx));
+    set.spawn(async move{
+        match binance_stream_task(evt_tx.clone(), symbols).await {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                tracing::error!("Binance stream task failed: {}", e);
+                Err(e)
+            }
+        }
+    });
 
     let rpc_url = std::env::var("RPC_URL").map_err(|_| {
         eyre::eyre!("RPC_URL environment variable is not set")
     })?;
-    set.spawn(ethereum::block_metadata_task(rpc_url));
+    tracing::info!("Spawning ethereum block metadata task from RPC URL: {}", rpc_url);
+    set.spawn(async {
+        match ethereum::block_metadata_task(rpc_url).await {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                tracing::error!("Ethereum block metadata task failed: {}", e);
+                Err(e)
+            }
+        }
+    });
+
+    set.spawn(async {
+        match clickhouse_cex_writer_task(evt_rx).await {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                tracing::error!("Clickhouse writer task failed: {}", e);
+                Err(e)
+            }
+        }
+    });
 
     tokio::select! {
         _ = async {
