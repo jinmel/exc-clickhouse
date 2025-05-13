@@ -9,25 +9,24 @@ CLICKHOUSE_USER=${CLICKHOUSE_USER:-default}
 CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-}
 CLICKHOUSE_DATABASE=${CLICKHOUSE_DATABASE:-default}
 
-# CSV file to import (default: address_symbols.csv)
-CSV_FILE=${1:-address_symbols.csv}
+# TSV file to import (default: address_symbols.TSV)
+TSV_FILE=${1:-address_symbols.tsv}
 
-if [[ ! -f "$CSV_FILE" ]]; then
-  echo "Error: CSV file not found: $CSV_FILE" >&2
+if [[ ! -f "$TSV_FILE" ]]; then
+  echo "Error: TSV file not found: $TSV_FILE" >&2
   exit 1
 fi
 
 # ── IMPORT ────────────────────────────────────────────────────────────────
-echo "⟳ Inserting data from '$CSV_FILE' into cex.address_symbols…"
+echo "⟳ Inserting data from '$TSV_FILE' into cex.address_symbols…"
 
-clickhouse-client \
+clickhouse client \
   --host     "$CLICKHOUSE_HOST" \
   --port     "$CLICKHOUSE_PORT" \
   --user     "$CLICKHOUSE_USER" \
   ${CLICKHOUSE_PASSWORD:+--password="$CLICKHOUSE_PASSWORD"} \
-  --database "$CLICKHOUSE_DATABASE" \
-  --query="INSERT INTO cex.address_symbols FORMAT CSVWithNames" \
-  < "$CSV_FILE"
+  --query="INSERT INTO cex.address_symbols FORMAT TSVWithNames" \
+  < "$TSV_FILE"
 
 echo "✔ Done."
 

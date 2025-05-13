@@ -29,7 +29,7 @@ jq -r --arg ex "$BINANCE_EXCHANGE_NAME" '
 
 # ── 3. BULK INSERT ─────────────────────────────────────────────────────────
 echo "⟳ Inserting $(wc -l < trading_pairs.tsv) rows into cex.trading_pairs…"
-clickhouse-client \
+clickhouse client \
   --host     "$CLICKHOUSE_HOST" \
   --port     "$CLICKHOUSE_PORT" \
   --user     "$CLICKHOUSE_USER" \
