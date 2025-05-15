@@ -16,13 +16,13 @@ curl -sS "$BINANCE_API" -o exchangeInfo.json
 
 # ── 2. PARSE & EXPLODE ────────────────────────────────────────────────────
 # Columns: exchange, trading_type, pair, base_asset, quote_asset
-echo "⟳ Generating trading_pairs.tsv…"
+echo "⟳ Generating spot trading_pairs.tsv…"
 jq -r --arg ex "$BINANCE_EXCHANGE_NAME" '
   .symbols[]
   | select(.status == "TRADING")            # only keep symbols that are actively trading
   | . as $orig                              # save the full object
   | $orig.permissionSets[0]                 # take its first permission-set array
-    | map(select(test("^TRD_") | not))[]   # filter out TRD_* flags and explode the array
+    | map(select(. == "SPOT"))[]            # keep only SPOT and explode the array
   | [ $ex, ., $orig.symbol, $orig.baseAsset, $orig.quoteAsset ]
   | @tsv
 ' exchangeInfo.json > trading_pairs.tsv
