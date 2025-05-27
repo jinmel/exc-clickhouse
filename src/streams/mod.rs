@@ -1,11 +1,15 @@
 pub mod binance;
+pub mod upbit;
 
 use tokio_stream::wrappers::ReceiverStream;
 use crate::models::{NormalizedTrade, NormalizedQuote, NormalizedEvent};
 use futures::stream::{Stream, StreamExt};
 use async_trait::async_trait;
-use tokio_tungstenite::connect_async;
+use tokio_tungstenite::{connect_async, WebSocketStream, MaybeTlsStream};
 use tokio_tungstenite::tungstenite::Message;
+use tokio::net::TcpStream;
+use std::future::Future;
+use std::pin::Pin;
 
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
@@ -16,7 +20,11 @@ pub enum ExchangeStreamError {
     StreamNotConnected(String),
     #[error("Parse error: {0}")]
     ParseError(String),
+    #[error("Invalid configuration: {0}")]
+    InvalidConfiguration(String),
 }
+
+type WsPostConnectFn = Box<dyn FnOnce(WebSocketStream<MaybeTlsStream<TcpStream>>) -> Pin<Box<dyn Future<Output = Result<WebSocketStream<MaybeTlsStream<TcpStream>>, ExchangeStreamError>> + Send>> + Send>;
 
 pub struct ExchangeStream<T: Send + 'static> {
     inner: ReceiverStream<Result<T, ExchangeStreamError>>,
@@ -27,13 +35,19 @@ impl<T: Send + 'static> ExchangeStream<T> {
     pub async fn new<F>(
         url: &str,
         parser: F,
+        post_connect: Option<WsPostConnectFn>,
     ) -> Result<Self, ExchangeStreamError>
     where
-        F: Fn(&str) -> Result<T, ExchangeStreamError> + Send + Sync + 'static,
+        F: Fn(&str) -> Result<T, ExchangeStreamError> + Send + Sync + 'static
     {
-        let (ws, _) = connect_async(url)
+        let (mut ws, _) = connect_async(url)
             .await
             .map_err(|e| ExchangeStreamError::StreamError(e.to_string()))?;
+
+        // Execute post-connect closure if provided
+        if let Some(connect_fn) = post_connect {
+            ws = connect_fn(ws).await?;
+        }
 
         let (tx, rx) = tokio::sync::mpsc::channel(100);
         let handle = tokio::spawn(async move {

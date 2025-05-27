@@ -1,10 +1,14 @@
 use async_trait::async_trait;
 use url::Url;
+use tokio_tungstenite::{WebSocketStream, MaybeTlsStream};
+use tokio::net::TcpStream;
 
 use crate::{
     models::NormalizedEvent,
     streams::{CombinedStream, ExchangeStream, ExchangeStreamError},
 };
+
+type WsPostConnectFn = fn(WebSocketStream<MaybeTlsStream<TcpStream>>) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>, ExchangeStreamError>;
 
 /// Default WebSocket URL for Binance
 pub const DEFAULT_BINANCE_WS_URL: &str = "wss://stream.binance.com:9443/stream";
@@ -51,7 +55,7 @@ impl CombinedStream for BinanceClient {
 
     async fn combined_stream(&self) -> Result<Self::CombinedStream, ExchangeStreamError> {
         let url = self.build_multi_stream_url()?;
-        ExchangeStream::new(&url, parser::parse_binance_combined).await
+        ExchangeStream::new(&url, parser::parse_binance_combined, None).await
     }
 }
 
@@ -75,19 +79,8 @@ impl Default for BinanceClientBuilder {
 }
 
 impl BinanceClientBuilder {
-    pub fn add_symbol(mut self, symbol: impl Into<String>) -> Self {
-        self.symbols.push(symbol.into());
-        self
-    }
-
     pub fn add_symbols(mut self, symbols: Vec<impl Into<String>>) -> Self {
         self.symbols.extend(symbols.into_iter().map(|s| s.into().to_lowercase()));
-        self
-    }
-
-    /// Set the base URL
-    pub fn with_base_url(mut self, url: impl Into<String>) -> Self {
-        self.base_url = url.into();
         self
     }
 

@@ -13,6 +13,8 @@ pub enum ExchangeName {
     Coinbase,
     #[serde(rename = "kraken")]
     Kraken,
+    #[serde(rename = "upbit")]
+    Upbit,
 }
 
 impl ToString for ExchangeName {
@@ -23,6 +25,7 @@ impl ToString for ExchangeName {
             ExchangeName::Okx => "okx".to_string(),
             ExchangeName::Coinbase => "coinbase".to_string(),
             ExchangeName::Kraken => "kraken".to_string(),
+            ExchangeName::Upbit => "upbit".to_string(),
         }
     }
 }
