@@ -11,7 +11,7 @@ use tokio::net::TcpStream;
 use std::future::Future;
 use std::pin::Pin;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, Clone)]
 #[non_exhaustive]
 pub enum ExchangeStreamError {
     #[error("Stream error: {0}")]
