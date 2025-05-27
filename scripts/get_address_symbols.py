@@ -1,6 +1,7 @@
 import argparse
 import csv
 import dataclasses
+import collections
 from datetime import datetime
 from typing import Optional, List, Dict
 import re
@@ -60,10 +61,57 @@ class PoolRecord:
             liquidity_pool_factory_address=row['liquidity_pool_factory_address'],
         )
 
+    def validate(self) -> bool:
+
+        if self.token0_address == 'null' or self.token1_address == 'null':
+            # print(f"Invalid token addresses: {self.token0_address}, {self.token1_address}")
+            return False
+
+        if self.token0_symbol == 'null' or self.token1_symbol == 'null':
+            # print(f"Invalid token symbols: {self.token0_symbol}, {self.token1_symbol}")
+            return False
+
+        if self.token0_address == 'null' and self.token1_address == 'null':
+            # print(f"Both token addresses are null: {self.token0_address}, {self.token1_address}")
+            return False
+
+        if check_address(self.token0_address) is False:
+            print(f"Invalid token0 address: {self.token0_address}")
+            return False
+
+        if check_address(self.token1_address) is False:
+            print(f"Invalid token1 address: {self.token1_address}")
+            return False
+
+        return True
+
 
 def nul_stripper(f):
     for line in f:
-        yield line.replace('\0', '')
+        yield line.replace('\0', '').replace('\r', '')
+
+
+def check_address(addr):
+    if len(addr) != 42:
+        raise ValueError(f"Invalid address length: {addr}")
+    clean = addr[2:] if addr.lower().startswith("0x") else addr
+    try:
+        bytes.fromhex(clean)          # or: binascii.unhexlify(clean)
+    except ValueError:
+        return False
+    else:
+        return True
+
+
+_ASCII_RE = re.compile(r"^[A-za-z0-9\.\-\,\$ ]+$")
+
+
+def is_ascii(s: str) -> bool:
+    try:
+        s.encode('ascii')
+    except UnicodeEncodeError:
+        return False
+    return bool(_ASCII_RE.fullmatch(s))
 
 
 def read_pool_records(csv_path: str) -> List[PoolRecord]:
@@ -72,7 +120,8 @@ def read_pool_records(csv_path: str) -> List[PoolRecord]:
         reader = csv.DictReader(nul_stripper(f))
         for row in reader:
             record = PoolRecord.from_dict(row)
-            records.append(record)
+            if record.validate():
+                records.append(record)
     return records
 
 
@@ -118,9 +167,10 @@ def parse_args():
 _strip_w_leading = re.compile(r'^([^A-Za-z]*)([wW])')
 
 
-def get_token_info(records: List[PoolRecord]) -> Dict[str, TokenInfo]:
+def get_token_info(records: List[PoolRecord], min_count=10) -> Dict[str, TokenInfo]:
     # address to token_info mapping
     token_infos: Dict[str, TokenInfo] = {}
+    addr_to_count = collections.defaultdict(int)
 
     for record in records:
         for addr, name, sym in [
@@ -130,26 +180,46 @@ def get_token_info(records: List[PoolRecord]) -> Dict[str, TokenInfo]:
             if addr == 'null' or name == 'null' or sym == 'null':
                 continue
 
-            if addr in token_infos.keys():
+            # Skip names with non-ascii characters
+            if not (is_ascii(name) and is_ascii(sym)):
                 continue
+
+            addr_to_count[addr] += 1
 
             is_wrapped = name.lower().startswith('wrapped')
             unwrapped_symbol = None
             if is_wrapped:
                 unwrapped_symbol= _strip_w_leading.sub(r'\1', sym)
-                print(sym, "unwrapped symbol", unwrapped_symbol)
+
+            if addr in token_infos.keys():
+                continue
+
             token_infos[addr] = TokenInfo(
                 address=addr,
                 name=name,
                 symbol=sym,
                 unwrapped_symbol=unwrapped_symbol
             )
-    return token_infos
+
+    filtered = {}
+    for addr, info in token_infos.items():
+        # Check if the token appears more than once
+        if addr_to_count[addr] > min_count:
+            filtered[addr] = info
+    return filtered
 
 
-def get_pools(records: List[PoolRecord]) -> List[PoolRecord]:
+def get_pools(records: List[PoolRecord], token_infos: List[TokenInfo]) -> List[PoolRecord]:
+    token_addresses = set()
+
+    for info in token_infos:
+        token_addresses.add(info.address)
+
     pools: List[PoolRecord] = []
     for record in records:
+        if record.token0_address not in token_addresses or record.token1_address not in token_addresses:
+            continue
+
         protocol = record.protocol
         parts = protocol.split('_')
 
@@ -158,9 +228,22 @@ def get_pools(records: List[PoolRecord]) -> List[PoolRecord]:
             protocol_subtype = ''
         else:
             protocol = parts[0]
-            protocol_subtype = '-'.join(parts[1:])
+            protocol_subtype = parts[1]
 
+        if protocol == 'uniswap':
+            protocol = 'Uniswap'
+        elif protocol == 'sushiswap':
+            protocol = 'SushiSwap'
+        elif protocol == 'balancer':
+            protocol = 'Balancer'
+        elif protocol == 'curve':
+            protocol = 'Curve'
+        elif protocol == 'camelot':
+            protocol = 'Camelot'
+        elif protocol == 'pancakeswap':
+            protocol = 'PancakeSwap'
 
+        protocol_subtype = protocol_subtype.upper()
         pool = PoolInfo(
             protocol=protocol,
             protocol_subtype=protocol_subtype,
@@ -173,18 +256,18 @@ def get_pools(records: List[PoolRecord]) -> List[PoolRecord]:
 
 def main(args):
     records = read_pool_records(args.input_csv)
-    token_infos = get_token_info(records)
+    token_infos = get_token_info(records, min_count=100)
     with open(args.address_symbols_tsv, 'w') as f:
-        writer = csv.writer(f, delimiter='\t')
+        writer = csv.writer(f, delimiter='\t', lineterminator='\n')
         writer.writerow(['address', 'symbol', 'unwrapped_symbol'])
         for token_info in token_infos.values():
             writer.writerow([token_info.address, token_info.symbol, token_info.unwrapped_symbol])
 
     print(f"Token info {len(token_infos.values())} written to {args.address_symbols_tsv}")
 
-    pools = get_pools(records)
-    with open(args.pools_tsv, 'w') as f:
-        writer = csv.writer(f, delimiter='\t')
+    pools = get_pools(records, token_infos.values())
+    with open(args.pools_tsv, 'w', newline='') as f:
+        writer = csv.writer(f, delimiter='\t', lineterminator='\n')
         writer.writerow(['protocol', 'protocol_subtype', 'address', 'tokens'])
         for pool in pools:
             writer.writerow([pool.protocol, pool.protocol_subtype, pool.address, pool.tokens])
