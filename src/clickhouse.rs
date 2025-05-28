@@ -8,7 +8,10 @@ use crate::models::NormalizedQuote;
 use crate::models::NormalizedTrade;
 use crate::{ethereum::BlockMetadata, models::NormalizedEvent};
 use clickhouse::Row;
-use clickhouse::{Client, inserter::Quantities};
+use clickhouse::inserter::Quantities;
+
+// Re-export the external clickhouse Client for use in other modules
+pub use clickhouse::Client;
 use eyre::WrapErr;
 use futures::pin_mut;
 use futures::{Future, Stream, StreamExt};
@@ -44,7 +47,7 @@ impl ClickHouseConfig {
 }
 #[derive(Clone)]
 pub struct ClickHouseService {
-    client: Client,
+    client: clickhouse::Client,
 }
 
 #[derive(Debug, Clone, Row, Serialize, Deserialize)]
@@ -82,6 +85,17 @@ struct ClickhouseTrade {
     pub amount: f64,
 }
 
+#[derive(Debug, Clone, Row, Serialize, Deserialize)]
+pub struct ArbitrageData {
+    pub timestamp: u64,
+    pub binance_ask: f64,
+    pub binance_bid: f64,
+    pub upbit_ask: f64,
+    pub upbit_bid: f64,
+    pub upbit_usdt_ask: f64,
+    pub upbit_usdt_bid: f64,
+}
+
 impl From<NormalizedTrade> for ClickhouseTrade {
     fn from(trade: NormalizedTrade) -> Self {
         Self {
@@ -97,7 +111,7 @@ impl From<NormalizedTrade> for ClickhouseTrade {
 
 impl ClickHouseService {
     pub fn new(config: ClickHouseConfig) -> Self {
-        let client = Client::default()
+        let client = clickhouse::Client::default()
             .with_url(config.url())
             .with_user(config.user)
             .with_password(config.password);

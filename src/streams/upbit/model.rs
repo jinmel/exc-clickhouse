@@ -239,8 +239,8 @@ impl TryInto<NormalizedQuote> for TradeEvent {
       timestamp,
       ask_amount,
       ask_price,
-      bid_amount,
       bid_price,
+      bid_amount,
     ))
   }
 }

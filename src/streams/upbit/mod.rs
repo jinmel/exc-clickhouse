@@ -49,6 +49,7 @@ impl UpbitClient {
             {
               "type": stream_type,
               "codes": self.symbols,
+              "is_only_realtime": true,              
             },
             {
               "format": "SIMPLE"
@@ -68,27 +69,13 @@ impl ExchangeClient for UpbitClient {
                 "Trade streams not enabled".to_string(),
             ));
         }
-
         let subscribe_msg = self.build_subscription_message("ticker")?;
-
+        let init_msg = serde_json::to_string(&subscribe_msg).unwrap();
         ExchangeStream::new(
             &self.base_url,
             parser::parse_upbit_trade,
-            Some(Box::new(move |mut ws| {
-                Box::pin(async move {
-                    let res = ws
-                        .send(Message::Text(
-                            serde_json::to_string(&subscribe_msg).unwrap().into(),
-                        ))
-                        .await;
-                    if let Err(e) = res {
-                        return Err(ExchangeStreamError::StreamError(e.to_string()));
-                    }
-                    Ok(ws)
-                })
-            })),
-        )
-        .await
+            Some(init_msg),
+        ).await
     }
 
     async fn normalized_quotes(&self) -> Result<Self::QuoteStream, ExchangeStreamError> {
@@ -99,23 +86,12 @@ impl ExchangeClient for UpbitClient {
         }
 
         let subscribe_msg = self.build_subscription_message("trade")?;
+        let init_msg = serde_json::to_string(&subscribe_msg).unwrap();
 
         ExchangeStream::new(
             &self.base_url,
             parser::parse_upbit_quote,
-            Some(Box::new(move |mut ws| {
-                Box::pin(async move {
-                    let res = ws
-                        .send(Message::Text(
-                            serde_json::to_string(&subscribe_msg).unwrap().into(),
-                        ))
-                        .await;
-                    if let Err(e) = res {
-                        return Err(ExchangeStreamError::StreamError(e.to_string()));
-                    }
-                    Ok(ws)
-                })
-            })),
+            Some(init_msg),
         )
         .await
     }
