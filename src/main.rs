@@ -279,7 +279,7 @@ async fn arbitrage_task(
                             upbit_bid_price = quote.bid_price;
                             tracing::debug!("Received upbit quote: {:?}", quote);
                         }
-                        let timestamp = quote.timestamp;
+                        let timestamp = quote.timestamp / 1000;
                         if let (Some(upbit_usdt_ask_price), Some(upbit_usdt_bid_price)) =
                             (upbit_usdt_ask_price, upbit_usdt_bid_price)
                         {
