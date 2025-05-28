@@ -291,8 +291,8 @@ async fn arbitrage_task(
                                 timestamp,
                                 binance_ask: binance_ask_price,
                                 binance_bid: binance_bid_price,
-                                upbit_ask: upbit_ask_price_usd,
-                                upbit_bid: upbit_bid_price_usd,
+                                upbit_ask: upbit_ask_price,
+                                upbit_bid: upbit_bid_price,
                                 upbit_usdt_ask: upbit_usdt_ask_price,
                                 upbit_usdt_bid: upbit_usdt_bid_price,
                             };
@@ -306,8 +306,8 @@ async fn arbitrage_task(
                                 ?timestamp,
                                 ?binance_ask_price,
                                 ?binance_bid_price,
-                                upbit_ask_price_usd = ?upbit_ask_price_usd,
-                                upbit_bid_price_usd = ?upbit_bid_price_usd,
+                                ?upbit_ask_price_usd,
+                                ?upbit_bid_price_usd,
                                 ?upbit_usdt_ask_price,
                                 ?upbit_usdt_bid_price,
                             );
