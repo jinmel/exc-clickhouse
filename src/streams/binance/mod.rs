@@ -1,14 +1,10 @@
 use async_trait::async_trait;
 use url::Url;
-use tokio_tungstenite::{WebSocketStream, MaybeTlsStream};
-use tokio::net::TcpStream;
 
 use crate::{
     models::NormalizedEvent,
     streams::{CombinedStream, ExchangeStream, ExchangeStreamError},
 };
-
-type WsPostConnectFn = fn(WebSocketStream<MaybeTlsStream<TcpStream>>) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>, ExchangeStreamError>;
 
 /// Default WebSocket URL for Binance
 pub const DEFAULT_BINANCE_WS_URL: &str = "wss://stream.binance.com:9443/stream";
