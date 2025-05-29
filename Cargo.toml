@@ -9,18 +9,24 @@ description = "Exchange data collector to clickhouse db"
 alloy = { version = "0.15.10", features = ["full"] }
 arrayvec = "0.7.6"
 async-trait = "0.1.88"
+aws-config = "1.5.8"
+aws-credential-types = "1.2.3"
+aws-sdk-s3 = "1.63.0"
 clickhouse = { version = "0.13.2", features = ["inserter"] }
+csv = "1.3.1"
 dotenv = "0.15.0"
 eyre = "0.6.12"
+flate2 = "1.0.35"
 futures = "0.3.31"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
+tempfile = "3.14.0"
 thiserror = "2.0.12"
 tokio = { version = "1.45.0", features = ["full", "tracing"] }
 tokio-stream = "0.1.17"
 tokio-tungstenite = { version = "0.26.2", features = ["native-tls"] }
-tower = { version = "0.5.2", features = ["util"] }
+tower = { version = "0.5.2", features = ["util", "limit", "timeout"] }
 tracing = "0.1.41"
-tracing-subscriber = "0.3.19"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 url = "2.5.4"
 uuid = { version = "1.4", features = ["v4"] }

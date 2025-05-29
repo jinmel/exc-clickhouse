@@ -1,11 +1,6 @@
 use async_trait::async_trait;
 use futures::SinkExt;
-use futures::stream::Stream;
-use std::sync::Arc;
-use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::Message;
-use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
-use url::Url;
 use uuid::Uuid;
 
 use crate::{

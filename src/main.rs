@@ -3,10 +3,10 @@ use eyre::WrapErr;
 use futures::stream::StreamExt;
 use std::fs::File;
 use std::io::{self, BufRead};
-use tokio::sync::mpsc::{self, unbounded_channel};
+use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tower::ServiceExt;
-use tracing_subscriber::FmtSubscriber;
+use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 use crate::{
     clickhouse::{ClickHouseConfig, ClickHouseService},
@@ -18,6 +18,7 @@ mod clickhouse;
 mod models;
 mod streams;
 mod ethereum;
+mod timeboost;
 
 const BATCH_SIZE: usize = 500;
 
@@ -45,9 +46,12 @@ async fn main() -> eyre::Result<()> {
     // Load environment variables from .env file
     dotenv().ok();
 
-    // Initialize tracing
+    // Initialize tracing with environment filter
     let subscriber = FmtSubscriber::builder()
-        .with_max_level(tracing::Level::INFO)
+        .with_env_filter(
+            EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| EnvFilter::new("info"))
+        )
         .finish();
     tracing::subscriber::set_global_default(subscriber)?;
 
@@ -88,6 +92,17 @@ async fn main() -> eyre::Result<()> {
             Ok(()) => Ok(()),
             Err(e) => {
                 tracing::error!("Clickhouse writer task failed: {}", e);
+                Err(e)
+            }
+        }
+    });
+
+    tracing::info!("Spawning timeboost bids task");
+    set.spawn(async {
+        match timeboost::bids::insert_timeboost_bids_task().await {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                tracing::error!("Timeboost bids task failed: {}", e);
                 Err(e)
             }
         }
