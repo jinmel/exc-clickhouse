@@ -3,7 +3,7 @@ use eyre::WrapErr;
 use futures::stream::StreamExt;
 use std::fs::File;
 use std::io::{self, BufRead};
-use tokio::sync::mpsc::{self, unbounded_channel};
+use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tower::ServiceExt;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};

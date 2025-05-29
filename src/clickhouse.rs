@@ -128,8 +128,8 @@ impl ClickHouseService {
 
     pub async fn get_latest_bid(&self) -> Option<BidData> {
         let query = self.client.query("SELECT * FROM timeboost.bids ORDER BY round DESC LIMIT 1");
-        let row= query.fetch_one::<BidData>().await.ok();
-        row
+        
+        query.fetch_one::<BidData>().await.ok()
     }
 
     pub async fn write_bids(&self, bids: Vec<BidData>) -> eyre::Result<Quantities> {
