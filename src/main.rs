@@ -87,6 +87,7 @@ async fn main() -> eyre::Result<()> {
         }
     });
 
+    tracing::info!("Spawning clickhouse writer task");
     set.spawn(async {
         match clickhouse_cex_writer_task(evt_rx).await {
             Ok(()) => Ok(()),
