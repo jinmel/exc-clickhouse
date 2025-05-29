@@ -18,6 +18,7 @@ mod clickhouse;
 mod models;
 mod streams;
 mod ethereum;
+mod timeboost;
 
 const BATCH_SIZE: usize = 500;
 
@@ -88,6 +89,17 @@ async fn main() -> eyre::Result<()> {
             Ok(()) => Ok(()),
             Err(e) => {
                 tracing::error!("Clickhouse writer task failed: {}", e);
+                Err(e)
+            }
+        }
+    });
+
+    tracing::info!("Spawning timeboost bids task");
+    set.spawn(async {
+        match timeboost::bids::insert_timeboost_bids_task().await {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                tracing::error!("Timeboost bids task failed: {}", e);
                 Err(e)
             }
         }

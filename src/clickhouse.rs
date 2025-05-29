@@ -13,6 +13,7 @@ use eyre::WrapErr;
 use futures::pin_mut;
 use futures::{Future, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
+use crate::timeboost::bids::BidData;
 
 #[derive(Debug, Clone)]
 pub struct ClickHouseConfig {
@@ -123,6 +124,27 @@ impl ClickHouseService {
             .end()
             .await
             .wrap_err("failed to write block metadata")
+    }
+
+    pub async fn get_latest_bid(&self) -> Option<BidData> {
+        let query = self.client.query("SELECT * FROM timeboost.bids ORDER BY round DESC LIMIT 1");
+        let row= query.fetch_one::<BidData>().await.ok();
+        row
+    }
+
+    pub async fn write_bids(&self, bids: Vec<BidData>) -> eyre::Result<Quantities> {
+        let mut inserter = self
+            .client
+            .inserter("timeboost.bids")?
+            .with_max_rows(100)
+            .with_period(Some(Duration::from_secs(1)))
+            .with_period_bias(0.1);
+
+        for bid in bids {
+            inserter.write(&bid)?;
+        }
+
+        inserter.end().await.wrap_err("failed to write bids")
     }
 
     async fn write_events(&self, events: Vec<NormalizedEvent>) -> eyre::Result<()> {
