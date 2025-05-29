@@ -6,7 +6,7 @@ use std::io::{self, BufRead};
 use tokio::sync::mpsc::{self, unbounded_channel};
 use tokio_stream::wrappers::ReceiverStream;
 use tower::ServiceExt;
-use tracing_subscriber::FmtSubscriber;
+use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 use crate::{
     clickhouse::{ClickHouseConfig, ClickHouseService},
@@ -46,9 +46,12 @@ async fn main() -> eyre::Result<()> {
     // Load environment variables from .env file
     dotenv().ok();
 
-    // Initialize tracing
+    // Initialize tracing with environment filter
     let subscriber = FmtSubscriber::builder()
-        .with_max_level(tracing::Level::INFO)
+        .with_env_filter(
+            EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| EnvFilter::new("info"))
+        )
         .finish();
     tracing::subscriber::set_global_default(subscriber)?;
 

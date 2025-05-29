@@ -27,19 +27,19 @@ pub struct S3ObjectInfo {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Row)]
 pub struct BidData {
-    #[serde(rename = "ChainID")]
+    #[serde(alias = "ChainID")]
     pub chain_id: u64,
-    #[serde(rename = "Bidder")]
+    #[serde(alias = "Bidder")]
     pub bidder: String,
-    #[serde(rename = "ExpressLaneController")]
+    #[serde(alias = "ExpressLaneController")]
     pub express_lane_controller: String,
-    #[serde(rename = "AuctionContractAddress")]
+    #[serde(alias = "AuctionContractAddress")]
     pub auction_contract_address: String,
-    #[serde(rename = "Round")]
+    #[serde(alias = "Round")]
     pub round: u64,
-    #[serde(rename = "Amount")]
+    #[serde(alias = "Amount")]
     pub amount: String, // Keep as String to handle large numbers
-    #[serde(rename = "Signature")]
+    #[serde(alias = "Signature")]
     pub signature: String,
 }
 
@@ -52,18 +52,22 @@ pub async fn insert_timeboost_bids_task() -> eyre::Result<()> {
 
     let clickhouse = ClickHouseService::new(ClickHouseConfig::from_env()?);
     loop {
+        tracing::trace!("Waiting for service to be ready");
         svc.ready()
             .await
             .map_err(|e| eyre::eyre!("Service not ready: {}", e))?;
+        tracing::trace!("Service is ready");
         let mut bids = svc
             .call(())
             .await
             .map_err(|e| eyre::eyre!("Service call failed: {}", e))?;
-        bids.sort_by(|a, b| a.round.cmp(&b.round));
+        tracing::debug!("Got {} bids from s3", bids.len());
         if bids.is_empty() {
             tracing::warn!("No bids found from s3");
             continue;
         }
+
+        bids.sort_by(|a, b| a.round.cmp(&b.round));
 
         let last_bid = bids.last().unwrap();
         let last_bid_db = clickhouse.get_latest_bid().await;
@@ -75,13 +79,13 @@ pub async fn insert_timeboost_bids_task() -> eyre::Result<()> {
         }
 
         let count = clickhouse.write_bids(bids).await?;
-        tracing::info!(?count.rows, "Wrote bids to clickhouse");
+        tracing::debug!(?count.rows, "Written bids to clickhouse");
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct HistoricalBidsService {
-    client: BidClient,
+    client: S3Client,
 }
 
 impl HistoricalBidsService {
@@ -89,7 +93,7 @@ impl HistoricalBidsService {
     pub const PREFIX: &str = "uw2/validated-timeboost-bids/";
 
     pub async fn new() -> eyre::Result<Self> {
-        let client = BidClient::new(Self::BUCKET_NAME, Self::PREFIX).await?;
+        let client = S3Client::new(Self::BUCKET_NAME, Self::PREFIX).await?;
         Ok(Self { client })
     }
 
@@ -118,13 +122,13 @@ impl Service<()> for HistoricalBidsService {
 
 /// Client for accessing historical bids from S3 location provided by offchain labs.
 #[derive(Debug, Clone)]
-pub struct BidClient {
+pub struct S3Client {
     client: Client,
     bucket_name: String,
     prefix: String,
 }
 
-impl BidClient {
+impl S3Client {
     pub async fn new(bucket_name: &str, prefix: &str) -> eyre::Result<Self> {
         // For public S3 buckets, we need to configure the client to not sign requests
         // This is equivalent to AWS CLI's --no-sign-request flag
@@ -245,7 +249,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_latest_bid_file() {
-        let client = BidClient::new(BUCKET_NAME, PREFIX).await.unwrap();
+        let client = S3Client::new(BUCKET_NAME, PREFIX).await.unwrap();
         let _ = client
             .get_latest_bid_file()
             .await
@@ -254,7 +258,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_read_file() {
-        let client = BidClient::new(BUCKET_NAME, PREFIX)
+        let client = S3Client::new(BUCKET_NAME, PREFIX)
             .await
             .expect("Failed to create S3 client");
 
@@ -275,7 +279,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_all_bid_files() {
-        let client = BidClient::new(BUCKET_NAME, PREFIX)
+        let client = S3Client::new(BUCKET_NAME, PREFIX)
             .await
             .expect("Failed to create S3 client");
 
