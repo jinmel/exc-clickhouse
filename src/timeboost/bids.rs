@@ -119,6 +119,7 @@ pub async fn insert_all_timeboost_bids() -> eyre::Result<()> {
     for (round, bids) in bids_by_round {
         let bids_by_round = clickhouse.get_bids_by_round(round).await?;
         if !bids_by_round.is_empty() {
+            tracing::info!(?round, "Bids already exist for round");
             continue;
         }
 
