@@ -6,6 +6,7 @@ use csv;
 use flate2::read::GzDecoder;
 use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::io::Read;
 use std::task::{Context, Poll};
 use tokio::time::Duration;
@@ -93,6 +94,34 @@ impl From<CsvBidData> for BidData {
     }
 }
 
+pub async fn insert_all_timeboost_bids() -> eyre::Result<()> {
+    let inner = HistoricalBidsService::new().await?;
+    let mut svc = tower::ServiceBuilder::new()
+        .service(inner);
+
+    let clickhouse = ClickHouseService::new(ClickHouseConfig::from_env()?);
+
+    svc.ready().await?;
+    let bids = svc.call(HistoricalBidsRequest::All).await?;
+    let bids_by_round: HashMap<u64, Vec<BidData>> = bids
+        .into_iter()
+        .fold(HashMap::new(), |mut acc, bid| {
+            acc.entry(bid.round)
+                .or_insert_with(Vec::new)
+                .push(bid);
+            acc
+        });
+
+    for (round, bids) in bids_by_round {
+        let bids_by_round = clickhouse.get_bids_by_round(round).await?;
+        if !bids_by_round.is_empty() {
+            continue;
+        }
+        clickhouse.write_express_lane_bids(bids).await?;
+    }
+    Ok(())
+}
+
 pub async fn insert_timeboost_bids_task() -> eyre::Result<()> {
     let inner = HistoricalBidsService::new().await?;
     let mut svc = tower::ServiceBuilder::new()
@@ -108,7 +137,7 @@ pub async fn insert_timeboost_bids_task() -> eyre::Result<()> {
             .map_err(|e| eyre::eyre!("Service not ready: {}", e))?;
         tracing::trace!("Service is ready");
         let mut bids = svc
-            .call(())
+            .call(HistoricalBidsRequest::Latest)
             .await
             .map_err(|e| eyre::eyre!("Service call failed: {}", e))?;
         tracing::debug!("Got {} bids from s3", bids.len());
@@ -120,7 +149,7 @@ pub async fn insert_timeboost_bids_task() -> eyre::Result<()> {
         bids.sort_by(|a, b| a.round.cmp(&b.round));
 
         let last_bid = bids.last().unwrap();
-        let last_bid_db = clickhouse.get_latest_bid().await;
+        let last_bid_db = clickhouse.get_latest_bid().await.ok();
         if let Some(last_bid_db) = last_bid_db {
             if last_bid_db.round == last_bid.round {
                 tracing::debug!(?last_bid_db.round, ?last_bid.round, "No new round found");
@@ -147,15 +176,31 @@ impl HistoricalBidsService {
         Ok(Self { client })
     }
 
-    pub async fn request(&self) -> eyre::Result<Vec<BidData>> {
+    pub async fn get_latest_bids(&self) -> eyre::Result<Vec<BidData>> {
         let latest_file = self.client.get_latest_bid_file().await?;
         let bids = self.client.read_file(&latest_file).await?;
         Ok(bids)
     }
+
+    pub async fn get_all_bids(&self) -> eyre::Result<Vec<BidData>> {
+        let files = self.client.get_all_bid_files().await?;
+        let mut bids = Vec::new();
+        for file in files {
+            tracing::debug!(?file.key, "Reading file from S3 bucket");
+            let file_bids = self.client.read_file(&file).await?;
+            bids.extend(file_bids);
+        }
+        Ok(bids)
+    }
+}
+
+pub enum HistoricalBidsRequest {
+    All,
+    Latest,
 }
 
 #[async_trait::async_trait]
-impl Service<()> for HistoricalBidsService {
+impl Service<HistoricalBidsRequest> for HistoricalBidsService {
     type Response = Vec<BidData>;
     type Error = eyre::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
@@ -164,9 +209,14 @@ impl Service<()> for HistoricalBidsService {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, _req: ()) -> Self::Future {
+    fn call(&mut self, req: HistoricalBidsRequest) -> Self::Future {
         let this = self.clone();
-        Box::pin(async move { this.request().await })
+        Box::pin(async move {
+            match req {
+                HistoricalBidsRequest::All => this.get_all_bids().await,
+                HistoricalBidsRequest::Latest => this.get_latest_bids().await,
+            }
+        })
     }
 }
 

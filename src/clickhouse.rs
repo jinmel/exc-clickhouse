@@ -127,10 +127,14 @@ impl ClickHouseService {
             .wrap_err("failed to write block metadata")
     }
 
-    pub async fn get_latest_bid(&self) -> Option<BidData> {
+    pub async fn get_latest_bid(&self) -> eyre::Result<BidData> {
         let query = self.client.query("SELECT * FROM timeboost.bids ORDER BY round DESC LIMIT 1");
-        
-        query.fetch_one::<BidData>().await.ok()
+        query.fetch_one::<BidData>().await.wrap_err("failed to get latest bid")
+    }
+
+    pub async fn get_bids_by_round(&self, round: u64) -> eyre::Result<Vec<BidData>> {
+        let query = self.client.query("SELECT * FROM timeboost.bids WHERE round = ?").bind(round);
+        query.fetch_all::<BidData>().await.wrap_err("failed to get bids by round")
     }
 
     pub async fn write_express_lane_bids(&self, bids: Vec<BidData>) -> eyre::Result<Quantities> {
