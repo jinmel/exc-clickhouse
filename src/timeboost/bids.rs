@@ -132,7 +132,7 @@ pub async fn insert_all_timeboost_bids() -> eyre::Result<()> {
         let chrono_elapsed = chrono::Duration::from_std(elapsed)?;
         let final_timestamp = (first_round_at + chrono_elapsed).with_timezone(&Utc);
         let bids = bids.into_iter().map(|bid| bid.with_timestamp(final_timestamp)).collect();
-
+        tracing::info!(?round, ?final_timestamp, "Writing bids to clickhouse");
         clickhouse.write_express_lane_bids(bids).await?;
     }
     Ok(())
