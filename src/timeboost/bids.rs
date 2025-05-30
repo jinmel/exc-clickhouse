@@ -94,7 +94,11 @@ impl From<CsvBidData> for BidData {
     }
 }
 
+const FIRST_ROUND: u64 = 53516;
+const ROUND_DURATION: u64 = 60;
+
 pub async fn insert_all_timeboost_bids() -> eyre::Result<()> {
+    let first_round_at = DateTime::parse_from_str("2025-04-17T13:53:38+00:00", "%Y-%m-%dT%H:%M:%S%z")?;
     let inner = HistoricalBidsService::new().await?;
     let mut svc = tower::ServiceBuilder::new()
         .service(inner);
@@ -117,6 +121,18 @@ pub async fn insert_all_timeboost_bids() -> eyre::Result<()> {
         if !bids_by_round.is_empty() {
             continue;
         }
+
+        if round < FIRST_ROUND {
+            tracing::warn!(?round, "Found bids from before the first round");
+            continue;
+        }
+
+        let delta = round - FIRST_ROUND;
+        let elapsed = Duration::from_secs(delta as u64 * ROUND_DURATION);
+        let chrono_elapsed = chrono::Duration::from_std(elapsed)?;
+        let final_timestamp = (first_round_at + chrono_elapsed).with_timezone(&Utc);
+        let bids = bids.into_iter().map(|bid| bid.with_timestamp(final_timestamp)).collect();
+
         clickhouse.write_express_lane_bids(bids).await?;
     }
     Ok(())
