@@ -22,7 +22,7 @@ fn default_timestamp() -> DateTime<Utc> {
 // ClickHouse table schema for proper time filtering:
 // CREATE TABLE timeboost.bids
 // (
-//     `ts` DateTime64(3),  -- DateTime with millisecond precision for $__timefilter
+//     `timestamp` DateTime64(3),  -- DateTime with millisecond precision for $__timefilter
 //     `chain_id` UInt64,
 //     `bidder` String,
 //     `express_lane_controller` String,
