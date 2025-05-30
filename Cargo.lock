@@ -1681,6 +1681,7 @@ checksum = "d9894248c4c5a4402f76a56c273836a0c32547ec8a68166aedee7e01b7b8d102"
 dependencies = [
  "bstr",
  "bytes",
+ "chrono",
  "cityhash-rs",
  "clickhouse-derive",
  "futures",
@@ -1695,6 +1696,7 @@ dependencies = [
  "serde",
  "static_assertions",
  "thiserror 1.0.69",
+ "time",
  "tokio",
  "url",
 ]

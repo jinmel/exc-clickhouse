@@ -13,7 +13,7 @@ aws-config = "1.5.8"
 aws-credential-types = "1.2.3"
 aws-sdk-s3 = "1.63.0"
 chrono = { version = "0.4", features = ["serde"] }
-clickhouse = { version = "0.13.2", features = ["inserter"] }
+clickhouse = { version = "0.13.2", features = ["inserter", "time", "chrono"] }
 csv = "1.3.1"
 dotenv = "0.15.0"
 eyre = "0.6.12"

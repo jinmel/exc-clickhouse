@@ -46,7 +46,7 @@ pub struct S3ObjectInfo {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Row)]
 pub struct BidData {
-    #[serde(skip, default = "default_timestamp")]
+    #[serde(skip_deserializing, with = "clickhouse::serde::chrono::datetime64::millis", default = "default_timestamp")]
     pub timestamp: DateTime<Utc>,
     #[serde(alias = "ChainID")]
     pub chain_id: u64,
