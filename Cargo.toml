@@ -12,6 +12,7 @@ async-trait = "0.1.88"
 aws-config = "1.5.8"
 aws-credential-types = "1.2.3"
 aws-sdk-s3 = "1.63.0"
+chrono = { version = "0.4", features = ["serde"] }
 clickhouse = { version = "0.13.2", features = ["inserter"] }
 csv = "1.3.1"
 dotenv = "0.15.0"

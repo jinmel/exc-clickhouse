@@ -13,6 +13,28 @@ use tower::Service;
 use tower::limit::RateLimitLayer;
 use tower::timeout::TimeoutLayer;
 use tower::util::ServiceExt;
+use chrono::{DateTime, Utc};
+
+fn default_timestamp() -> DateTime<Utc> {
+    Utc::now()
+}
+
+// ClickHouse table schema for proper time filtering:
+// CREATE TABLE timeboost.bids
+// (
+//     `ts` DateTime64(3),  -- DateTime with millisecond precision for $__timefilter
+//     `chain_id` UInt64,
+//     `bidder` String,
+//     `express_lane_controller` String,
+//     `auction_contract_address` String,
+//     `round` UInt64,
+//     `amount` String,
+//     `signature` String
+// )
+// ENGINE = MergeTree
+// PARTITION BY chain_id
+// PRIMARY KEY round
+// ORDER BY round
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct S3ObjectInfo {
@@ -24,6 +46,8 @@ pub struct S3ObjectInfo {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Row)]
 pub struct BidData {
+    #[serde(skip, default = "default_timestamp")]
+    pub timestamp: DateTime<Utc>,
     #[serde(alias = "ChainID")]
     pub chain_id: u64,
     #[serde(alias = "Bidder")]
@@ -38,6 +62,18 @@ pub struct BidData {
     pub amount: String, // Keep as String to handle large numbers
     #[serde(alias = "Signature")]
     pub signature: String,
+}
+
+impl BidData {
+    pub fn with_timestamp(mut self, timestamp: DateTime<Utc>) -> Self {
+        self.timestamp = timestamp;
+        self
+    }
+    
+    pub fn with_current_timestamp(mut self) -> Self {
+        self.timestamp = Utc::now();
+        self
+    }
 }
 
 pub async fn insert_timeboost_bids_task() -> eyre::Result<()> {
