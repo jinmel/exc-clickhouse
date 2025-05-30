@@ -7,6 +7,7 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tower::ServiceExt;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
+use clap::Parser;
 
 use crate::{
     clickhouse::{ClickHouseConfig, ClickHouseService},
@@ -20,7 +21,46 @@ mod streams;
 mod ethereum;
 mod timeboost;
 
-const BATCH_SIZE: usize = 500;
+#[derive(Parser)]
+#[command(name = "exc-clickhouse")]
+#[command(about = "Exchange data collector to ClickHouse database")]
+#[command(version)]
+struct Cli {
+    /// Path to symbols file
+    #[arg(short, long, default_value = "symbols.txt")]
+    symbols_file: String,
+
+    /// Batch size for processing events
+    #[arg(short, long, default_value_t = 500)]
+    batch_size: usize,
+
+    #[arg(long)]
+    insert_all_timeboost_bids: bool,
+
+    /// Log level (trace, debug, info, warn, error)
+    #[arg(short, long, default_value = "info")]
+    log_level: String,
+
+    /// Skip Binance stream
+    #[arg(long)]
+    skip_binance: bool,
+
+    /// Skip Ethereum block metadata
+    #[arg(long)]
+    skip_ethereum: bool,
+
+    /// Skip ClickHouse writer
+    #[arg(long)]
+    skip_clickhouse: bool,
+
+    /// Skip Timeboost bids
+    #[arg(long)]
+    skip_timeboost: bool,
+
+    /// RPC URL for Ethereum (overrides environment variable)
+    #[arg(long)]
+    rpc_url: Option<String>,
+}
 
 fn read_symbols(filename: &str) -> eyre::Result<Vec<String>> {
     let file = File::open(filename).wrap_err("Failed to open symbols.txt")?;
@@ -43,14 +83,18 @@ fn read_symbols(filename: &str) -> eyre::Result<Vec<String>> {
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
+    // Parse command line arguments
+    let cli = Cli::parse();
+
     // Load environment variables from .env file
     dotenv().ok();
 
-    // Initialize tracing with environment filter
+    // Initialize tracing with environment filter using CLI log level
+    let log_level = format!("exc_clickhouse={},info", cli.log_level);
     let subscriber = FmtSubscriber::builder()
         .with_env_filter(
             EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new("info"))
+                .unwrap_or_else(|_| EnvFilter::new(&log_level))
         )
         .finish();
     tracing::subscriber::set_global_default(subscriber)?;
@@ -60,54 +104,73 @@ async fn main() -> eyre::Result<()> {
 
     let mut set = tokio::task::JoinSet::new();
 
-    let symbols = read_symbols("symbols.txt")?;
+    // Spawn Binance stream task if not skipped
+    if !cli.skip_binance {
+        let symbols = read_symbols(&cli.symbols_file)?;
+        let batch_size = cli.batch_size;
 
-    tracing::info!("Spawning binance stream for symbols: {:?}", symbols);
-    set.spawn(async move{
-        match binance_stream_task(evt_tx.clone(), symbols).await {
-            Ok(()) => Ok(()),
-            Err(e) => {
-                tracing::error!("Binance stream task failed: {}", e);
-                Err(e)
+        tracing::info!("Spawning binance stream for symbols: {:?}", symbols);
+        set.spawn(async move{
+            match binance_stream_task(evt_tx.clone(), symbols, batch_size).await {
+                Ok(()) => Ok(()),
+                Err(e) => {
+                    tracing::error!("Binance stream task failed: {}", e);
+                    Err(e)
+                }
             }
-        }
-    });
+        });
+    }
 
-    let rpc_url = std::env::var("RPC_URL").map_err(|_| {
-        eyre::eyre!("RPC_URL environment variable is not set")
-    })?;
-    tracing::info!("Spawning ethereum block metadata task from RPC URL: {}", rpc_url);
-    set.spawn(async {
-        match ethereum::block_metadata_task(rpc_url).await {
-            Ok(()) => Ok(()),
-            Err(e) => {
-                tracing::error!("Ethereum block metadata task failed: {}", e);
-                Err(e)
+    // Spawn Ethereum block metadata task if not skipped
+    if !cli.skip_ethereum {
+        let rpc_url = cli.rpc_url.or_else(|| std::env::var("RPC_URL").ok())
+            .ok_or_else(|| eyre::eyre!("RPC_URL must be provided via --rpc-url flag or RPC_URL environment variable"))?;
+        
+        tracing::info!("Spawning ethereum block metadata task from RPC URL: {}", rpc_url);
+        set.spawn(async {
+            match ethereum::block_metadata_task(rpc_url).await {
+                Ok(()) => Ok(()),
+                Err(e) => {
+                    tracing::error!("Ethereum block metadata task failed: {}", e);
+                    Err(e)
+                }
             }
-        }
-    });
+        });
+    }
 
-    tracing::info!("Spawning clickhouse writer task");
-    set.spawn(async {
-        match clickhouse_cex_writer_task(evt_rx).await {
-            Ok(()) => Ok(()),
-            Err(e) => {
-                tracing::error!("Clickhouse writer task failed: {}", e);
-                Err(e)
+    // Spawn ClickHouse writer task if not skipped
+    if !cli.skip_clickhouse {
+        tracing::info!("Spawning clickhouse writer task");
+        set.spawn(async {
+            match clickhouse_cex_writer_task(evt_rx).await {
+                Ok(()) => Ok(()),
+                Err(e) => {
+                    tracing::error!("Clickhouse writer task failed: {}", e);
+                    Err(e)
+                }
             }
-        }
-    });
+        });
+    }
 
-    tracing::info!("Spawning timeboost bids task");
-    set.spawn(async {
-        match timeboost::bids::insert_timeboost_bids_task().await {
-            Ok(()) => Ok(()),
-            Err(e) => {
-                tracing::error!("Timeboost bids task failed: {}", e);
-                Err(e)
+    // Spawn Timeboost bids task if not skipped
+    if !cli.skip_timeboost {
+        tracing::info!("Spawning timeboost bids task");
+        set.spawn(async {
+            match timeboost::bids::insert_timeboost_bids_task().await {
+                Ok(()) => Ok(()),
+                Err(e) => {
+                    tracing::error!("Timeboost bids task failed: {}", e);
+                    Err(e)
+                }
             }
-        }
-    });
+        });
+    }
+
+    // If no tasks were spawned, exit early
+    if set.is_empty() {
+        tracing::warn!("No tasks were spawned. Use --help to see available options.");
+        return Ok(());
+    }
 
     tokio::select! {
         _ = async {
@@ -151,6 +214,7 @@ async fn main() -> eyre::Result<()> {
 async fn binance_stream_task(
     evt_tx: mpsc::Sender<Vec<Result<NormalizedEvent, ExchangeStreamError>>>,
     symbols: Vec<String>,
+    batch_size: usize,
 ) -> eyre::Result<()> {
     let binance = BinanceClient::builder()
         .add_symbols(symbols)
@@ -158,7 +222,7 @@ async fn binance_stream_task(
         .with_trades(true)
         .build()?;
     let combined_stream = binance.combined_stream().await?;
-    let chunks = combined_stream.chunks(BATCH_SIZE);
+    let chunks = combined_stream.chunks(batch_size);
 
     chunks
         .for_each_concurrent(10, |batch| {
