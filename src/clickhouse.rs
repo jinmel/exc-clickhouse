@@ -145,9 +145,9 @@ impl ClickHouseService {
             .with_period(Some(Duration::from_secs(1)))
             .with_period_bias(0.1);
 
-        let last_round = bids.iter().map(|bid| bid.round).max().ok_or(eyre::eyre!("no bids"))?;
+        let latest_round = bids.iter().map(|bid| bid.round).max().ok_or(eyre::eyre!("no bids"))?;
         for bid in bids {
-            let timestamp = Utc::now() - Duration::from_secs(last_round - bid.round);
+            let timestamp = Utc::now() - Duration::from_secs((latest_round - bid.round) * 60);
             let bid = bid.with_timestamp(timestamp);
             tracing::debug!(?bid.round, ?timestamp, "writing bid");
             inserter.write(&bid)?;
