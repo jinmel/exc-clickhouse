@@ -60,6 +60,7 @@ pub struct CsvBidData {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Row)]
 pub struct BidData {
+    #[serde(with = "clickhouse::serde::chrono::datetime64::millis")]
     pub timestamp: DateTime<Utc>,
     pub chain_id: u64,
     pub bidder: String,
