@@ -102,6 +102,14 @@ async fn main() -> eyre::Result<()> {
     let (evt_tx, evt_rx) =
         mpsc::channel::<Vec<Result<NormalizedEvent, ExchangeStreamError>>>(50000);
 
+
+    if cli.insert_all_timeboost_bids {
+        tracing::info!("Inserting all timeboost bids");
+        timeboost::bids::insert_all_timeboost_bids().await?;
+        tracing::info!("All timeboost bids inserted");
+        return Ok(());
+    }
+
     let mut set = tokio::task::JoinSet::new();
 
     // Spawn Binance stream task if not skipped
