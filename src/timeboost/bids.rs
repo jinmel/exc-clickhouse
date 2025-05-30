@@ -71,6 +71,13 @@ pub struct BidData {
     pub signature: String,
 }
 
+impl BidData {
+    pub fn with_timestamp(mut self, timestamp: DateTime<Utc>) -> Self {
+        self.timestamp = timestamp;
+        self
+    }
+}
+
 impl From<CsvBidData> for BidData {
     fn from(csv_bid: CsvBidData) -> Self {
         Self {
@@ -121,7 +128,7 @@ pub async fn insert_timeboost_bids_task() -> eyre::Result<()> {
             }
         }
 
-        let count = clickhouse.write_bids(bids).await?;
+        let count = clickhouse.write_express_lane_bids(bids).await?;
         tracing::debug!(?count.rows, "Written bids to clickhouse");
     }
 }

@@ -14,6 +14,7 @@ use futures::pin_mut;
 use futures::{Future, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use crate::timeboost::bids::BidData;
+use chrono::Utc;
 
 #[derive(Debug, Clone)]
 pub struct ClickHouseConfig {
@@ -132,7 +133,11 @@ impl ClickHouseService {
         query.fetch_one::<BidData>().await.ok()
     }
 
-    pub async fn write_bids(&self, bids: Vec<BidData>) -> eyre::Result<Quantities> {
+    pub async fn write_express_lane_bids(&self, bids: Vec<BidData>) -> eyre::Result<Quantities> {
+        if bids.is_empty() {
+            return Ok(Quantities::ZERO);
+        }
+        
         let mut inserter = self
             .client
             .inserter("timeboost.bids")?
@@ -140,8 +145,13 @@ impl ClickHouseService {
             .with_period(Some(Duration::from_secs(1)))
             .with_period_bias(0.1);
 
+        let last_round = bids.iter().map(|bid| bid.round).max().ok_or(eyre::eyre!("no bids"))?;
         for bid in bids {
+            let timestamp = Utc::now() - Duration::from_secs(last_round - bid.round);
+            let bid = bid.with_timestamp(timestamp);
+            tracing::debug!(?bid.round, ?timestamp, "writing bid");
             inserter.write(&bid)?;
+            inserter.commit().await?;
         }
 
         inserter.end().await.wrap_err("failed to write bids")
