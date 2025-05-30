@@ -133,7 +133,6 @@ pub async fn insert_all_timeboost_bids() -> eyre::Result<()> {
         let chrono_elapsed = chrono::Duration::from_std(elapsed)?;
         let final_timestamp = (first_round_at + chrono_elapsed).with_timezone(&Utc);
         let bids = bids.into_iter().map(|bid| bid.with_timestamp(final_timestamp)).collect();
-        tracing::info!(?round, ?final_timestamp, "Writing bids to clickhouse");
         clickhouse.write_express_lane_bids(bids).await?;
     }
     Ok(())
@@ -165,7 +164,7 @@ pub async fn insert_timeboost_bids_task() -> eyre::Result<()> {
 
         bids.sort_by(|a, b| a.round.cmp(&b.round));
 
-        let last_bid = bids.last().unwrap();
+        let last_bid = bids.last().unwrap().clone();
         let last_bid_db = clickhouse.get_latest_bid().await.ok();
         if let Some(last_bid_db) = last_bid_db {
             if last_bid_db.round == last_bid.round {
@@ -173,6 +172,15 @@ pub async fn insert_timeboost_bids_task() -> eyre::Result<()> {
                 continue;
             }
         }
+
+        let bids = bids.into_iter().map(|bid| {
+            assert!(last_bid.round >= bid.round);
+            let delta = last_bid.round - bid.round;
+            let elapsed = Duration::from_secs(delta as u64 * ROUND_DURATION);
+            let chrono_elapsed = chrono::Duration::from_std(elapsed).expect("elapsed is out of range");
+            let final_timestamp = (Utc::now() - chrono_elapsed).with_timezone(&Utc);
+            bid.with_timestamp(final_timestamp)
+        }).collect();
 
         let count = clickhouse.write_express_lane_bids(bids).await?;
         tracing::debug!(?count.rows, "Written bids to clickhouse");
