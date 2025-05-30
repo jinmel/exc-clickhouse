@@ -15,10 +15,6 @@ use tower::timeout::TimeoutLayer;
 use tower::util::ServiceExt;
 use chrono::{DateTime, Utc};
 
-fn default_timestamp() -> DateTime<Utc> {
-    Utc::now()
-}
-
 // ClickHouse table schema for proper time filtering:
 // CREATE TABLE timeboost.bids
 // (
@@ -44,10 +40,8 @@ pub struct S3ObjectInfo {
     pub etag: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Row)]
-pub struct BidData {
-    #[serde(skip_deserializing, with = "clickhouse::serde::chrono::datetime64::millis", default = "default_timestamp")]
-    pub timestamp: DateTime<Utc>,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CsvBidData {
     #[serde(alias = "ChainID")]
     pub chain_id: u64,
     #[serde(alias = "Bidder")]
@@ -64,15 +58,30 @@ pub struct BidData {
     pub signature: String,
 }
 
-impl BidData {
-    pub fn with_timestamp(mut self, timestamp: DateTime<Utc>) -> Self {
-        self.timestamp = timestamp;
-        self
-    }
-    
-    pub fn with_current_timestamp(mut self) -> Self {
-        self.timestamp = Utc::now();
-        self
+#[derive(Debug, Clone, Serialize, Deserialize, Row)]
+pub struct BidData {
+    pub timestamp: DateTime<Utc>,
+    pub chain_id: u64,
+    pub bidder: String,
+    pub express_lane_controller: String,
+    pub auction_contract_address: String,
+    pub round: u64,
+    pub amount: String,
+    pub signature: String,
+}
+
+impl From<CsvBidData> for BidData {
+    fn from(csv_bid: CsvBidData) -> Self {
+        Self {
+            timestamp: Utc::now(),
+            chain_id: csv_bid.chain_id,
+            bidder: csv_bid.bidder,
+            express_lane_controller: csv_bid.express_lane_controller,
+            auction_contract_address: csv_bid.auction_contract_address,
+            round: csv_bid.round,
+            amount: csv_bid.amount,
+            signature: csv_bid.signature,
+        }
     }
 }
 
@@ -264,7 +273,8 @@ impl S3Client {
         let mut bids = Vec::new();
 
         for result in reader.deserialize() {
-            let bid: BidData = result?;
+            let csv_bid: CsvBidData = result?;
+            let bid = BidData::from(csv_bid);
             bids.push(bid);
         }
 

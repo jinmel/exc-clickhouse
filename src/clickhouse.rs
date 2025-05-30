@@ -141,8 +141,7 @@ impl ClickHouseService {
             .with_period_bias(0.1);
 
         for bid in bids {
-            let bid_with_ts = bid.with_current_timestamp();
-            inserter.write(&bid_with_ts)?;
+            inserter.write(&bid)?;
         }
 
         inserter.end().await.wrap_err("failed to write bids")
