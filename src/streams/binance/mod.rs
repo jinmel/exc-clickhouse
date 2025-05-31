@@ -9,6 +9,7 @@ use tokio::time::Duration;
 
 /// Default WebSocket URL for Binance
 pub const DEFAULT_BINANCE_WS_URL: &str = "wss://stream.binance.com:9443/stream";
+pub const US_BINANCE_WS_URL: &str = "wss://ws-api.binance.us:443/ws-api/v3";
 
 pub mod model;
 pub mod parser;
@@ -89,6 +90,11 @@ impl BinanceClientBuilder {
 
     pub fn with_trades(mut self, enable: bool) -> Self {  
         self.enable_trade = enable;
+        self
+    }
+
+    pub fn with_base_url(mut self, base_url: String) -> Self {
+        self.base_url = base_url;
         self
     }
 
