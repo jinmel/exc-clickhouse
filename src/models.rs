@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use arrayvec::ArrayString;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Copy, Clone)]
 pub enum ExchangeName {
@@ -36,11 +36,11 @@ pub enum TradeSide {
     Sell
 }
 
-impl ToString for TradeSide {
-    fn to_string(&self) -> String {
+impl std::fmt::Display for TradeSide {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TradeSide::Buy => "buy".to_string(),
-            TradeSide::Sell => "sell".to_string(),
+            TradeSide::Buy => write!(f, "buy"),
+            TradeSide::Sell => write!(f, "sell"),
         }
     }
 }

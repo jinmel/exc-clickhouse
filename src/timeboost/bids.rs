@@ -111,7 +111,7 @@ pub async fn insert_all_timeboost_bids() -> eyre::Result<()> {
         .into_iter()
         .fold(HashMap::new(), |mut acc, bid| {
             acc.entry(bid.round)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(bid);
             acc
         });
@@ -129,7 +129,7 @@ pub async fn insert_all_timeboost_bids() -> eyre::Result<()> {
         }
 
         let delta = round - FIRST_ROUND;
-        let elapsed = Duration::from_secs(delta as u64 * ROUND_DURATION);
+        let elapsed = Duration::from_secs(delta * ROUND_DURATION);
         let chrono_elapsed = chrono::Duration::from_std(elapsed)?;
         let final_timestamp = (first_round_at + chrono_elapsed).with_timezone(&Utc);
         let bids = bids.into_iter().map(|bid| bid.with_timestamp(final_timestamp)).collect();

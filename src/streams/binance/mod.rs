@@ -5,6 +5,7 @@ use crate::{
     models::NormalizedEvent,
     streams::{CombinedStream, ExchangeStream, ExchangeStreamError},
 };
+use tokio::time::Duration;
 
 /// Default WebSocket URL for Binance
 pub const DEFAULT_BINANCE_WS_URL: &str = "wss://stream.binance.com:9443/stream";
@@ -51,7 +52,8 @@ impl CombinedStream for BinanceClient {
 
     async fn combined_stream(&self) -> Result<Self::CombinedStream, ExchangeStreamError> {
         let url = self.build_multi_stream_url()?;
-        ExchangeStream::new(&url, parser::parse_binance_combined, None).await
+        let timeout = Duration::from_secs(23 * 60 * 60); // Binance has 24 hour timeout.
+        ExchangeStream::new(&url, parser::parse_binance_combined, Some(timeout), None).await
     }
 }
 

@@ -14,7 +14,6 @@ use futures::pin_mut;
 use futures::{Future, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use crate::timeboost::bids::BidData;
-use chrono::Utc;
 
 #[derive(Debug, Clone)]
 pub struct ClickHouseConfig {
