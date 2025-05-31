@@ -41,7 +41,7 @@ impl BinanceClient {
         }).collect::<Vec<String>>().join("/");
 
         Url::parse_with_params(&self.base_url, &[("streams", &stream_name_part)])
-            .map_err(|e| ExchangeStreamError::ParseError(format!("Failed to parse URL: {e}")))
+            .map_err(|e| ExchangeStreamError::InvalidConfiguration(format!("Failed to parse URL: {e}")))
             .map(|url| url.to_string())
     }
 }
