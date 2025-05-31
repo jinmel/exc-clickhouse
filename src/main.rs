@@ -14,7 +14,7 @@ use tracing_subscriber::{EnvFilter, FmtSubscriber};
 use crate::{
     clickhouse::{ClickHouseConfig, ClickHouseService},
     models::NormalizedEvent,
-    streams::{CombinedStream, ExchangeStreamError, binance::{BinanceClient, US_BINANCE_WS_URL}},
+    streams::{CombinedStream, ExchangeStreamError, binance::{BinanceClient, DEFAULT_BINANCE_WS_URL}},
 };
 
 mod clickhouse;
@@ -356,7 +356,7 @@ async fn binance_stream_task(
 ) -> eyre::Result<()> {
     let binance = BinanceClient::builder()
         .add_symbols(symbols)
-        .with_base_url(US_BINANCE_WS_URL.to_string())
+        .with_base_url(DEFAULT_BINANCE_WS_URL.to_string())
         .with_quotes(true)
         .with_trades(true)
         .build()?;
