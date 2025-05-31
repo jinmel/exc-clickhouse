@@ -230,9 +230,11 @@ async fn main() -> eyre::Result<()> {
         }
 
         if !cli.skip_ethereum {
-            let rpc_url = cli.rpc_url.clone().ok_or(eyre::eyre!(
-                "RPC_URL must be provided via --rpc-url flag or RPC_URL environment variable"
-            ))?;
+            let rpc_url = cli.rpc_url.clone()
+                .or_else(|| std::env::var("RPC_URL").ok())
+                .ok_or(eyre::eyre!(
+                    "RPC_URL must be provided via --rpc-url flag or RPC_URL environment variable"
+                ))?;
 
             tracing::info!(
                 "Spawning ethereum block metadata task from RPC URL: {}",
