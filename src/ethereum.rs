@@ -13,7 +13,7 @@ pub struct BlockMetadata {
   valid: bool,
 }
 
-pub async fn block_metadata_task(rpc_url: String) -> eyre::Result<()> {
+pub async fn block_metadata_task(rpc_url: &String) -> eyre::Result<()> {
   let ws = WsConnect::new(rpc_url);
   let provider = ProviderBuilder::new().connect_ws(ws).await?;
   let block_stream = provider.subscribe_blocks().await?.into_stream();

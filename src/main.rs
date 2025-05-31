@@ -1,13 +1,15 @@
+use clap::Parser;
 use dotenv::dotenv;
 use eyre::WrapErr;
 use futures::stream::StreamExt;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, BufRead};
+use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tower::ServiceExt;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
-use clap::Parser;
 
 use crate::{
     clickhouse::{ClickHouseConfig, ClickHouseService},
@@ -16,9 +18,9 @@ use crate::{
 };
 
 mod clickhouse;
+mod ethereum;
 mod models;
 mod streams;
-mod ethereum;
 mod timeboost;
 
 #[derive(Parser)]
@@ -60,6 +62,91 @@ struct Cli {
     /// RPC URL for Ethereum (overrides environment variable)
     #[arg(long)]
     rpc_url: Option<String>,
+
+    /// Enable automatic restart of failed tasks
+    #[arg(long)]
+    enable_restart: bool,
+
+    /// Maximum number of restart attempts per task (0 = unlimited)
+    #[arg(long, default_value_t = 0)]
+    max_restart_attempts: u32,
+
+    /// Initial restart delay in seconds
+    #[arg(long, default_value_t = 1)]
+    restart_delay_seconds: u64,
+
+    /// Maximum restart delay in seconds (for exponential backoff)
+    #[arg(long, default_value_t = 300)]
+    max_restart_delay_seconds: u64,
+}
+
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+enum TaskType {
+    BinanceStream,
+    EthereumBlockMetadata,
+    ClickHouseInsert,
+    FetchTimeboostBids,
+}
+
+impl std::fmt::Display for TaskType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TaskType::BinanceStream => write!(f, "Binance"),
+            TaskType::EthereumBlockMetadata => write!(f, "Ethereum"),
+            TaskType::ClickHouseInsert => write!(f, "ClickHouse"),
+            TaskType::FetchTimeboostBids => write!(f, "Timeboost"),
+        }
+    }
+}
+
+struct TaskSupervisor {
+    restart_attempts: HashMap<TaskType, u32>,
+    max_attempts: u32,
+    initial_delay: Duration,
+    max_delay: Duration,
+}
+
+impl TaskSupervisor {
+    fn new(max_attempts: u32, initial_delay_secs: u64, max_delay_secs: u64) -> Self {
+        Self {
+            restart_attempts: HashMap::new(),
+            max_attempts,
+            initial_delay: Duration::from_secs(initial_delay_secs),
+            max_delay: Duration::from_secs(max_delay_secs),
+        }
+    }
+
+    fn should_restart(&mut self, task_type: &TaskType) -> bool {
+        if self.max_attempts == 0 {
+            return true; // Unlimited restarts
+        }
+
+        let attempts = self.restart_attempts.entry(task_type.clone()).or_insert(0);
+        *attempts < self.max_attempts
+    }
+
+    async fn wait_before_restart(&mut self, task_type: &TaskType) {
+        let attempts = self.restart_attempts.entry(task_type.clone()).or_insert(0);
+        *attempts += 1;
+
+        // Exponential backoff: delay = min(initial_delay * 2^(attempts-1), max_delay)
+        let delay = std::cmp::min(
+            self.initial_delay * 2_u32.pow(attempts.saturating_sub(1)),
+            self.max_delay,
+        );
+
+        tracing::info!(
+            "Waiting {:?} before restarting {} task (attempt {})",
+            delay,
+            task_type,
+            attempts
+        );
+        tokio::time::sleep(delay).await;
+    }
+
+    fn reset_attempts(&mut self, task_type: &TaskType) {
+        self.restart_attempts.remove(task_type);
+    }
 }
 
 fn read_symbols(filename: &str) -> eyre::Result<Vec<String>> {
@@ -93,15 +180,10 @@ async fn main() -> eyre::Result<()> {
     let log_level = format!("exc_clickhouse={},info", cli.log_level);
     let subscriber = FmtSubscriber::builder()
         .with_env_filter(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new(&log_level))
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&log_level)),
         )
         .finish();
     tracing::subscriber::set_global_default(subscriber)?;
-
-    let (evt_tx, evt_rx) =
-        mpsc::channel::<Vec<Result<NormalizedEvent, ExchangeStreamError>>>(50000);
-
 
     if cli.insert_all_timeboost_bids {
         tracing::info!("Inserting all timeboost bids");
@@ -110,112 +192,158 @@ async fn main() -> eyre::Result<()> {
         return Ok(());
     }
 
-    let mut set = tokio::task::JoinSet::new();
+    // Initialize task supervisor if restart is enabled
+    let mut supervisor = if cli.enable_restart {
+        Some(TaskSupervisor::new(
+            cli.max_restart_attempts,
+            cli.restart_delay_seconds,
+            cli.max_restart_delay_seconds,
+        ))
+    } else {
+        None
+    };
 
-    // Spawn Binance stream task if not skipped
-    if !cli.skip_binance {
-        let symbols = read_symbols(&cli.symbols_file)?;
-        let batch_size = cli.batch_size;
-
-        tracing::info!("Spawning binance stream for symbols: {:?}", symbols);
-        set.spawn(async move{
-            match binance_stream_task(evt_tx.clone(), symbols, batch_size).await {
-                Ok(()) => Ok(()),
-                Err(e) => {
-                    tracing::error!("Binance stream task failed: {}", e);
-                    Err(e)
-                }
-            }
-        });
-    }
-
-    // Spawn Ethereum block metadata task if not skipped
-    if !cli.skip_ethereum {
-        let rpc_url = cli.rpc_url.or_else(|| std::env::var("RPC_URL").ok())
-            .ok_or_else(|| eyre::eyre!("RPC_URL must be provided via --rpc-url flag or RPC_URL environment variable"))?;
-        
-        tracing::info!("Spawning ethereum block metadata task from RPC URL: {}", rpc_url);
-        set.spawn(async {
-            match ethereum::block_metadata_task(rpc_url).await {
-                Ok(()) => Ok(()),
-                Err(e) => {
-                    tracing::error!("Ethereum block metadata task failed: {}", e);
-                    Err(e)
-                }
-            }
-        });
-    }
-
-    // Spawn ClickHouse writer task if not skipped
-    if !cli.skip_clickhouse {
-        tracing::info!("Spawning clickhouse writer task");
-        set.spawn(async {
-            match clickhouse_cex_writer_task(evt_rx).await {
-                Ok(()) => Ok(()),
-                Err(e) => {
-                    tracing::error!("Clickhouse writer task failed: {}", e);
-                    Err(e)
-                }
-            }
-        });
-    }
-
-    // Spawn Timeboost bids task if not skipped
-    if !cli.skip_timeboost {
-        tracing::info!("Spawning timeboost bids task");
-        set.spawn(async {
-            match timeboost::bids::insert_timeboost_bids_task().await {
-                Ok(()) => Ok(()),
-                Err(e) => {
-                    tracing::error!("Timeboost bids task failed: {}", e);
-                    Err(e)
-                }
-            }
-        });
-    }
-
-    // If no tasks were spawned, exit early
-    if set.is_empty() {
-        tracing::warn!("No tasks were spawned. Use --help to see available options.");
+    if cli.skip_binance && cli.skip_ethereum && cli.skip_clickhouse && cli.skip_timeboost {
+        tracing::warn!("No tasks were enabled. Use --help to see available options.");
         return Ok(());
     }
 
-    tokio::select! {
-        _ = async {
-            while let Some(res) = set.join_next().await {
-                match res {
-                    Ok(Ok(())) => {
-                        // one worker returned Ok(())
-                        continue;
-                    }
-                    Ok(Err(err)) => {
-                        tracing::error!("worker task failed: {:?}", err);
-                        break;
-                    }
-                    Err(join_err) => {
-                        tracing::error!("worker task panicked: {}", join_err);
-                        break;
+    loop {
+        // Create new channel for each restart cycle
+        let (evt_tx, evt_rx) =
+            mpsc::channel::<Vec<Result<NormalizedEvent, ExchangeStreamError>>>(50000);
+        let mut set = tokio::task::JoinSet::new();
+
+        // Spawn tasks
+        if !cli.skip_binance {
+            let symbols = read_symbols(&cli.symbols_file)?;
+            let batch_size = cli.batch_size;
+            let tx = evt_tx.clone();
+
+            tracing::info!("Spawning binance stream for symbols: {:?}", symbols);
+            set.spawn(async move {
+                (
+                    TaskType::BinanceStream,
+                    binance_stream_task(tx, symbols, batch_size).await,
+                )
+            });
+        }
+
+        if !cli.skip_ethereum {
+            let rpc_url = cli.rpc_url.clone().ok_or(eyre::eyre!(
+                "RPC_URL must be provided via --rpc-url flag or RPC_URL environment variable"
+            ))?;
+
+            tracing::info!(
+                "Spawning ethereum block metadata task from RPC URL: {}",
+                rpc_url
+            );
+            set.spawn(async move {
+                (
+                    TaskType::EthereumBlockMetadata,
+                    ethereum::block_metadata_task(&rpc_url).await,
+                )
+            });
+        }
+
+        if !cli.skip_clickhouse {
+            tracing::info!("Spawning clickhouse writer task");
+            set.spawn(async move {
+                (
+                    TaskType::ClickHouseInsert,
+                    clickhouse_cex_writer_task(evt_rx).await,
+                )
+            });
+        }
+
+        if !cli.skip_timeboost {
+            tracing::info!("Spawning timeboost bids task");
+            set.spawn(async move {
+                (
+                    TaskType::FetchTimeboostBids,
+                    timeboost::bids::insert_timeboost_bids_task().await,
+                )
+            });
+        }
+
+        // Drop the sender to ensure proper cleanup
+        drop(evt_tx);
+
+        let mut should_restart = false;
+        let mut failed_tasks = Vec::new();
+
+        // Monitor tasks
+        tokio::select! {
+            _ = async {
+                while let Some(res) = set.join_next().await {
+                    match res {
+                        Ok((task_type, Ok(()))) => {
+                            tracing::info!("{} task completed successfully", task_type);
+                            if let Some(ref mut supervisor) = supervisor {
+                                supervisor.reset_attempts(&task_type);
+                            }
+                        }
+                        Ok((task_type, Err(err))) => {
+                            tracing::error!("{} task failed: {:?}", task_type, err);
+
+                            if let Some(ref mut supervisor) = supervisor {
+                                if supervisor.should_restart(&task_type) {
+                                    failed_tasks.push(task_type.clone());
+                                    should_restart = true;
+                                } else {
+                                    tracing::error!("{} task exceeded maximum restart attempts", task_type);
+                                    break;
+                                }
+                            } else {
+                                tracing::info!("Task restart is disabled, shutting down");
+                                break;
+                            }
+                        }
+                        Err(join_err) => {
+                            tracing::error!("Task panicked: {}", join_err);
+                            if supervisor.is_none() {
+                                break;
+                            }
+                            // For panics, we'll restart all tasks to be safe
+                            should_restart = true;
+                            break;
+                        }
                     }
                 }
+            } => {
+                if !should_restart {
+                    tracing::info!("All tasks completed or failed without restart enabled");
+                    break;
+                }
             }
-        } => {
-            tracing::info!("One of the worker tasks has finished; shutting down remaining tasks");
+            _ = tokio::signal::ctrl_c() => {
+                tracing::info!("SIGINT received; shutting down worker tasks");
+                break;
+            }
         }
-        _ = tokio::signal::ctrl_c() => {
-            tracing::info!("SIGINT received; shutting down worker tasks");
+
+        // Abort remaining tasks
+        set.abort_all();
+        while let Some(res) = set.join_next().await {
+            if let Err(e) = res {
+                tracing::debug!("Error during task shutdown: {}", e);
+            }
+        }
+
+        if !should_restart {
+            break;
+        }
+
+        // Wait before restarting failed tasks
+        if let Some(ref mut supervisor) = supervisor {
+            for task_type in &failed_tasks {
+                supervisor.wait_before_restart(task_type).await;
+            }
+            tracing::info!("Restarting failed tasks: {:?}", failed_tasks);
         }
     }
 
-    // abort any remaining in-flight tasks
-    set.abort_all();
-
-    // Wait for all tasks to complete their abort
-    while let Some(res) = set.join_next().await {
-        if let Err(e) = res {
-            tracing::warn!("Error during task shutdown: {}", e);
-        }
-    }
-    tracing::info!("All tasks have been shut down");
+    tracing::info!("Application shutdown complete");
     Ok(())
 }
 
