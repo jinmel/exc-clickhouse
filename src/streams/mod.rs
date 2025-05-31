@@ -96,6 +96,7 @@ impl<T: Send + 'static> ExchangeStream<T> {
                 }
                 tracing::info!("Reconnecting to {url}");
                 (ws, _) = connect_async(&url).await.map_err(|e|  ExchangeStreamError::ConnectionError(e.to_string()))?;
+                connected_at = Instant::now();
             }
         });
 
