@@ -152,9 +152,8 @@ impl ClickHouseService {
         for bid in bids {
             tracing::debug!(?bid.round, ?bid.timestamp, "writing bid");
             inserter.write(&bid)?;
-            inserter.commit().await?;
         }
-
+        inserter.commit().await?;
         inserter.end().await.wrap_err("failed to write bids")
     }
 
@@ -162,14 +161,14 @@ impl ClickHouseService {
         let mut trade_inserter = self
             .client
             .inserter("cex.normalized_trades")?
-            .with_max_rows(100)
+            .with_max_rows(500)
             .with_period(Some(Duration::from_secs(1)))
             .with_period_bias(0.1);
 
         let mut quote_inserter = self
             .client
             .inserter("cex.normalized_quotes")?
-            .with_max_rows(100)
+            .with_max_rows(500)
             .with_period(Some(Duration::from_secs(1)))
             .with_period_bias(0.1);
 
@@ -178,15 +177,15 @@ impl ClickHouseService {
                 NormalizedEvent::Trade(trade) => {
                     let trade: ClickhouseTrade = trade.into();
                     trade_inserter.write(&trade)?;
-                    trade_inserter.commit().await?;
                 }
                 NormalizedEvent::Quote(quote) => {
                     let quote: ClickhouseQuote = quote.into();
                     quote_inserter.write(&quote)?;
-                    quote_inserter.commit().await?;
                 }
             }
         }
+        trade_inserter.commit().await?;
+        quote_inserter.commit().await?;
         trade_inserter.end().await?;
         quote_inserter.end().await?;
         Ok(())
