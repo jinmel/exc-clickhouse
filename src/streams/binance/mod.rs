@@ -8,8 +8,8 @@ use crate::{
 use tokio::time::Duration;
 
 /// Default WebSocket URL for Binance
-pub const DEFAULT_BINANCE_WS_URL: &str = "wss://stream.binance.com:9443/stream";
-pub const US_BINANCE_WS_URL: &str = "wss://ws-api.binance.us:443/ws-api/v3";
+pub const DEFAULT_BINANCE_WS_URL: &str = "wss://stream.binance.com:9443";
+pub const US_BINANCE_WS_URL: &str = "wss://stream.binance.us:9443";
 
 pub mod model;
 pub mod parser;
@@ -41,7 +41,8 @@ impl BinanceClient {
             stream_names
         }).collect::<Vec<String>>().join("/");
 
-        Url::parse_with_params(&self.base_url, &[("streams", &stream_name_part)])
+        let url = format!("{}/{}", self.base_url, "stream");
+        Url::parse_with_params(&url, &[("streams", &stream_name_part)])
             .map_err(|e| ExchangeStreamError::InvalidConfiguration(format!("Failed to parse URL: {e}")))
             .map(|url| url.to_string())
     }
