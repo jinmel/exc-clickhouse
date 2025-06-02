@@ -28,7 +28,7 @@ pub struct BlockMetadataFetcher {
 
 impl BlockMetadataFetcher {
     pub fn new(rpc_url: String) -> Self {
-        let retry_layer = RetryBackoffLayer::new(10, 1000, 1000);
+        let retry_layer = RetryBackoffLayer::new(10, 1000, 100);
         let delay_layer = DelayLayer::new(Duration::from_millis(50));
         let client = RpcClient::builder()
             .layer(retry_layer)
