@@ -29,22 +29,29 @@ impl BinanceClient {
     }
 
     fn build_multi_stream_url(&self) -> Result<String, ExchangeStreamError> {
-        let stream_name_part = self.symbols.iter().flat_map(|symbol| {
-            let mut stream_names = vec![];
-            if self.enable_quote {
-                stream_names.push(format!("{symbol}@bookTicker"));
-            }
+        let stream_name_part = self
+            .symbols
+            .iter()
+            .flat_map(|symbol| {
+                let mut stream_names = vec![];
+                if self.enable_quote {
+                    stream_names.push(format!("{symbol}@bookTicker"));
+                }
 
-            if self.enable_trade {
-                stream_names.push(format!("{symbol}@trade"));
-            }
+                if self.enable_trade {
+                    stream_names.push(format!("{symbol}@trade"));
+                }
 
-            stream_names
-        }).collect::<Vec<String>>().join("/");
+                stream_names
+            })
+            .collect::<Vec<String>>()
+            .join("/");
 
         let url = format!("{}/{}", self.base_url, "stream");
         Url::parse_with_params(&url, &[("streams", &stream_name_part)])
-            .map_err(|e| ExchangeStreamError::InvalidConfiguration(format!("Failed to parse URL: {e}")))
+            .map_err(|e| {
+                ExchangeStreamError::InvalidConfiguration(format!("Failed to parse URL: {e}"))
+            })
             .map(|url| url.to_string())
     }
 }
@@ -82,7 +89,8 @@ impl Default for BinanceClientBuilder {
 
 impl BinanceClientBuilder {
     pub fn add_symbols(mut self, symbols: Vec<impl Into<String>>) -> Self {
-        self.symbols.extend(symbols.into_iter().map(|s| s.into().to_lowercase()));
+        self.symbols
+            .extend(symbols.into_iter().map(|s| s.into().to_lowercase()));
         self
     }
 
@@ -91,7 +99,7 @@ impl BinanceClientBuilder {
         self
     }
 
-    pub fn with_trades(mut self, enable: bool) -> Self {  
+    pub fn with_trades(mut self, enable: bool) -> Self {
         self.enable_trade = enable;
         self
     }

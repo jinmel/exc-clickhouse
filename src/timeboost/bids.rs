@@ -1,6 +1,7 @@
 use crate::clickhouse::{ClickHouseConfig, ClickHouseService};
 use aws_config::BehaviorVersion;
 use aws_sdk_s3::Client;
+use chrono::{DateTime, Utc};
 use clickhouse::Row;
 use csv;
 use flate2::read::GzDecoder;
@@ -14,7 +15,6 @@ use tower::Service;
 use tower::limit::RateLimitLayer;
 use tower::timeout::TimeoutLayer;
 use tower::util::ServiceExt;
-use chrono::{DateTime, Utc};
 
 // ClickHouse table schema for proper time filtering:
 // CREATE TABLE timeboost.bids
@@ -98,21 +98,18 @@ const FIRST_ROUND: u64 = 53516;
 const ROUND_DURATION: u64 = 60;
 
 pub async fn insert_all_timeboost_bids() -> eyre::Result<()> {
-    let first_round_at = DateTime::parse_from_str("2025-04-17T13:53:38+00:00", "%Y-%m-%dT%H:%M:%S%z")?;
+    let first_round_at =
+        DateTime::parse_from_str("2025-04-17T13:53:38+00:00", "%Y-%m-%dT%H:%M:%S%z")?;
     let inner = HistoricalBidsService::new().await?;
-    let mut svc = tower::ServiceBuilder::new()
-        .service(inner);
+    let mut svc = tower::ServiceBuilder::new().service(inner);
 
     let clickhouse = ClickHouseService::new(ClickHouseConfig::from_env()?);
 
     svc.ready().await?;
     let bids = svc.call(HistoricalBidsRequest::All).await?;
-    let bids_by_round: HashMap<u64, Vec<BidData>> = bids
-        .into_iter()
-        .fold(HashMap::new(), |mut acc, bid| {
-            acc.entry(bid.round)
-                .or_default()
-                .push(bid);
+    let bids_by_round: HashMap<u64, Vec<BidData>> =
+        bids.into_iter().fold(HashMap::new(), |mut acc, bid| {
+            acc.entry(bid.round).or_default().push(bid);
             acc
         });
 
@@ -132,7 +129,10 @@ pub async fn insert_all_timeboost_bids() -> eyre::Result<()> {
         let elapsed = Duration::from_secs(delta * ROUND_DURATION);
         let chrono_elapsed = chrono::Duration::from_std(elapsed)?;
         let final_timestamp = (first_round_at + chrono_elapsed).with_timezone(&Utc);
-        let bids = bids.into_iter().map(|bid| bid.with_timestamp(final_timestamp)).collect();
+        let bids = bids
+            .into_iter()
+            .map(|bid| bid.with_timestamp(final_timestamp))
+            .collect();
         clickhouse.write_express_lane_bids(bids).await?;
     }
     Ok(())
@@ -173,14 +173,18 @@ pub async fn insert_timeboost_bids_task() -> eyre::Result<()> {
             }
         }
 
-        let bids = bids.into_iter().map(|bid| {
-            assert!(last_bid.round >= bid.round);
-            let delta = last_bid.round - bid.round;
-            let elapsed = Duration::from_secs(delta as u64 * ROUND_DURATION);
-            let chrono_elapsed = chrono::Duration::from_std(elapsed).expect("elapsed is out of range");
-            let final_timestamp = (Utc::now() - chrono_elapsed).with_timezone(&Utc);
-            bid.with_timestamp(final_timestamp)
-        }).collect();
+        let bids = bids
+            .into_iter()
+            .map(|bid| {
+                assert!(last_bid.round >= bid.round);
+                let delta = last_bid.round - bid.round;
+                let elapsed = Duration::from_secs(delta as u64 * ROUND_DURATION);
+                let chrono_elapsed =
+                    chrono::Duration::from_std(elapsed).expect("elapsed is out of range");
+                let final_timestamp = (Utc::now() - chrono_elapsed).with_timezone(&Utc);
+                bid.with_timestamp(final_timestamp)
+            })
+            .collect();
 
         let count = clickhouse.write_express_lane_bids(bids).await?;
         tracing::debug!(?count.rows, "Written bids to clickhouse");

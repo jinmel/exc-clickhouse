@@ -32,8 +32,8 @@ impl std::fmt::Display for ExchangeName {
 
 #[derive(Debug, Serialize, Deserialize, Copy, Clone)]
 pub enum TradeSide {
-    Buy, 
-    Sell
+    Buy,
+    Sell,
 }
 
 impl std::fmt::Display for TradeSide {
@@ -84,7 +84,7 @@ impl NormalizedTrade {
         amount: f64,
     ) -> Self {
         let symbol = ArrayString::from(symbol).expect("Symbol is too long");
-        
+
         Self {
             exchange,
             symbol,

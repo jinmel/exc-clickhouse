@@ -41,17 +41,25 @@ impl TryInto<NormalizedTrade> for TradeEvent {
 
     fn try_into(self) -> Result<NormalizedTrade, Self::Error> {
         // Parse price and quantity strings to f64
-        let price = self.price.parse::<f64>()
+        let price = self
+            .price
+            .parse::<f64>()
             .map_err(|e| ExchangeStreamError::ParseError(format!("Invalid price value: {e}")))?;
 
-        let amount = self.quantity.parse::<f64>()
+        let amount = self
+            .quantity
+            .parse::<f64>()
             .map_err(|e| ExchangeStreamError::ParseError(format!("Invalid quantity value: {e}")))?;
 
         Ok(NormalizedTrade::new(
             ExchangeName::Binance,
             &self.symbol,
             self.event_time * 1000, // Convert milliseconds to microseconds
-            if self.is_buyer_maker { TradeSide::Sell } else { TradeSide::Buy },
+            if self.is_buyer_maker {
+                TradeSide::Sell
+            } else {
+                TradeSide::Buy
+            },
             price,
             amount,
         ))
@@ -90,17 +98,21 @@ impl TryInto<NormalizedQuote> for BookTickerEvent {
             .as_micros() as u64;
 
         // Parse ask and bid values
-        let ask_amount = self.best_ask_quantity.parse::<f64>()
-            .map_err(|e| ExchangeStreamError::ParseError(format!("Invalid ask quantity value: {e}")))?;
+        let ask_amount = self.best_ask_quantity.parse::<f64>().map_err(|e| {
+            ExchangeStreamError::ParseError(format!("Invalid ask quantity value: {e}"))
+        })?;
 
-        let ask_price = self.best_ask.parse::<f64>()
-            .map_err(|e| ExchangeStreamError::ParseError(format!("Invalid ask price value: {e}")))?;
+        let ask_price = self.best_ask.parse::<f64>().map_err(|e| {
+            ExchangeStreamError::ParseError(format!("Invalid ask price value: {e}"))
+        })?;
 
-        let bid_price = self.best_bid.parse::<f64>()
-            .map_err(|e| ExchangeStreamError::ParseError(format!("Invalid bid price value: {e}")))?;
+        let bid_price = self.best_bid.parse::<f64>().map_err(|e| {
+            ExchangeStreamError::ParseError(format!("Invalid bid price value: {e}"))
+        })?;
 
-        let bid_amount = self.best_bid_quantity.parse::<f64>()
-            .map_err(|e| ExchangeStreamError::ParseError(format!("Invalid bid quantity value: {e}")))?;
+        let bid_amount = self.best_bid_quantity.parse::<f64>().map_err(|e| {
+            ExchangeStreamError::ParseError(format!("Invalid bid quantity value: {e}"))
+        })?;
 
         Ok(NormalizedQuote::new(
             ExchangeName::Binance,

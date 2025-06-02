@@ -7,11 +7,11 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
+use std::time::{Duration, Instant};
 use tokio::net::TcpStream;
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async};
-use std::time::{Duration, Instant};
 
 #[derive(Debug, thiserror::Error, Clone)]
 #[non_exhaustive]
@@ -28,7 +28,20 @@ pub enum ExchangeStreamError {
     ConnectionError(String),
 }
 
-type WsPostConnectFn = Box<dyn FnOnce(WebSocketStream<MaybeTlsStream<TcpStream>>) -> Pin<Box<dyn Future<Output = Result<WebSocketStream<MaybeTlsStream<TcpStream>>, ExchangeStreamError>> + Send>> + Send>;
+type WsPostConnectFn = Box<
+    dyn FnOnce(
+            WebSocketStream<MaybeTlsStream<TcpStream>>,
+        ) -> Pin<
+            Box<
+                dyn Future<
+                        Output = Result<
+                            WebSocketStream<MaybeTlsStream<TcpStream>>,
+                            ExchangeStreamError,
+                        >,
+                    > + Send,
+            >,
+        > + Send,
+>;
 
 pub struct ExchangeStream<T: Send + 'static> {
     inner: ReceiverStream<Result<T, ExchangeStreamError>>,
@@ -95,7 +108,9 @@ impl<T: Send + 'static> ExchangeStream<T> {
                     }
                 }
                 tracing::info!("Reconnecting to {url}");
-                (ws, _) = connect_async(&url).await.map_err(|e|  ExchangeStreamError::ConnectionError(e.to_string()))?;
+                (ws, _) = connect_async(&url)
+                    .await
+                    .map_err(|e| ExchangeStreamError::ConnectionError(e.to_string()))?;
                 connected_at = Instant::now();
             }
         });

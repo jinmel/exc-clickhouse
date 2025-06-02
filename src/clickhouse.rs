@@ -6,6 +6,7 @@ use std::{
 
 use crate::models::NormalizedQuote;
 use crate::models::NormalizedTrade;
+use crate::timeboost::bids::BidData;
 use crate::{ethereum::BlockMetadata, models::NormalizedEvent};
 use clickhouse::Row;
 use clickhouse::{Client, inserter::Quantities};
@@ -13,7 +14,6 @@ use eyre::WrapErr;
 use futures::pin_mut;
 use futures::{Future, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
-use crate::timeboost::bids::BidData;
 
 #[derive(Debug, Clone)]
 pub struct ClickHouseConfig {
@@ -138,20 +138,31 @@ impl ClickHouseService {
     }
 
     pub async fn get_latest_bid(&self) -> eyre::Result<BidData> {
-        let query = self.client.query("SELECT * FROM timeboost.bids ORDER BY round DESC LIMIT 1");
-        query.fetch_one::<BidData>().await.wrap_err("failed to get latest bid")
+        let query = self
+            .client
+            .query("SELECT * FROM timeboost.bids ORDER BY round DESC LIMIT 1");
+        query
+            .fetch_one::<BidData>()
+            .await
+            .wrap_err("failed to get latest bid")
     }
 
     pub async fn get_bids_by_round(&self, round: u64) -> eyre::Result<Vec<BidData>> {
-        let query = self.client.query("SELECT * FROM timeboost.bids WHERE round = ?").bind(round);
-        query.fetch_all::<BidData>().await.wrap_err("failed to get bids by round")
+        let query = self
+            .client
+            .query("SELECT * FROM timeboost.bids WHERE round = ?")
+            .bind(round);
+        query
+            .fetch_all::<BidData>()
+            .await
+            .wrap_err("failed to get bids by round")
     }
 
     pub async fn write_express_lane_bids(&self, bids: Vec<BidData>) -> eyre::Result<Quantities> {
         if bids.is_empty() {
             return Ok(Quantities::ZERO);
         }
-        
+
         let mut inserter = self
             .client
             .inserter("timeboost.bids")?
