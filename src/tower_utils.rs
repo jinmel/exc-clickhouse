@@ -58,7 +58,7 @@ where
         let future = self.service.call(req);
 
         Box::pin(async move {
-            tracing::trace!("Delaying for {} seconds...", delay.as_secs());
+            tracing::trace!("Delaying for {:?}", delay);
             sleep(delay).await;
             tracing::trace!("Dispatching request...");
             future.await
