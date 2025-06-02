@@ -14,7 +14,10 @@ use tracing_subscriber::{EnvFilter, FmtSubscriber};
 use crate::{
     clickhouse::{ClickHouseConfig, ClickHouseService},
     models::NormalizedEvent,
-    streams::{CombinedStream, ExchangeStreamError, binance::{BinanceClient, DEFAULT_BINANCE_WS_URL}},
+    streams::{
+        CombinedStream, ExchangeStreamError,
+        binance::{BinanceClient, DEFAULT_BINANCE_WS_URL},
+    },
 };
 
 mod clickhouse;
@@ -22,6 +25,7 @@ mod ethereum;
 mod models;
 mod streams;
 mod timeboost;
+mod tower_utils;
 
 #[derive(Parser)]
 #[command(name = "exc-clickhouse")]
@@ -230,7 +234,9 @@ async fn main() -> eyre::Result<()> {
         }
 
         if !cli.skip_ethereum {
-            let rpc_url = cli.rpc_url.clone()
+            let rpc_url = cli
+                .rpc_url
+                .clone()
                 .or_else(|| std::env::var("RPC_URL").ok())
                 .ok_or(eyre::eyre!(
                     "RPC_URL must be provided via --rpc-url flag or RPC_URL environment variable"
@@ -243,7 +249,7 @@ async fn main() -> eyre::Result<()> {
             set.spawn(async move {
                 (
                     TaskType::EthereumBlockMetadata,
-                    ethereum::block_metadata_task(&rpc_url).await,
+                    ethereum::stream_blocks_to_clickhouse(rpc_url).await,
                 )
             });
         }

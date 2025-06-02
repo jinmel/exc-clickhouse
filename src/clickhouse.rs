@@ -107,7 +107,7 @@ impl ClickHouseService {
 
     pub async fn write_block_metadata_stream(
         &self,
-        stream: impl Stream<Item = BlockMetadata>,
+        stream: impl Stream<Item = eyre::Result<BlockMetadata>>,
     ) -> eyre::Result<Quantities> {
         let mut inserter = self
             .client
@@ -116,10 +116,21 @@ impl ClickHouseService {
             .with_period(Some(Duration::from_secs(1)))
             .with_period_bias(0.1);
         pin_mut!(stream);
+        let mut count = 0;
         while let Some(metadata) = stream.next().await {
-            inserter.write(&metadata)?;
-            inserter.commit().await?;
+            if let Ok(metadata) = metadata {
+                inserter.write(&metadata)?;
+                count += 1;
+            } else {
+                tracing::error!("Failed to write block metadata: {:?}", metadata);
+            }
+
+            // Write 4 blocks per db transaction.
+            if count % 4 == 0 {
+                inserter.commit().await?;
+            }
         }
+        tracing::info!("Wrote {} block metadata to clickhouse", count);
         inserter
             .end()
             .await

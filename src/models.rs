@@ -17,15 +17,15 @@ pub enum ExchangeName {
     Upbit,
 }
 
-impl ToString for ExchangeName {
-    fn to_string(&self) -> String {
+impl std::fmt::Display for ExchangeName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ExchangeName::Binance => "binance".to_string(),
-            ExchangeName::Bybit => "bybit".to_string(),
-            ExchangeName::Okx => "okx".to_string(),
-            ExchangeName::Coinbase => "coinbase".to_string(),
-            ExchangeName::Kraken => "kraken".to_string(),
-            ExchangeName::Upbit => "upbit".to_string(),
+            ExchangeName::Binance => write!(f, "binance"),
+            ExchangeName::Bybit => write!(f, "bybit"),
+            ExchangeName::Okx => write!(f, "okx"),
+            ExchangeName::Coinbase => write!(f, "coinbase"),
+            ExchangeName::Kraken => write!(f, "kraken"),
+            ExchangeName::Upbit => write!(f, "upbit"),
         }
     }
 }
