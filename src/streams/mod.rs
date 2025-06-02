@@ -120,10 +120,6 @@ impl<T: Send + 'static> ExchangeStream<T> {
             handle,
         })
     }
-
-    pub fn shutdown(self) {
-        self.handle.abort();
-    }
 }
 
 impl<T: Send + 'static> Stream for ExchangeStream<T> {
@@ -141,6 +137,7 @@ impl<T: Send + 'static> Drop for ExchangeStream<T> {
 }
 
 #[async_trait]
+#[allow(unused)]
 pub trait ExchangeClient {
     type TradeStream: Stream<Item = Result<NormalizedTrade, ExchangeStreamError>>
         + Send

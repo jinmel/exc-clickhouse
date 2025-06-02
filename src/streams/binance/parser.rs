@@ -6,12 +6,14 @@ use crate::{
     },
 };
 
+#[allow(unused)]
 pub fn parse_binance_trade(event: &str) -> Result<NormalizedTrade, ExchangeStreamError> {
     serde_json::from_str::<TradeEvent>(event)
         .map_err(|e| ExchangeStreamError::ParseError(e.to_string()))?
         .try_into()
 }
 
+#[allow(unused)]
 pub fn parse_binance_quote(event: &str) -> Result<NormalizedQuote, ExchangeStreamError> {
     serde_json::from_str::<BookTickerEvent>(event)
         .map_err(|e| ExchangeStreamError::ParseError(e.to_string()))?
