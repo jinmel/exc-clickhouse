@@ -51,7 +51,7 @@ impl BlockMetadataFetcher {
                 block_timestamp: block.timestamp,
                 valid: true,
               };
-              tracing::info!("Fetched block: {}", block.number);
+              tracing::trace!("Fetched block: {}", block.number);
               yield block_metadata;
             }
             tracing::info!("Block stream ended. reconnecting...");
