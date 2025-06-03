@@ -200,9 +200,9 @@ impl ClickHouseService {
                         quote_inserter.write(&quote)?;
                     }
                 }
-                trade_inserter.commit().await?;
-                quote_inserter.commit().await?;
             }
+            trade_inserter.commit().await?;
+            quote_inserter.commit().await?;
         }
         trade_inserter.end().await?;
         quote_inserter.end().await?;
