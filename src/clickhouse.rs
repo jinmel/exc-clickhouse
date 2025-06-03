@@ -194,15 +194,15 @@ impl ClickHouseService {
                     NormalizedEvent::Trade(trade) => {
                         let trade: ClickhouseTrade = trade.into();
                         trade_inserter.write(&trade)?;
+                        trade_inserter.commit().await?;
                     }
                     NormalizedEvent::Quote(quote) => {
                         let quote: ClickhouseQuote = quote.into();
                         quote_inserter.write(&quote)?;
+                        quote_inserter.commit().await?;
                     }
                 }
             }
-            trade_inserter.commit().await?;
-            quote_inserter.commit().await?;
         }
         trade_inserter.end().await?;
         quote_inserter.end().await?;
