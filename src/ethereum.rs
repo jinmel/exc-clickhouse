@@ -7,6 +7,7 @@ use alloy::transports::layers::RetryBackoffLayer;
 use alloy::transports::ws::WsConnect;
 use async_stream::try_stream;
 use clickhouse::Row;
+use futures::StreamExt;
 use futures::{Stream, pin_mut};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -61,9 +62,18 @@ impl BlockMetadataFetcher {
 }
 
 pub async fn stream_blocks_to_clickhouse(rpc_url: String) -> eyre::Result<()> {
+    let clickhouse_service = ClickHouseService::new(ClickHouseConfig::from_env()?);
     let fetcher = BlockMetadataFetcher::new(rpc_url).await?;
     let block_stream = fetcher.create_block_metadata_stream().await;
-    let clickhouse_service = ClickHouseService::new(ClickHouseConfig::from_env()?);
+    let block_stream = block_stream.filter_map(|result| async move {
+        match result {
+            Ok(block) => Some(block),
+            Err(e) => {
+                tracing::error!("Error in block stream: {:?}", e);
+                None
+            }
+        }
+    });
     clickhouse_service
         .write_block_metadata_stream(block_stream)
         .await?;

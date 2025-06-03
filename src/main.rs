@@ -1,6 +1,8 @@
 use clap::Parser;
 use dotenv::dotenv;
 use eyre::WrapErr;
+use futures::SinkExt;
+use futures::pin_mut;
 use futures::stream::StreamExt;
 use std::collections::HashMap;
 use std::fs::File;
@@ -8,7 +10,6 @@ use std::io::{self, BufRead};
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
-use tower::ServiceExt;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 use crate::{
@@ -368,17 +369,10 @@ async fn binance_stream_task(
         .build()?;
     let combined_stream = binance.combined_stream().await?;
     let chunks = combined_stream.chunks(batch_size);
-
-    chunks
-        .for_each_concurrent(10, |batch| {
-            let tx = evt_tx.clone();
-            async move {
-                if let Err(e) = tx.send(batch).await {
-                    tracing::error!("Error sending batch to ClickHouse: {:?}", e);
-                }
-            }
-        })
-        .await;
+    pin_mut!(chunks);
+    while let Some(chunk) = chunks.next().await {
+        evt_tx.send(chunk).await?;
+    }
     Ok(())
 }
 
@@ -387,26 +381,17 @@ async fn clickhouse_cex_writer_task(
 ) -> eyre::Result<()> {
     let cfg = ClickHouseConfig::from_env()?;
     let writer = ClickHouseService::new(cfg);
-
-    let batch_stream = ReceiverStream::new(rx)
-        .map(|batch| {
-            batch
-                .into_iter()
-                .inspect(|result| {
-                    if let Err(e) = result {
-                        tracing::error!("{:?}", e);
-                    }
-                })
-                .filter_map(Result::ok)
-                .collect::<Vec<_>>()
-        })
-        .filter(|events| futures::future::ready(!events.is_empty()));
-
-    let mut resp_stream = writer.call_all(batch_stream);
-    while let Some(result) = resp_stream.next().await {
-        if let Err(e) = result {
-            tracing::error!("Error writing to ClickHouse: {:?}", e);
-        }
-    }
+    let batch_stream = ReceiverStream::new(rx).map(|batch| {
+        batch
+            .into_iter()
+            .inspect(|result| {
+                if let Err(e) = result {
+                    tracing::error!("{:?}", e);
+                }
+            })
+            .filter_map(Result::ok)
+            .collect::<Vec<_>>()
+    });
+    writer.write_events(batch_stream).await?;
     Ok(())
 }

@@ -1,8 +1,4 @@
-use std::{
-    pin::Pin,
-    task::{Context, Poll},
-    time::Duration,
-};
+use std::time::Duration;
 
 use crate::models::NormalizedQuote;
 use crate::models::NormalizedTrade;
@@ -12,7 +8,7 @@ use clickhouse::Row;
 use clickhouse::{Client, inserter::Quantities};
 use eyre::WrapErr;
 use futures::pin_mut;
-use futures::{Future, Stream, StreamExt};
+use futures::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
@@ -107,7 +103,7 @@ impl ClickHouseService {
 
     pub async fn write_block_metadata_stream(
         &self,
-        stream: impl Stream<Item = eyre::Result<BlockMetadata>>,
+        stream: impl Stream<Item = BlockMetadata>,
     ) -> eyre::Result<Quantities> {
         let mut inserter = self
             .client
@@ -118,13 +114,8 @@ impl ClickHouseService {
         pin_mut!(stream);
         let mut count = 0;
         while let Some(metadata) = stream.next().await {
-            if let Ok(metadata) = metadata {
-                inserter.write(&metadata)?;
-                count += 1;
-            } else {
-                tracing::error!("Failed to write block metadata: {:?}", metadata);
-            }
-
+            inserter.write(&metadata)?;
+            count += 1;
             // Write 4 blocks per db transaction.
             if count % 4 == 0 {
                 inserter.commit().await?;
@@ -178,7 +169,10 @@ impl ClickHouseService {
         inserter.end().await.wrap_err("failed to write bids")
     }
 
-    async fn write_events(&self, events: Vec<NormalizedEvent>) -> eyre::Result<()> {
+    pub async fn write_events(
+        &self,
+        event_stream: impl Stream<Item = Vec<NormalizedEvent>>,
+    ) -> eyre::Result<()> {
         let mut trade_inserter = self
             .client
             .inserter("cex.normalized_trades")?
@@ -193,15 +187,18 @@ impl ClickHouseService {
             .with_period(Some(Duration::from_secs(1)))
             .with_period_bias(0.1);
 
-        for event in events.into_iter() {
-            match event {
-                NormalizedEvent::Trade(trade) => {
-                    let trade: ClickhouseTrade = trade.into();
-                    trade_inserter.write(&trade)?;
-                }
-                NormalizedEvent::Quote(quote) => {
-                    let quote: ClickhouseQuote = quote.into();
-                    quote_inserter.write(&quote)?;
+        pin_mut!(event_stream);
+        while let Some(events) = event_stream.next().await {
+            for event in events {
+                match event {
+                    NormalizedEvent::Trade(trade) => {
+                        let trade: ClickhouseTrade = trade.into();
+                        trade_inserter.write(&trade)?;
+                    }
+                    NormalizedEvent::Quote(quote) => {
+                        let quote: ClickhouseQuote = quote.into();
+                        quote_inserter.write(&quote)?;
+                    }
                 }
             }
         }
@@ -210,27 +207,5 @@ impl ClickHouseService {
         trade_inserter.end().await?;
         quote_inserter.end().await?;
         Ok(())
-    }
-}
-
-impl tower::Service<Vec<NormalizedEvent>> for ClickHouseService {
-    type Response = ();
-    type Error = eyre::Error;
-    type Future = Pin<Box<dyn Future<Output = Result<(), Self::Error>> + Send>>;
-
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn call(&mut self, batch: Vec<NormalizedEvent>) -> Self::Future {
-        let svc = self.clone();
-        Box::pin(async move {
-            // if write_batch fails, this returns Err(eyre::Error)
-            svc.write_events(batch)
-                .await
-                .map_err(|e| eyre::eyre!("clickhouse write failed: {}", e))?;
-            // on success:
-            Ok(())
-        })
     }
 }
