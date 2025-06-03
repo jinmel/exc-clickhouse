@@ -1,7 +1,6 @@
 use clap::Parser;
 use dotenv::dotenv;
 use eyre::WrapErr;
-use futures::SinkExt;
 use futures::pin_mut;
 use futures::stream::StreamExt;
 use std::collections::HashMap;
