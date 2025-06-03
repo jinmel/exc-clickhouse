@@ -112,16 +112,10 @@ impl ClickHouseService {
             .with_period(Some(Duration::from_secs(1)))
             .with_period_bias(0.1);
         pin_mut!(stream);
-        let mut count = 0;
         while let Some(metadata) = stream.next().await {
             inserter.write(&metadata)?;
-            count += 1;
-            // Write 4 blocks per db transaction.
-            if count % 4 == 0 {
-                inserter.commit().await?;
-            }
+            inserter.commit().await?;
         }
-        tracing::info!("Wrote {} block metadata to clickhouse", count);
         inserter
             .end()
             .await
