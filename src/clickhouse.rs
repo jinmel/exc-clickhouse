@@ -176,14 +176,14 @@ impl ClickHouseService {
         let mut trade_inserter = self
             .client
             .inserter("cex.normalized_trades")?
-            .with_max_rows(500)
+            .with_max_rows(5000)
             .with_period(Some(Duration::from_secs(1)))
             .with_period_bias(0.1);
 
         let mut quote_inserter = self
             .client
             .inserter("cex.normalized_quotes")?
-            .with_max_rows(500)
+            .with_max_rows(5000)
             .with_period(Some(Duration::from_secs(1)))
             .with_period_bias(0.1);
 
