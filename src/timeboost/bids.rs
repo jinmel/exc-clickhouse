@@ -15,6 +15,8 @@ use tower::Service;
 use tower::limit::RateLimitLayer;
 use tower::timeout::TimeoutLayer;
 use tower::util::ServiceExt;
+use tokio::sync::mpsc;
+use crate::models::{ClickhouseMessage, ExpresslaneMessage};
 
 // ClickHouse table schema for proper time filtering:
 // CREATE TABLE timeboost.bids
@@ -138,7 +140,7 @@ pub async fn insert_all_timeboost_bids() -> eyre::Result<()> {
     Ok(())
 }
 
-pub async fn insert_timeboost_bids_task() -> eyre::Result<()> {
+pub async fn fetch_bids_task(msg_tx: mpsc::UnboundedSender<Vec<ClickhouseMessage>>) -> eyre::Result<()> {
     let inner = HistoricalBidsService::new().await?;
     let mut svc = tower::ServiceBuilder::new()
         .layer(TimeoutLayer::new(Duration::from_secs(10)))
@@ -184,10 +186,12 @@ pub async fn insert_timeboost_bids_task() -> eyre::Result<()> {
                 let final_timestamp = (Utc::now() - chrono_elapsed).with_timezone(&Utc);
                 bid.with_timestamp(final_timestamp)
             })
-            .collect();
-
-        let count = clickhouse.write_express_lane_bids(bids).await?;
-        tracing::debug!(?count.rows, "Written bids to clickhouse");
+            .map(|bid| ClickhouseMessage::Expresslane(ExpresslaneMessage::Bid(bid)))
+            .collect::<Vec<_>>();
+        let res = msg_tx.send(bids);
+        if res.is_err() {
+            tracing::error!("Failed to send bids to channel");
+        }
     }
 }
 

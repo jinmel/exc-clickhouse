@@ -8,12 +8,11 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::time::Duration;
 use tokio::sync::mpsc;
-use tokio_stream::wrappers::ReceiverStream;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 use crate::{
     clickhouse::{ClickHouseConfig, ClickHouseService},
-    models::NormalizedEvent,
+    models::{ClickhouseMessage, NormalizedEvent},
     streams::{
         CombinedStream, ExchangeStreamError,
         binance::{BinanceClient, DEFAULT_BINANCE_WS_URL},
@@ -214,15 +213,15 @@ async fn main() -> eyre::Result<()> {
 
     loop {
         // Create new channel for each restart cycle
-        let (evt_tx, evt_rx) =
-            mpsc::channel::<Vec<Result<NormalizedEvent, ExchangeStreamError>>>(50000);
+        let (msg_tx, msg_rx) =
+            mpsc::unbounded_channel::<Vec<ClickhouseMessage>>();
         let mut set = tokio::task::JoinSet::new();
 
         // Spawn tasks
         if !cli.skip_binance {
             let symbols = read_symbols(&cli.symbols_file)?;
             let batch_size = cli.batch_size;
-            let tx = evt_tx.clone();
+            let tx = msg_tx.clone();
 
             tracing::info!("Spawning binance stream for symbols: {:?}", symbols);
             set.spawn(async move {
@@ -246,10 +245,11 @@ async fn main() -> eyre::Result<()> {
                 "Spawning ethereum block metadata task from RPC URL: {}",
                 rpc_url
             );
+            let tx = msg_tx.clone();
             set.spawn(async move {
                 (
                     TaskType::EthereumBlockMetadata,
-                    ethereum::stream_blocks_to_clickhouse(rpc_url).await,
+                    ethereum::fetch_blocks_task(rpc_url, tx).await,
                 )
             });
         }
@@ -259,23 +259,24 @@ async fn main() -> eyre::Result<()> {
             set.spawn(async move {
                 (
                     TaskType::ClickHouseInsert,
-                    clickhouse_cex_writer_task(evt_rx).await,
+                    clickhouse_writer_task(msg_rx).await,
                 )
             });
         }
 
         if !cli.skip_timeboost {
             tracing::info!("Spawning timeboost bids task");
+            let tx = msg_tx.clone();
             set.spawn(async move {
                 (
                     TaskType::FetchTimeboostBids,
-                    timeboost::bids::insert_timeboost_bids_task().await,
+                    timeboost::bids::fetch_bids_task(tx).await,
                 )
             });
         }
 
         // Drop the sender to ensure proper cleanup
-        drop(evt_tx);
+        drop(msg_tx);
 
         let mut should_restart = false;
         let mut failed_tasks = Vec::new();
@@ -356,7 +357,7 @@ async fn main() -> eyre::Result<()> {
 }
 
 async fn binance_stream_task(
-    evt_tx: mpsc::Sender<Vec<Result<NormalizedEvent, ExchangeStreamError>>>,
+    evt_tx: mpsc::UnboundedSender<Vec<ClickhouseMessage>>,
     symbols: Vec<String>,
     batch_size: usize,
 ) -> eyre::Result<()> {
@@ -367,30 +368,39 @@ async fn binance_stream_task(
         .with_trades(true)
         .build()?;
     let combined_stream = binance.combined_stream().await?;
-    let chunks = combined_stream.chunks(batch_size);
+    let chunks = combined_stream.filter_map(|event: Result<NormalizedEvent, ExchangeStreamError>| async move{
+        match event {
+            Ok(NormalizedEvent::Trade(trade)) => {
+                Some(ClickhouseMessage::Cex(NormalizedEvent::Trade(trade)))
+            }
+            Ok(NormalizedEvent::Quote(quote)) => {  
+                Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
+            }
+            Err(e) => {
+                // TODO: handle error
+                tracing::error!("Error parsing event: {:?}", e);
+                None
+            }
+        }
+    }).chunks(batch_size);
     pin_mut!(chunks);
     while let Some(chunk) = chunks.next().await {
-        evt_tx.send(chunk).await?;
+        let res = evt_tx.send(chunk);
+        if res.is_err() {
+            tracing::error!("Failed to send chunk to channel");
+        }
     }
     Ok(())
 }
 
-async fn clickhouse_cex_writer_task(
-    rx: mpsc::Receiver<Vec<Result<NormalizedEvent, ExchangeStreamError>>>,
+async fn clickhouse_writer_task(
+    rx: mpsc::UnboundedReceiver<Vec<ClickhouseMessage>>,
 ) -> eyre::Result<()> {
     let cfg = ClickHouseConfig::from_env()?;
-    let writer = ClickHouseService::new(cfg);
-    let batch_stream = ReceiverStream::new(rx).map(|batch| {
-        batch
-            .into_iter()
-            .inspect(|result| {
-                if let Err(e) = result {
-                    tracing::error!("{:?}", e);
-                }
-            })
-            .filter_map(Result::ok)
-            .collect::<Vec<_>>()
-    });
-    writer.write_events(batch_stream).await?;
+    let clickhouse_svc = ClickHouseService::new(cfg);
+    pin_mut!(rx);
+    while let Some(batch) = rx.recv().await {
+        clickhouse_svc.handle_msg(batch).await?;
+    }
     Ok(())
 }

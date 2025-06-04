@@ -1,6 +1,8 @@
 use arrayvec::ArrayString;
 use serde::{Deserialize, Serialize};
 
+use crate::{ethereum::BlockMetadata, timeboost::bids::BidData};
+
 #[derive(Debug, Serialize, Deserialize, Copy, Clone)]
 pub enum ExchangeName {
     #[serde(rename = "binance")]
@@ -43,6 +45,23 @@ impl std::fmt::Display for TradeSide {
             TradeSide::Sell => write!(f, "sell"),
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum ClickhouseMessage {
+    Cex(NormalizedEvent),
+    Expresslane(ExpresslaneMessage),
+    Ethereum(EthereumMetadataMessage),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum ExpresslaneMessage {
+    Bid(BidData),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum EthereumMetadataMessage {
+    Block(BlockMetadata),
 }
 
 #[derive(Debug, Serialize, Deserialize, Copy, Clone)]
