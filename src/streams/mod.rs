@@ -1,5 +1,6 @@
 pub mod binance;
 pub mod okx;
+pub mod kucoin;
 
 use crate::models::{NormalizedEvent, NormalizedQuote, NormalizedTrade};
 use async_trait::async_trait;
