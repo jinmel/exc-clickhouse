@@ -157,7 +157,10 @@ pub async fn fetch_bids_task(msg_tx: mpsc::UnboundedSender<Vec<ClickhouseMessage
         let mut bids = svc
             .call(HistoricalBidsRequest::Latest)
             .await
-            .map_err(|e| eyre::eyre!("Service call failed: {}", e))?;
+            .map_err(|e| {
+                tracing::error!("Failed to fetch timeboost bids: {}", e);
+                eyre::eyre!("Service call failed: {}", e)
+            })?;
         tracing::debug!("Got {} bids from s3", bids.len());
         if bids.is_empty() {
             tracing::warn!("No bids found from s3");
@@ -188,10 +191,9 @@ pub async fn fetch_bids_task(msg_tx: mpsc::UnboundedSender<Vec<ClickhouseMessage
             })
             .map(|bid| ClickhouseMessage::Expresslane(ExpresslaneMessage::Bid(bid)))
             .collect::<Vec<_>>();
-        let res = msg_tx.send(bids);
-        if res.is_err() {
-            tracing::error!("Failed to send bids to channel");
-        }
+        msg_tx
+            .send(bids)
+            .map_err(|_| eyre::eyre!("failed to send bids to channel"))?;
     }
 }
 
