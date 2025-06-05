@@ -1,0 +1,9 @@
+- exchange: "Binance"
+  market: "SPOT"
+  symbols:
+    - BTCUSDT
+    - ETHBTC
+- exchange: "OKX"
+  market: "SPOT"
+  symbols:
+    - BTCUSDT

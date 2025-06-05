@@ -5,8 +5,8 @@ use futures::pin_mut;
 use futures::stream::StreamExt;
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{self, BufRead};
 use std::time::Duration;
+use crate::symbols::SymbolsConfig;
 use tokio::sync::mpsc;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
@@ -25,6 +25,7 @@ mod models;
 mod streams;
 mod timeboost;
 mod tower_utils;
+mod symbols;
 
 #[derive(Parser)]
 #[command(name = "exc-clickhouse")]
@@ -32,7 +33,7 @@ mod tower_utils;
 #[command(version)]
 struct Cli {
     /// Path to symbols file
-    #[arg(short, long, default_value = "symbols.txt")]
+    #[arg(short, long, default_value = "symbols.yaml")]
     symbols_file: String,
 
     /// Batch size for processing events
@@ -152,23 +153,9 @@ impl TaskSupervisor {
     }
 }
 
-fn read_symbols(filename: &str) -> eyre::Result<Vec<String>> {
-    let file = File::open(filename).wrap_err("Failed to open symbols.txt")?;
-    let reader = io::BufReader::new(file);
-    reader
-        .lines()
-        .enumerate()
-        .map(|(idx, line)| {
-            line.wrap_err(format!("Failed to read line {}", idx + 1))
-                .and_then(|line| {
-                    if line.is_empty() {
-                        Err(eyre::eyre!("Empty line at {}", idx + 1))
-                    } else {
-                        Ok(line.trim().to_lowercase())
-                    }
-                })
-        })
-        .collect::<eyre::Result<Vec<String>>>()
+fn read_symbols(filename: &str) -> eyre::Result<SymbolsConfig> {
+    let file = File::open(filename).wrap_err("Failed to open symbols YAML file")?;
+    SymbolsConfig::from_yaml(file)
 }
 
 #[tokio::main]
@@ -219,7 +206,13 @@ async fn main() -> eyre::Result<()> {
 
         // Spawn tasks
         if !cli.skip_binance {
-            let symbols = read_symbols(&cli.symbols_file)?;
+            let config = read_symbols(&cli.symbols_file)?;
+            let symbols: Vec<String> = config
+                .entries
+                .iter()
+                .filter(|e| e.exchange.eq_ignore_ascii_case("binance"))
+                .flat_map(|e| e.symbols.iter().cloned().map(|s| s.to_lowercase()))
+                .collect();
             let batch_size = cli.batch_size;
             let tx = msg_tx.clone();
 
