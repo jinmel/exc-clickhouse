@@ -117,3 +117,34 @@ impl BybitClientBuilder {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio_stream::StreamExt;
+
+    #[tokio::test]
+    async fn test_bybit_combined_stream_connect() {
+        let client = BybitClient::builder()
+            .add_symbols(vec!["BTCUSDT"])
+            .with_quotes(true)
+            .with_trades(true)
+            .build()
+            .unwrap();
+
+        let mut stream = client
+            .combined_stream()
+            .await
+            .expect("failed to connect");
+
+        let event = stream
+            .next()
+            .await
+            .expect("stream closed before yielding event")
+            .expect("error from stream");
+
+        match event {
+            NormalizedEvent::Trade(_) | NormalizedEvent::Quote(_) => {}
+        }
+    }
+}
+
