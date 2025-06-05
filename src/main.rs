@@ -189,9 +189,9 @@ async fn main() -> eyre::Result<()> {
 
     match cli.command {
         Commands::Db => {
-            tracing::info!("Inserting all timeboost bids");
-            timeboost::bids::insert_all_timeboost_bids().await?;
-            tracing::info!("All timeboost bids inserted");
+            tracing::info!("Backfilling timeboost bids");
+            timeboost::bids::backfill_timeboost_bids().await?;
+            tracing::info!("Timeboost bids backfill complete");
             return Ok(());
         }
         Commands::Stream(args) => {
