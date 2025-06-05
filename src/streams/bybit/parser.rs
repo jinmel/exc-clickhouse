@@ -64,14 +64,14 @@ mod tests {
     #[test]
     fn test_parse_bybit_trade() {
         let msg = r#"{
-            \"topic\": \"publicTrade.BTCUSDT\",
-            \"type\": \"snapshot\",
-            \"data\": [{
-                \"T\": 1700000000000,
-                \"s\": \"BTCUSDT\",
-                \"S\": \"Buy\",
-                \"p\": \"45000\",
-                \"v\": \"0.1\"
+            "topic": "publicTrade.BTCUSDT",
+            "type": "snapshot",
+            "data": [{
+                "T": 1700000000000,
+                "s": "BTCUSDT",
+                "S": "Buy",
+                "p": "45000",
+                "v": "0.1"
             }]
         }"#;
         let trade = parse_bybit_trade(msg).unwrap();
@@ -86,15 +86,15 @@ mod tests {
     #[test]
     fn test_parse_bybit_quote() {
         let msg = r#"{
-            \"topic\": \"tickers.BTCUSDT\",
-            \"type\": \"snapshot\",
-            \"data\": [{
-                \"s\": \"BTCUSDT\",
-                \"bid1Price\": \"44999\",
-                \"bid1Size\": \"0.2\",
-                \"ask1Price\": \"45001\",
-                \"ask1Size\": \"0.3\",
-                \"ts\": 1700000000000
+            "topic": "tickers.BTCUSDT",
+            "type": "snapshot",
+            "data": [{
+                "s": "BTCUSDT",
+                "bid1Price": "44999",
+                "bid1Size": "0.2",
+                "ask1Price": "45001",
+                "ask1Size": "0.3",
+                "ts": 1700000000000
             }]
         }"#;
         let quote = parse_bybit_quote(msg).unwrap();
@@ -110,14 +110,14 @@ mod tests {
     #[test]
     fn test_parse_bybit_combined_trade() {
         let msg = r#"{
-            \"topic\": \"publicTrade.BTCUSDT\",
-            \"type\": \"snapshot\",
-            \"data\": [{
-                \"T\": 1700000000000,
-                \"s\": \"BTCUSDT\",
-                \"S\": \"Buy\",
-                \"p\": \"45000\",
-                \"v\": \"0.1\"
+            "topic": "publicTrade.BTCUSDT",
+            "type": "snapshot",
+            "data": [{
+                "T": 1700000000000,
+                "s": "BTCUSDT",
+                "S": "Buy",
+                "p": "45000",
+                "v": "0.1"
             }]
         }"#;
         match parse_bybit_combined(msg).unwrap() {
@@ -129,15 +129,15 @@ mod tests {
     #[test]
     fn test_parse_bybit_combined_quote() {
         let msg = r#"{
-            \"topic\": \"tickers.BTCUSDT\",
-            \"type\": \"snapshot\",
-            \"data\": [{
-                \"s\": \"BTCUSDT\",
-                \"bid1Price\": \"44999\",
-                \"bid1Size\": \"0.2\",
-                \"ask1Price\": \"45001\",
-                \"ask1Size\": \"0.3\",
-                \"ts\": 1700000000000
+            "topic": "tickers.BTCUSDT",
+            "type": "snapshot",
+            "data": [{
+                "s": "BTCUSDT",
+                "bid1Price": "44999",
+                "bid1Size": "0.2",
+                "ask1Price": "45001",
+                "ask1Size": "0.3",
+                "ts": 1700000000000
             }]
         }"#;
         match parse_bybit_combined(msg).unwrap() {
