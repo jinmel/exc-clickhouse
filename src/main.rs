@@ -299,6 +299,7 @@ async fn main() -> eyre::Result<()> {
                                 if supervisor.should_restart(&task_type) {
                                     failed_tasks.push(task_type.clone());
                                     should_restart = true;
+                                    break;
                                 } else {
                                     tracing::error!("{} task exceeded maximum restart attempts", task_type);
                                     break;
