@@ -67,7 +67,8 @@
     - ANIMEUSDC
     - CAKEUSDC
     - GMXUSDC
-- exchange: "OKX"
+- exchange: "Bybit"
   market: "SPOT"
   symbols:
     - BTCUSDT
+    - ETHUSDT
