@@ -14,7 +14,7 @@ use crate::{
     clickhouse::{ClickHouseConfig, ClickHouseService},
     models::{ClickhouseMessage, NormalizedEvent},
     streams::{
-        CombinedStream, ExchangeStreamError,
+        WebsocketStream, ExchangeStreamError,
         binance::{BinanceClient, DEFAULT_BINANCE_WS_URL},
     },
 };
@@ -361,7 +361,7 @@ async fn binance_stream_task(
         .with_quotes(true)
         .with_trades(true)
         .build()?;
-    let combined_stream = binance.combined_stream().await?;
+    let combined_stream = binance.stream_events().await?;
     let chunks = combined_stream.filter_map(|event: Result<NormalizedEvent, ExchangeStreamError>| async move{
         match event {
             Ok(NormalizedEvent::Trade(trade)) => {

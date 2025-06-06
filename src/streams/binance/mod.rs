@@ -3,7 +3,7 @@ use url::Url;
 
 use crate::{
     models::NormalizedEvent,
-    streams::{CombinedStream, ExchangeStream, ExchangeStreamError},
+    streams::{WebsocketStream, ExchangeStream, ExchangeStreamError},
 };
 use tokio::time::Duration;
 
@@ -57,10 +57,10 @@ impl BinanceClient {
 }
 
 #[async_trait]
-impl CombinedStream for BinanceClient {
-    type CombinedStream = ExchangeStream<NormalizedEvent>;
+impl WebsocketStream for BinanceClient {
+    type EventStream = ExchangeStream<NormalizedEvent>;
 
-    async fn combined_stream(&self) -> Result<Self::CombinedStream, ExchangeStreamError> {
+    async fn stream_events(&self) -> Result<Self::EventStream, ExchangeStreamError> {
         let url = self.build_multi_stream_url()?;
         tracing::debug!("Binance URL: {url}");
         let timeout = Duration::from_secs(23 * 60 * 60); // Binance has 24 hour timeout.
