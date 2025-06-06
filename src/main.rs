@@ -1,4 +1,8 @@
-use crate::symbols::{SymbolsConfig, SymbolsConfigEntry, fetch_binance_spot_symbols};
+use crate::symbols::{
+    SymbolsConfig,
+    SymbolsConfigEntry,
+    fetch_binance_spot_pairs,
+};
 use clap::{Args, Parser, Subcommand};
 use dotenv::dotenv;
 use eyre::WrapErr;
@@ -15,7 +19,7 @@ use crate::{
     models::{ClickhouseMessage, NormalizedEvent},
     streams::{
         ExchangeStreamError, WebsocketStream,
-        binance::{BinanceClient, MARKET_ONLY_BINANCE_WS_URL},
+        binance::BinanceClient,
     },
 };
 
@@ -53,7 +57,7 @@ enum Commands {
 enum DbCommands {
     /// Backfill timeboost bids
     Timeboost,
-    /// Fetch top Binance SPOT symbols by volume
+    /// Fetch Binance SPOT symbols from exchangeInfo
     FetchBinanceSymbols(FetchBinanceSymbolsArgs),
 }
 
@@ -68,6 +72,9 @@ struct FetchBinanceSymbolsArgs {
     /// Output YAML file path
     #[arg(short, long)]
     output: String,
+    /// Also insert trading pairs into ClickHouse
+    #[arg(long)]
+    update_clickhouse: bool,
 }
 
 #[derive(Args, Clone)]
@@ -217,8 +224,9 @@ async fn main() -> eyre::Result<()> {
                 return Ok(());
             }
             DbCommands::FetchBinanceSymbols(args) => {
-                tracing::info!("Fetching top Binance SPOT symbols by volume");
-                let symbols = fetch_binance_spot_symbols().await?;
+                tracing::info!("Fetching Binance SPOT symbols");
+                let pairs = fetch_binance_spot_pairs().await?;
+                let symbols: Vec<String> = pairs.iter().map(|p| p.pair.clone()).collect();
                 let cfg = SymbolsConfig {
                     entries: vec![SymbolsConfigEntry {
                         exchange: "Binance".to_string(),
@@ -230,6 +238,14 @@ async fn main() -> eyre::Result<()> {
                     .wrap_err("Failed to create output YAML file")?;
                 cfg.to_yaml(file)?;
                 tracing::info!("Symbols written to {}", args.output);
+
+                if args.update_clickhouse {
+                    tracing::info!("Updating ClickHouse trading_pairs table");
+                    let ch_cfg = ClickHouseConfig::from_env()?;
+                    let ch = ClickHouseService::new(ch_cfg);
+                    ch.write_trading_pairs(pairs).await?;
+                }
+
                 return Ok(());
             }
         },
