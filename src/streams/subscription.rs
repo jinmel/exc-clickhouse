@@ -21,7 +21,7 @@ impl BinanceSubscription {
         struct SubscriptionMessage {
             method: String,
             params: Vec<String>,
-            id: Option<u64>,
+            id: Option<String>,
         }
 
         let pararms = self
@@ -43,7 +43,7 @@ impl BinanceSubscription {
         let subscription_message = SubscriptionMessage {
             method: "SUBSCRIBE".to_string(),
             params: pararms,
-            id: Some(id),
+            id: Some(id.to_string()),
         };
         serde_json::to_value(subscription_message)
     }

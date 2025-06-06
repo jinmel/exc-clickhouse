@@ -11,8 +11,8 @@ use crate::{
 use tokio::time::Duration;
 
 /// Default WebSocket URL for Binance
-pub const DEFAULT_BINANCE_WS_URL: &str = "wss://stream.binance.com:9443";
-pub const MARKET_ONLY_BINANCE_WS_URL: &str = "wss://data-stream.binance.vision";
+pub const DEFAULT_BINANCE_WS_URL: &str = "wss://stream.binance.com:9443/stream";
+pub const MARKET_ONLY_BINANCE_WS_URL: &str = "wss://data-stream.binance.vision/stream";
 #[allow(unused)]
 pub const US_BINANCE_WS_URL: &str = "wss://stream.binance.us:9443";
 
@@ -47,7 +47,10 @@ impl WebsocketStream for BinanceClient {
             self.subscription.clone(),
         )
         .await?;
-        stream.run().await?;
+        let res = stream.run().await;
+        if res.is_err() {
+            tracing::error!("Error running exchange stream: {:?}", res.err());
+        }
         Ok(stream)
     }
 }

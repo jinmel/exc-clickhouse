@@ -373,7 +373,6 @@ async fn binance_stream_task(
 ) -> eyre::Result<()> {
     let binance = BinanceClient::builder()
         .add_symbols(symbols)
-        .with_base_url(MARKET_ONLY_BINANCE_WS_URL.to_string())
         .build()?;
     let combined_stream = binance.stream_events().await?;
     let chunks = combined_stream

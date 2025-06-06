@@ -130,7 +130,7 @@ impl TryInto<NormalizedQuote> for BookTickerEvent {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SubscriptionResult {
     pub result: Option<String>,
-    pub id: u64,
+    pub id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
