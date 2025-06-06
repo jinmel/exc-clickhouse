@@ -8,7 +8,6 @@ use crate::{
         exchange_stream::ExchangeStream, subscription::BybitSubscription,
     },
 };
-use tokio::time::Duration;
 
 pub const DEFAULT_BYBIT_WS_URL: &str = "wss://stream.bybit.com/v5/public/spot";
 
@@ -33,11 +32,10 @@ impl WebsocketStream for BybitClient {
 
     async fn stream_events(&self) -> Result<Self::EventStream, Self::Error> {
         tracing::debug!("Bybit URL: {}", self.base_url);
-        let timeout = Duration::from_secs(23 * 60 * 60);
         let parser = BybitParser::new();
         let mut stream = ExchangeStream::new(
             &self.base_url,
-            Some(timeout),
+            None,
             parser,
             self.subscription.clone(),
         )

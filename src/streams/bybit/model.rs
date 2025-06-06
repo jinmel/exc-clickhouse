@@ -71,8 +71,8 @@ pub struct OrderbookData {
     pub bids: Vec<[String; 2]>,
     #[serde(default, rename = "a")]
     pub asks: Vec<[String; 2]>,
-    pub u: Option<u64>,
-    pub seq: Option<u64>,
+    pub u: u64,
+    pub seq: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -83,6 +83,8 @@ pub struct OrderbookMessage {
     pub typ: String,
     pub ts: u64,
     #[serde(default)]
+    // Timestamp from the match engine when the orderbook was generated
+    // Used to ensure orderbook updates are processed in order
     pub cts: Option<u64>,
     pub data: OrderbookData,
 }

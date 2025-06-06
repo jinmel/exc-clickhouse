@@ -13,12 +13,14 @@ use super::model::{OrderbookMessage, TradeMessage};
 struct OrderBook {
     bids: BTreeMap<OrderedFloat<f64>, f64>,
     asks: BTreeMap<OrderedFloat<f64>, f64>,
+    last_cts: u64,
 }
 
 impl OrderBook {
     fn clear(&mut self) {
         self.bids.clear();
         self.asks.clear();
+        self.last_cts = 0;
     }
 
     fn update_bid(&mut self, price: f64, qty: f64) {
@@ -93,6 +95,13 @@ impl Parser<NormalizedEvent> for BybitParser {
             let mut books = self.books.lock().unwrap();
             let book = books.entry(msg.data.symbol.clone()).or_default();
 
+            let update_ts = msg.cts.unwrap_or(msg.ts);
+            if update_ts <= book.last_cts {
+                // Ignore out-of-order updates
+                return Ok(None);
+            }
+            book.last_cts = update_ts;
+
             match msg.typ.as_str() {
                 "snapshot" => {
                     book.clear();
@@ -125,7 +134,8 @@ impl Parser<NormalizedEvent> for BybitParser {
             if let (Some((bid_price, bid_qty)), Some((ask_price, ask_qty))) =
                 (book.best_bid(), book.best_ask())
             {
-                let timestamp = msg.cts.unwrap_or(msg.ts) * 1000;
+                // Bybit timestamps are in milliseconds. NormalizedQuote expects microseconds.
+                let timestamp = update_ts * 1000;
                 let quote = NormalizedQuote::new(
                     ExchangeName::Bybit,
                     &msg.data.symbol,
