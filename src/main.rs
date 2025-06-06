@@ -1,4 +1,8 @@
-use crate::symbols::SymbolsConfig;
+use crate::symbols::{
+    SymbolsConfig,
+    SymbolsConfigEntry,
+    fetch_binance_top_spot_pairs,
+};
 use clap::{Args, Parser, Subcommand};
 use dotenv::dotenv;
 use eyre::WrapErr;
@@ -15,7 +19,7 @@ use crate::{
     models::{ClickhouseMessage, NormalizedEvent},
     streams::{
         ExchangeStreamError, WebsocketStream,
-        binance::{BinanceClient, MARKET_ONLY_BINANCE_WS_URL},
+        binance::BinanceClient,
     },
 };
 
@@ -43,10 +47,37 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// One-time database tasks
-    Db,
+    Db(DbCmd),
 
     /// Run streaming tasks
     Stream(StreamArgs),
+}
+
+#[derive(Subcommand, Clone)]
+enum DbCommands {
+    /// Backfill timeboost bids
+    Timeboost,
+    /// Fetch Binance SPOT symbols from exchangeInfo
+    FetchBinanceSymbols(FetchBinanceSymbolsArgs),
+}
+
+#[derive(Args, Clone)]
+struct DbCmd {
+    #[command(subcommand)]
+    command: DbCommands,
+}
+
+#[derive(Args, Clone)]
+struct FetchBinanceSymbolsArgs {
+    /// Output YAML file path
+    #[arg(short, long)]
+    output: String,
+    /// Also insert trading pairs into ClickHouse
+    #[arg(long)]
+    update_clickhouse: bool,
+
+    #[arg(long)]
+    limit: usize,
 }
 
 #[derive(Args, Clone)]
@@ -188,12 +219,39 @@ async fn main() -> eyre::Result<()> {
     tracing::subscriber::set_global_default(subscriber)?;
 
     match cli.command {
-        Commands::Db => {
-            tracing::info!("Backfilling timeboost bids");
-            timeboost::bids::backfill_timeboost_bids().await?;
-            tracing::info!("Timeboost bids backfill complete");
-            return Ok(());
-        }
+        Commands::Db(db_cmd) => match db_cmd.command {
+            DbCommands::Timeboost => {
+                tracing::info!("Backfilling timeboost bids");
+                timeboost::bids::backfill_timeboost_bids().await?;
+                tracing::info!("Timeboost bids backfill complete");
+                return Ok(());
+            }
+            DbCommands::FetchBinanceSymbols(args) => {
+                tracing::info!("Fetching top Binance SPOT symbols");
+                let pairs = fetch_binance_top_spot_pairs(args.limit).await?;
+                let symbols: Vec<String> = pairs.iter().map(|p| p.pair.clone()).collect();
+                let cfg = SymbolsConfig {
+                    entries: vec![SymbolsConfigEntry {
+                        exchange: "Binance".to_string(),
+                        market: "SPOT".to_string(),
+                        symbols,
+                    }],
+                };
+                let file = std::fs::File::create(&args.output)
+                    .wrap_err("Failed to create output YAML file")?;
+                cfg.to_yaml(file)?;
+                tracing::info!("Symbols written to {}", args.output);
+
+                if args.update_clickhouse {
+                    tracing::info!("Updating ClickHouse trading_pairs table");
+                    let ch_cfg = ClickHouseConfig::from_env()?;
+                    let ch = ClickHouseService::new(ch_cfg);
+                    ch.write_trading_pairs(pairs).await?;
+                }
+
+                return Ok(());
+            }
+        },
         Commands::Stream(args) => run_stream(args).await,
     }
 }
@@ -371,9 +429,7 @@ async fn binance_stream_task(
     symbols: Vec<String>,
     batch_size: usize,
 ) -> eyre::Result<()> {
-    let binance = BinanceClient::builder()
-        .add_symbols(symbols)
-        .build()?;
+    let binance = BinanceClient::builder().add_symbols(symbols).build()?;
     let combined_stream = binance.stream_events().await?;
     let chunks = combined_stream
         .filter_map(
