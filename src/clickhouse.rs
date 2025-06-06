@@ -224,6 +224,21 @@ impl ClickHouseService {
         Ok(())
     }
 
+    pub async fn write_trading_pairs(&self, pairs: Vec<crate::symbols::TradingPair>) -> eyre::Result<()> {
+        if pairs.is_empty() {
+            return Ok(());
+        }
+
+        let mut inserter = self.get_inserter("cex.trading_pairs", 1000, 1, 0.1)?;
+        for pair in pairs {
+            tracing::trace!(pair = %pair.pair, base = %pair.base_asset, quote = %pair.quote_asset, "writing trading pair");
+            inserter.write(&pair)?;
+        }
+        inserter.commit().await?;
+        inserter.end().await?;
+        Ok(())
+    }
+
     #[allow(dead_code)]
     pub async fn write_events(
         &self,
