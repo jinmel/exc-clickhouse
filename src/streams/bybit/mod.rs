@@ -33,13 +33,8 @@ impl WebsocketStream for BybitClient {
     async fn stream_events(&self) -> Result<Self::EventStream, Self::Error> {
         tracing::debug!("Bybit URL: {}", self.base_url);
         let parser = BybitParser::new();
-        let mut stream = ExchangeStream::new(
-            &self.base_url,
-            None,
-            parser,
-            self.subscription.clone(),
-        )
-        .await?;
+        let mut stream =
+            ExchangeStream::new(&self.base_url, None, parser, self.subscription.clone()).await?;
         let res = stream.run().await;
         if res.is_err() {
             tracing::error!("Error running exchange stream: {:?}", res.err());

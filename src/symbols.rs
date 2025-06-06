@@ -13,7 +13,7 @@ pub struct SymbolsConfigEntry {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SymbolsConfig {
-pub entries: Vec<SymbolsConfigEntry>,
+    pub entries: Vec<SymbolsConfigEntry>,
 }
 
 impl SymbolsConfig {
@@ -73,7 +73,7 @@ pub async fn fetch_binance_spot_pairs() -> eyre::Result<Vec<TradingPair>> {
             continue;
         }
         if let Some(psets) = &sym.permission_sets {
-            if let Some(first) = psets.get(0) {
+            if let Some(first) = psets.first() {
                 if !first.iter().any(|p| p == "SPOT") {
                     continue;
                 }
@@ -108,7 +108,8 @@ pub const QUOTE_ASSETS: [&str; 4] = ["USDT", "USDC", "BTC", "ETH"];
 pub async fn fetch_binance_top_spot_pairs(limit: usize) -> eyre::Result<Vec<TradingPair>> {
     const TICKER_URL: &str = "https://data-api.binance.vision/api/v3/ticker/24hr";
 
-    let all_pairs = fetch_binance_spot_pairs().await?
+    let all_pairs = fetch_binance_spot_pairs()
+        .await?
         .into_iter()
         .filter(|p| QUOTE_ASSETS.contains(&p.quote_asset.as_str()))
         .collect::<Vec<_>>();

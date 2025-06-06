@@ -40,9 +40,12 @@ pub trait Subscription {
     fn to_json(&self) -> Result<Vec<serde_json::Value>, serde_json::Error>;
     fn messages(&self) -> Result<Vec<tokio_tungstenite::tungstenite::Message>, serde_json::Error> {
         let subscription_messages = self.to_json()?;
-        Ok(subscription_messages.iter().map(|message| {
-            tokio_tungstenite::tungstenite::Message::Text(message.to_string().into())
-        }).collect())
+        Ok(subscription_messages
+            .iter()
+            .map(|message| {
+                tokio_tungstenite::tungstenite::Message::Text(message.to_string().into())
+            })
+            .collect())
     }
     fn heartbeat(&self) -> Option<tokio_tungstenite::tungstenite::Message>;
     fn heartbeat_interval(&self) -> Option<Duration>;
