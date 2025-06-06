@@ -1,75 +1,73 @@
 use crate::streams::ExchangeStreamError;
 use crate::streams::Parser;
 use crate::streams::Subscription;
+use async_stream::try_stream;
 use futures::SinkExt;
-use futures::stream::Stream;
-use futures::stream::StreamExt;
+use futures::stream::{Stream, StreamExt};
 use std::pin::Pin;
-use std::task::{Context, Poll};
 use tokio::time::{Duration, Instant};
-use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio_tungstenite::tungstenite::Message;
 
-pub struct ExchangeStream<T, P, S>
+pub struct ExchangeStreamBuilder<T, P, S>
 where
     T: Send + 'static,
     P: Parser<T> + Send + 'static + Clone + Unpin + Sync,
     S: Subscription + Send + 'static + Clone + Unpin,
 {
-    inner: Option<UnboundedReceiverStream<Result<T, ExchangeStreamError>>>,
-    handle: Option<tokio::task::JoinHandle<Result<(), ExchangeStreamError>>>,
     timeout: Option<Duration>,
     parser: P,
     url: String,
     subscription: S,
+    _phantom: std::marker::PhantomData<T>,
 }
 
-impl<T, P, S> ExchangeStream<T, P, S>
+impl<T, P, S> ExchangeStreamBuilder<T, P, S>
 where
     T: Send + 'static,
     P: Parser<T> + Send + 'static + Clone + Unpin + Sync,
     S: Subscription + Send + 'static + Clone + Unpin,
 {
-    pub async fn new(
+    pub fn new(
         url: &str,
         timeout: Option<Duration>,
         parser: P,
         subscription: S,
-    ) -> Result<Self, ExchangeStreamError> {
-        Ok(Self {
-            inner: None,
-            handle: None,
+    ) -> Self {
+        Self {
             timeout,
             parser,
             url: url.to_owned(),
             subscription,
-        })
+            _phantom: std::marker::PhantomData,
+        }
     }
 
-    // Starts the internal task to pump the events from the websocket stream
-    pub async fn run(&mut self) -> Result<(), ExchangeStreamError> {
-        if let Some(handle) = &self.handle {
-            handle.abort();
-            self.handle = None;
-        }
+    pub fn with_timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = Some(timeout);
+        self
+    }
 
-        let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<Result<T, ExchangeStreamError>>();
+    pub fn with_url(mut self, url: &str) -> Self {
+        self.url = url.to_owned();
+        self
+    }
 
-        let url = self.url.clone();
-        let sub = self.subscription.clone();
-        let parser = self.parser.clone();
+    pub fn build(self) -> Pin<Box<dyn Stream<Item = Result<T, ExchangeStreamError>> + Send + 'static>> {
+        let url = self.url;
+        let subscription = self.subscription;
+        let parser = self.parser;
         let timeout = self.timeout;
 
-        let handle = tokio::spawn(async move {
+        let stream = try_stream! {
             loop {
                 tracing::trace!("Connecting to {}", url);
                 let (mut ws, response) = tokio_tungstenite::connect_async(&url)
                     .await
-                    .map_err(|e| ExchangeStreamError::ConnectionError(e.to_string()))
-                    .unwrap();
+                    .map_err(|e| ExchangeStreamError::ConnectionError(e.to_string()))?;
                 tracing::trace!(?response, "Connected to {}", url);
                 let connected_at = Instant::now();
-                let messages = sub
+                
+                let messages = subscription
                     .messages()
                     .map_err(|e| ExchangeStreamError::SubscriptionError(e.to_string()))?;
                 let mut msg_stream = futures::stream::iter(messages.into_iter().map(Ok));
@@ -79,7 +77,7 @@ where
 
                 // Create interval for periodic messages (e.g., every 30 seconds)
                 let mut interval = tokio::time::interval(
-                    sub.heartbeat_interval().unwrap_or(Duration::from_secs(30)),
+                    subscription.heartbeat_interval().unwrap_or(Duration::from_secs(30)),
                 );
                 interval.tick().await; // Skip the first immediate tick
 
@@ -100,20 +98,22 @@ where
                         msg = ws.next() => {
                             match msg {
                                 Some(Ok(Message::Text(text))) => {
-                                    let parsed = parser
-                                        .parse(&text)
-                                        .map_err(|e| ExchangeStreamError::MessageError(e.to_string()))?;
-                                    if let Some(parsed) = parsed {
-                                        tx.send(Ok(parsed))
-                                            .map_err(|e| ExchangeStreamError::StreamError(e.to_string()))?;
+                                    match parser.parse(&text) {
+                                        Ok(Some(parsed)) => {
+                                            yield parsed;
+                                        }
+                                        Ok(None) => {
+                                            // No parsed result, continue
+                                        }
+                                        Err(e) => {
+                                            tracing::error!("Parse error: {}", e);
+                                            // Continue processing other messages
+                                        }
                                     }
                                 }
                                 Some(Ok(Message::Close(frame))) => {
                                     tracing::error!("Stream closed: {frame:?}");
-                                    tx.send(Err(ExchangeStreamError::StreamNotConnected(format!(
-                                        "Close frame: {frame:?}"
-                                    ))))
-                                    .map_err(|e| ExchangeStreamError::StreamError(e.to_string()))?;
+                                    // Break from inner loop to reconnect
                                     break;
                                 }
                                 Some(Ok(_)) => {
@@ -121,8 +121,7 @@ where
                                 }
                                 Some(Err(e)) => {
                                     tracing::error!("Stream error: {e:?}");
-                                    tx.send(Err(ExchangeStreamError::StreamError(e.to_string())))
-                                        .map_err(|e| ExchangeStreamError::StreamError(e.to_string()))?;
+                                    // Break from inner loop to reconnect
                                     break;
                                 }
                                 None => {
@@ -135,7 +134,7 @@ where
                         // Handle periodic interval
                         _ = interval.tick() => {
                             // Send periodic message (e.g., ping or heartbeat)
-                            let heartbeat_msg = sub.heartbeat();
+                            let heartbeat_msg = subscription.heartbeat();
                             if let Some(msg) = heartbeat_msg {
                                 tracing::trace!(?msg, "Sending heartbeat");
                                 if let Err(e) = ws.send(msg).await {
@@ -152,40 +151,11 @@ where
                     }
                 }
             }
-        });
-        self.handle = Some(handle);
-        self.inner = Some(UnboundedReceiverStream::new(rx));
-        Ok(())
+        };
+
+        Box::pin(stream)
     }
 }
 
-impl<T, P, S> Stream for ExchangeStream<T, P, S>
-where
-    T: Send + 'static,
-    P: Parser<T> + Send + 'static + Clone + Unpin + Sync,
-    S: Subscription + Send + 'static + Clone + Unpin,
-{
-    type Item = Result<T, ExchangeStreamError>;
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let this = self.get_mut();
-        if let Some(inner) = &mut this.inner {
-            Pin::new(inner).poll_next(cx)
-        } else {
-            Poll::Pending
-        }
-    }
-}
-
-impl<T, P, S> Drop for ExchangeStream<T, P, S>
-where
-    T: Send + 'static,
-    P: Parser<T> + Send + 'static + Clone + Unpin + Sync,
-    S: Subscription + Send + 'static + Clone + Unpin,
-{
-    fn drop(&mut self) {
-        if let Some(handle) = &self.handle {
-            handle.abort();
-        }
-    }
-}
+// Keep the old name as an alias for the builder to maintain some backwards compatibility
+pub type ExchangeStream<T, P, S> = ExchangeStreamBuilder<T, P, S>;

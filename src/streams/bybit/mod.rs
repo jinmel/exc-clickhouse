@@ -8,6 +8,8 @@ use crate::{
         exchange_stream::ExchangeStream, subscription::BybitSubscription,
     },
 };
+use futures::stream::Stream;
+use std::pin::Pin;
 
 pub const DEFAULT_BYBIT_WS_URL: &str = "wss://stream.bybit.com/v5/public/spot";
 
@@ -28,17 +30,13 @@ impl BybitClient {
 #[async_trait]
 impl WebsocketStream for BybitClient {
     type Error = ExchangeStreamError;
-    type EventStream = ExchangeStream<NormalizedEvent, BybitParser, BybitSubscription>;
+    type EventStream = Pin<Box<dyn Stream<Item = Result<NormalizedEvent, ExchangeStreamError>> + Send + 'static>>;
 
     async fn stream_events(&self) -> Result<Self::EventStream, Self::Error> {
         tracing::debug!("Bybit URL: {}", self.base_url);
         let parser = BybitParser::new();
-        let mut stream =
-            ExchangeStream::new(&self.base_url, None, parser, self.subscription.clone()).await?;
-        let res = stream.run().await;
-        if res.is_err() {
-            tracing::error!("Error running exchange stream: {:?}", res.err());
-        }
+        let stream = ExchangeStream::new(&self.base_url, None, parser, self.subscription.clone())
+            .build();
         Ok(stream)
     }
 }
