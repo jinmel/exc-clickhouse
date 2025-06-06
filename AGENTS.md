@@ -22,7 +22,6 @@ since he is experienced in hacking and reverse engineering.
 3. Add integration tests for any websocket streams you implement. Tag it ignored so that it does not run in CI.
 4. The code should be well-structured and modular, allowing for easy maintenance and extension.
 5. Keep in mind the purpose of the repository: high throughput and low latency for streaming coin exchange websocket streams into a ClickHouse database.
-6. Search github for similar projects to find inspiration and best practices.
 
 ## Instructions from the user
 
@@ -30,9 +29,3 @@ since he is experienced in hacking and reverse engineering.
   - Documentation: <URL> <short description of the documentation>
 2. When user provides a module to reference read carefully and try to keep the code style and structure of the module. If you see obvious or necessary improvements,
 please suggest them but do not make changes without user approval.
-
-## Post-processing
-
-1. Run `cargo fmt` to format the code.
-2. Run `cargo clippy --fix` to fix for any linting issues.
-3. Run `cargo test` to ensure all tests pass.
