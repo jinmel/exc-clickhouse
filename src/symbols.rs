@@ -1,6 +1,8 @@
 use eyre::WrapErr;
 use serde::{Deserialize, Serialize};
 use clickhouse::Row;
+use std::collections::HashMap;
+use std::cmp::Ordering;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SymbolsConfigEntry {
@@ -93,6 +95,50 @@ pub async fn fetch_binance_spot_pairs() -> eyre::Result<Vec<TradingPair>> {
     }
 
     Ok(pairs)
+}
+
+#[derive(Debug, Deserialize)]
+struct BinanceTicker24 {
+    symbol: String,
+    #[serde(rename = "quoteVolume")]
+    quote_volume: String,
+}
+
+pub async fn fetch_binance_top_spot_pairs(limit: usize) -> eyre::Result<Vec<TradingPair>> {
+    const TICKER_URL: &str = "https://data-api.binance.vision/api/v3/ticker/24hr";
+
+    let all_pairs = fetch_binance_spot_pairs().await?;
+    let map: HashMap<String, TradingPair> =
+        all_pairs.into_iter().map(|p| (p.pair.clone(), p)).collect();
+
+    let client = reqwest::Client::new();
+    let tickers: Vec<BinanceTicker24> = client
+        .get(TICKER_URL)
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
+
+    let mut volumes: Vec<(String, f64)> = tickers
+        .into_iter()
+        .filter_map(|t| {
+            map.contains_key(&t.symbol).then(|| {
+                let v = t.quote_volume.parse::<f64>().unwrap_or(0.0);
+                (t.symbol, v)
+            })
+        })
+        .collect();
+
+    volumes.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
+    volumes.truncate(limit);
+
+    let result: Vec<TradingPair> = volumes
+        .into_iter()
+        .filter_map(|(sym, _)| map.get(&sym).cloned())
+        .collect();
+
+    Ok(result)
 }
 
 #[allow(dead_code)]

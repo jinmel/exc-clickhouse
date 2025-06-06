@@ -1,7 +1,7 @@
 use crate::symbols::{
     SymbolsConfig,
     SymbolsConfigEntry,
-    fetch_binance_spot_pairs,
+    fetch_binance_top_spot_pairs,
 };
 use clap::{Args, Parser, Subcommand};
 use dotenv::dotenv;
@@ -224,8 +224,8 @@ async fn main() -> eyre::Result<()> {
                 return Ok(());
             }
             DbCommands::FetchBinanceSymbols(args) => {
-                tracing::info!("Fetching Binance SPOT symbols");
-                let pairs = fetch_binance_spot_pairs().await?;
+                tracing::info!("Fetching top Binance SPOT symbols");
+                let pairs = fetch_binance_top_spot_pairs(200).await?;
                 let symbols: Vec<String> = pairs.iter().map(|p| p.pair.clone()).collect();
                 let cfg = SymbolsConfig {
                     entries: vec![SymbolsConfigEntry {

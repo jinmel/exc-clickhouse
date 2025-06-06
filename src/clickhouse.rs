@@ -231,6 +231,7 @@ impl ClickHouseService {
 
         let mut inserter = self.get_inserter("cex.trading_pairs", 1000, 1, 0.1)?;
         for pair in pairs {
+            tracing::trace!(pair = %pair.pair, base = %pair.base_asset, quote = %pair.quote_asset, "writing trading pair");
             inserter.write(&pair)?;
         }
         inserter.commit().await?;
