@@ -1,42 +1,44 @@
 use crate::{
     models::{NormalizedEvent, NormalizedQuote, NormalizedTrade},
     streams::{
-        ExchangeStreamError,
-        binance::model::{BookTickerEvent, Event, TradeEvent},
+        ExchangeStreamError, Parser,
+        binance::model::{BookTickerEvent, Response, TradeEvent},
     },
 };
 
-#[allow(unused)]
-pub fn parse_binance_trade(event: &str) -> Result<NormalizedTrade, ExchangeStreamError> {
-    serde_json::from_str::<TradeEvent>(event)
-        .map_err(|e| ExchangeStreamError::MessageError(e.to_string()))?
-        .try_into()
+#[derive(Debug, Clone)]
+pub struct BinanceParser {}
+
+impl BinanceParser {
+    pub fn new() -> Self {
+        Self {}
+    }
 }
 
-#[allow(unused)]
-pub fn parse_binance_quote(event: &str) -> Result<NormalizedQuote, ExchangeStreamError> {
-    serde_json::from_str::<BookTickerEvent>(event)
-        .map_err(|e| ExchangeStreamError::MessageError(e.to_string()))?
-        .try_into()
-}
+impl Parser<NormalizedEvent> for BinanceParser {
+    type Error = ExchangeStreamError;
 
-pub fn parse_binance_combined(res: &str) -> Result<NormalizedEvent, ExchangeStreamError> {
-    let value: serde_json::Value = serde_json::from_str(res)
-        .map_err(|e| ExchangeStreamError::MessageError(format!("Failed to parse JSON: {e}")))?;
+    fn parse(&self, text: &str) -> Result<Option<NormalizedEvent>, Self::Error> {
+        let value: serde_json::Value = serde_json::from_str(text)
+            .map_err(|e| ExchangeStreamError::MessageError(format!("Failed to parse JSON: {e}")))?;
 
-    // Extract data field from the JSON
-    let data = value.get("data").ok_or_else(|| {
-        ExchangeStreamError::MessageError("Missing 'data' field in JSON".to_string())
-    })?;
+        // Extract data field from the JSON
+        let data = value.get("data").ok_or_else(|| {
+            ExchangeStreamError::MessageError("Missing 'data' field in JSON".to_string())
+        })?;
 
-    let event = serde_json::from_value::<Event>(data.clone()).map_err(|e| {
-        ExchangeStreamError::MessageError(format!("Failed to parse NormalizedEvent: {e}"))
-    })?;
+        let event = serde_json::from_value::<Response>(data.clone()).map_err(|e| {
+            ExchangeStreamError::MessageError(format!("Failed to parse NormalizedEvent: {e}"))
+        })?;
 
-    let normalized = match event {
-        Event::Trade(trade) => NormalizedEvent::Trade(trade.try_into()?),
-        Event::Quote(quote) => NormalizedEvent::Quote(quote.try_into()?),
-    };
-
-    Ok(normalized)
+        let normalized = match event {
+            Response::Trade(trade) => Some(NormalizedEvent::Trade(trade.try_into()?)),
+            Response::Quote(quote) => Some(NormalizedEvent::Quote(quote.try_into()?)),
+            Response::Subscription(result) => {
+                tracing::debug!("Subscription result: {result:?}");
+                None
+            }
+        };
+        Ok(normalized)
+    }
 }

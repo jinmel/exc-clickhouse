@@ -96,9 +96,11 @@ where
                                 Some(Ok(Message::Text(text))) => {
                                     let parsed = parser
                                         .parse(&text)
-                                        .map_err(|e| ExchangeStreamError::MessageError(e.to_string()));
-                                    tx.send(parsed)
-                                        .map_err(|e| ExchangeStreamError::StreamError(e.to_string()))?;
+                                        .map_err(|e| ExchangeStreamError::MessageError(e.to_string()))?;
+                                    if let Some(parsed) = parsed {
+                                        tx.send(Ok(parsed))
+                                            .map_err(|e| ExchangeStreamError::StreamError(e.to_string()))?;
+                                    }
                                 }
                                 Some(Ok(Message::Close(frame))) => {
                                     tracing::error!("Stream closed: {frame:?}");

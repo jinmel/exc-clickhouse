@@ -1,5 +1,6 @@
 pub mod binance;
 pub mod exchange_stream;
+pub mod subscription;
 
 use crate::models::NormalizedEvent;
 use async_trait::async_trait;
@@ -10,10 +11,7 @@ use tokio::time::Duration;
 #[async_trait]
 pub trait WebsocketStream {
     type Error: std::error::Error + Send + Sync + 'static;
-    type EventStream: Stream<Item = Result<NormalizedEvent, Self::Error>>
-        + Send
-        + Unpin
-        + 'static;
+    type EventStream: Stream<Item = Result<NormalizedEvent, Self::Error>> + Send + Unpin + 'static;
 
     async fn stream_events(&self) -> Result<Self::EventStream, Self::Error>;
 }
@@ -21,20 +19,23 @@ pub trait WebsocketStream {
 pub trait Parser<T: Send + 'static> {
     type Error: std::error::Error + Send + Sync + 'static;
 
-    fn parse(&self, text: &str) -> Result<T, Self::Error>;
+    fn parse(&self, text: &str) -> Result<Option<T>, Self::Error>;
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum MarketType {
-    Spot,
-    Futures,
-    Perp,
-    Margin,
+pub enum StreamType {
+    Trade,
+    Quote,
+}
+
+#[derive(Debug, Clone)]
+pub struct StreamEndpoint {
+    pub stream_type: StreamType,
+    pub symbol: String,
 }
 
 // Returns subscription message
-pub trait Subscription<> 
-{
+pub trait Subscription {
     fn messages(&self) -> Vec<tokio_tungstenite::tungstenite::Message>;
     fn heartbeat(&self) -> Option<tokio_tungstenite::tungstenite::Message>;
     fn heartbeat_interval(&self) -> Duration;

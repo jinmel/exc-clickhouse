@@ -127,9 +127,16 @@ impl TryInto<NormalizedQuote> for BookTickerEvent {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SubscriptionResult {
+    pub result: Option<String>,
+    pub id: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 #[serde(untagged)]
-pub enum Event {
+pub enum Response {
     Trade(TradeEvent),
     Quote(BookTickerEvent),
+    Subscription(SubscriptionResult),
 }
