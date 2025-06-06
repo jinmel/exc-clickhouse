@@ -53,7 +53,7 @@ enum Commands {
 enum DbCommands {
     /// Backfill timeboost bids
     Timeboost,
-    /// Fetch Binance SPOT symbols
+    /// Fetch top Binance SPOT symbols by volume
     FetchBinanceSymbols(FetchBinanceSymbolsArgs),
 }
 
@@ -217,7 +217,7 @@ async fn main() -> eyre::Result<()> {
                 return Ok(());
             }
             DbCommands::FetchBinanceSymbols(args) => {
-                tracing::info!("Fetching Binance SPOT symbols");
+                tracing::info!("Fetching top Binance SPOT symbols by volume");
                 let symbols = fetch_binance_spot_symbols().await?;
                 let cfg = SymbolsConfig {
                     entries: vec![SymbolsConfigEntry {

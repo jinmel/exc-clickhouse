@@ -38,13 +38,29 @@ struct BinanceSymbolInfo {
     permission_sets: Option<Vec<Vec<String>>>,
 }
 
+#[derive(Debug, Deserialize)]
+struct BinanceTickerInfo {
+    symbol: String,
+    #[serde(rename = "quoteVolume")]
+    quote_volume: String,
+}
+
 pub async fn fetch_binance_spot_symbols() -> eyre::Result<Vec<String>> {
-    const BINANCE_URL: &str = "https://api.binance.com/api/v3/exchangeInfo";
+    const EXCHANGE_INFO_URL: &str = "https://data-api.binance.vision/api/v3/exchangeInfo";
+    const TICKER_URL: &str = "https://data-api.binance.vision/api/v3/ticker/24hr";
 
-    let resp = reqwest::get(BINANCE_URL).await?.error_for_status()?;
-    let info: BinanceExchangeInfo = resp.json().await?;
+    let client = reqwest::Client::new();
 
-    let symbols = info
+    let info: BinanceExchangeInfo = client
+        .get(EXCHANGE_INFO_URL)
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
+
+    use std::collections::HashSet;
+    let mut spot: HashSet<String> = info
         .symbols
         .into_iter()
         .filter(|s| {
@@ -60,5 +76,26 @@ pub async fn fetch_binance_spot_symbols() -> eyre::Result<Vec<String>> {
         })
         .map(|s| s.symbol)
         .collect();
-    Ok(symbols)
+
+    let tickers: Vec<BinanceTickerInfo> = client
+        .get(TICKER_URL)
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
+
+    let mut entries: Vec<(String, f64)> = tickers
+        .into_iter()
+        .filter(|t| spot.contains(&t.symbol))
+        .map(|t| {
+            let vol = t.quote_volume.parse::<f64>().unwrap_or(0.0);
+            (t.symbol, vol)
+        })
+        .collect();
+
+    entries.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    entries.truncate(200);
+
+    Ok(entries.into_iter().map(|(s, _)| s).collect())
 }
