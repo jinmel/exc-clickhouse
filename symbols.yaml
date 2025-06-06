@@ -71,4 +71,19 @@
   market: "SPOT"
   symbols:
     - BTCUSDT
+    - BTCUSDC
     - ETHUSDT
+    - ETHUSDC
+    - ETHBTC
+    - SOLUSDT
+    - SOLUSDC
+    - LINKUSDT
+    - LINKUSDC
+    - ANIMEUSDT
+    - ARBUSDT
+    - ARBUSDC
+    - ENAUSDT
+    - ENAUSDC
+    - UNIUSDT
+    - UNIUSDC
+    - PENDLEUSDT
