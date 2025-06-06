@@ -76,15 +76,11 @@ impl BybitSubscription {
         Self { endpoints: vec![] }
     }
 
-    pub fn add_market(&mut self, market: StreamEndpoint) {
-        self.endpoints.push(market);
-    }
-
     pub fn add_markets(&mut self, markets: Vec<StreamEndpoint>) {
         self.endpoints.extend(markets);
     }
 
-    pub fn get_subscription_message(&self) -> Result<serde_json::Value, serde_json::Error> {
+    pub fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
         #[derive(Serialize)]
         struct SubscriptionMessage {
             req_id: Option<String>,
@@ -119,7 +115,7 @@ impl BybitSubscription {
 
 impl Subscription for BybitSubscription {
     fn messages(&self) -> Vec<tokio_tungstenite::tungstenite::Message> {
-        let subscription_message = self.get_subscription_message().unwrap();
+        let subscription_message = self.to_json().unwrap();
         vec![tokio_tungstenite::tungstenite::Message::Text(
             subscription_message.to_string().into(),
         )]
