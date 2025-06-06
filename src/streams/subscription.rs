@@ -66,7 +66,8 @@ impl Subscription for BinanceSubscription {
     }
 }
 
-struct BybitSubscription {
+#[derive(Debug, Clone)]
+pub struct BybitSubscription {
     endpoints: Vec<StreamEndpoint>,
 }
 

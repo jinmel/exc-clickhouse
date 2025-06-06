@@ -1,45 +1,40 @@
 use async_trait::async_trait;
 
-use crate::streams::binance::parser::BinanceParser;
+use crate::streams::bybit::parser::BybitParser;
 use crate::{
     models::NormalizedEvent,
     streams::{
         ExchangeStreamError, StreamEndpoint, StreamType, WebsocketStream,
-        exchange_stream::ExchangeStream, subscription::BinanceSubscription,
+        exchange_stream::ExchangeStream, subscription::BybitSubscription,
     },
 };
 use tokio::time::Duration;
 
-/// Default WebSocket URL for Binance
-pub const DEFAULT_BINANCE_WS_URL: &str = "wss://stream.binance.com:9443/stream";
-pub const MARKET_ONLY_BINANCE_WS_URL: &str = "wss://data-stream.binance.vision/stream";
-#[allow(unused)]
-pub const US_BINANCE_WS_URL: &str = "wss://stream.binance.us:9443";
+pub const DEFAULT_BYBIT_WS_URL: &str = "wss://stream.bybit.com/v5/public/spot";
 
 pub mod model;
 pub mod parser;
 
-pub struct BinanceClient {
+pub struct BybitClient {
     base_url: String,
-    subscription: BinanceSubscription,
+    subscription: BybitSubscription,
 }
 
-impl BinanceClient {
-    /// Creates a new BinanceBuilder with default values
-    pub fn builder() -> BinanceClientBuilder {
-        BinanceClientBuilder::default()
+impl BybitClient {
+    pub fn builder() -> BybitClientBuilder {
+        BybitClientBuilder::default()
     }
 }
 
 #[async_trait]
-impl WebsocketStream for BinanceClient {
+impl WebsocketStream for BybitClient {
     type Error = ExchangeStreamError;
-    type EventStream = ExchangeStream<NormalizedEvent, BinanceParser, BinanceSubscription>;
+    type EventStream = ExchangeStream<NormalizedEvent, BybitParser, BybitSubscription>;
 
     async fn stream_events(&self) -> Result<Self::EventStream, Self::Error> {
-        tracing::debug!("Binance URL: {}", self.base_url);
-        let timeout = Duration::from_secs(23 * 60 * 60); // Binance has 24 hour timeout.
-        let parser = BinanceParser::new();
+        tracing::debug!("Bybit URL: {}", self.base_url);
+        let timeout = Duration::from_secs(23 * 60 * 60);
+        let parser = BybitParser::new();
         let mut stream = ExchangeStream::new(
             &self.base_url,
             Some(timeout),
@@ -55,25 +50,23 @@ impl WebsocketStream for BinanceClient {
     }
 }
 
-/// Builder for the Binance struct
-pub struct BinanceClientBuilder {
+pub struct BybitClientBuilder {
     symbols: Vec<String>,
     base_url: String,
 }
 
-impl Default for BinanceClientBuilder {
+impl Default for BybitClientBuilder {
     fn default() -> Self {
         Self {
             symbols: vec![],
-            base_url: DEFAULT_BINANCE_WS_URL.to_string(),
+            base_url: DEFAULT_BYBIT_WS_URL.to_string(),
         }
     }
 }
 
-impl BinanceClientBuilder {
+impl BybitClientBuilder {
     pub fn add_symbols(mut self, symbols: Vec<impl Into<String>>) -> Self {
-        self.symbols
-            .extend(symbols.into_iter().map(|s| s.into().to_lowercase()));
+        self.symbols.extend(symbols.into_iter().map(|s| s.into()));
         self
     }
 
@@ -82,9 +75,8 @@ impl BinanceClientBuilder {
         self
     }
 
-    /// Build the Binance instance
-    pub fn build(self) -> eyre::Result<BinanceClient> {
-        let mut subscription = BinanceSubscription::new();
+    pub fn build(self) -> eyre::Result<BybitClient> {
+        let mut subscription = BybitSubscription::new();
         subscription.add_markets(
             self.symbols
                 .iter()
@@ -104,7 +96,7 @@ impl BinanceClientBuilder {
                 .collect(),
         );
 
-        Ok(BinanceClient {
+        Ok(BybitClient {
             subscription,
             base_url: self.base_url,
         })
@@ -119,9 +111,9 @@ mod tests {
 
     #[tokio::test]
     #[ignore]
-    async fn test_binance_stream_event() {
-        let client = BinanceClient::builder()
-            .add_symbols(vec!["btcusdt"])
+    async fn test_bybit_stream_event() {
+        let client = BybitClient::builder()
+            .add_symbols(vec!["BTCUSDT"])
             .build()
             .unwrap();
         let mut stream = client.stream_events().await.unwrap();
