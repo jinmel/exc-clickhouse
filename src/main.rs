@@ -1,3 +1,4 @@
+use crate::symbols::SymbolsConfig;
 use clap::{Args, Parser, Subcommand};
 use dotenv::dotenv;
 use eyre::WrapErr;
@@ -6,7 +7,6 @@ use futures::stream::StreamExt;
 use std::collections::HashMap;
 use std::fs::File;
 use std::time::Duration;
-use crate::symbols::SymbolsConfig;
 use tokio::sync::mpsc;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
@@ -14,8 +14,8 @@ use crate::{
     clickhouse::{ClickHouseConfig, ClickHouseService},
     models::{ClickhouseMessage, NormalizedEvent},
     streams::{
-        WebsocketStream, ExchangeStreamError,
-        binance::{BinanceClient, DEFAULT_BINANCE_WS_URL},
+        ExchangeStreamError, WebsocketStream,
+        binance::{BinanceClient, MARKET_ONLY_BINANCE_WS_URL},
     },
 };
 
@@ -23,9 +23,9 @@ mod clickhouse;
 mod ethereum;
 mod models;
 mod streams;
+mod symbols;
 mod timeboost;
 mod tower_utils;
-mod symbols;
 
 #[derive(Parser)]
 #[command(name = "exc-clickhouse")]
@@ -194,9 +194,7 @@ async fn main() -> eyre::Result<()> {
             tracing::info!("Timeboost bids backfill complete");
             return Ok(());
         }
-        Commands::Stream(args) => {
-            run_stream(args).await
-        }
+        Commands::Stream(args) => run_stream(args).await,
     }
 }
 
@@ -219,8 +217,7 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
 
     loop {
         // Create new channel for each restart cycle
-        let (msg_tx, msg_rx) =
-            mpsc::unbounded_channel::<Vec<ClickhouseMessage>>();
+        let (msg_tx, msg_rx) = mpsc::unbounded_channel::<Vec<ClickhouseMessage>>();
         let mut set = tokio::task::JoinSet::new();
 
         // Spawn tasks
@@ -376,26 +373,28 @@ async fn binance_stream_task(
 ) -> eyre::Result<()> {
     let binance = BinanceClient::builder()
         .add_symbols(symbols)
-        .with_base_url(DEFAULT_BINANCE_WS_URL.to_string())
-        .with_quotes(true)
-        .with_trades(true)
+        .with_base_url(MARKET_ONLY_BINANCE_WS_URL.to_string())
         .build()?;
     let combined_stream = binance.stream_events().await?;
-    let chunks = combined_stream.filter_map(|event: Result<NormalizedEvent, ExchangeStreamError>| async move{
-        match event {
-            Ok(NormalizedEvent::Trade(trade)) => {
-                Some(ClickhouseMessage::Cex(NormalizedEvent::Trade(trade)))
-            }
-            Ok(NormalizedEvent::Quote(quote)) => {  
-                Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
-            }
-            Err(e) => {
-                // TODO: handle error
-                tracing::error!("Error parsing event: {:?}", e);
-                None
-            }
-        }
-    }).chunks(batch_size);
+    let chunks = combined_stream
+        .filter_map(
+            |event: Result<NormalizedEvent, ExchangeStreamError>| async move {
+                match event {
+                    Ok(NormalizedEvent::Trade(trade)) => {
+                        Some(ClickhouseMessage::Cex(NormalizedEvent::Trade(trade)))
+                    }
+                    Ok(NormalizedEvent::Quote(quote)) => {
+                        Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
+                    }
+                    Err(e) => {
+                        // TODO: handle error
+                        tracing::error!("Error parsing event: {:?}", e);
+                        None
+                    }
+                }
+            },
+        )
+        .chunks(batch_size);
     pin_mut!(chunks);
     while let Some(chunk) = chunks.next().await {
         let res = evt_tx.send(chunk);

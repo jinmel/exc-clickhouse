@@ -5,7 +5,7 @@ use crate::streams::binance::parser::BinanceParser;
 use crate::{
     models::NormalizedEvent,
     streams::{
-        ExchangeStreamError, StreamType, StreamEndpoint, WebsocketStream,
+        ExchangeStreamError, StreamEndpoint, StreamType, WebsocketStream,
         exchange_stream::ExchangeStream, subscription::BinanceSubscription,
     },
 };
@@ -13,6 +13,7 @@ use tokio::time::Duration;
 
 /// Default WebSocket URL for Binance
 pub const DEFAULT_BINANCE_WS_URL: &str = "wss://stream.binance.com:9443";
+pub const MARKET_ONLY_BINANCE_WS_URL: &str = "wss://data-stream.binance.vision";
 #[allow(unused)]
 pub const US_BINANCE_WS_URL: &str = "wss://stream.binance.us:9443";
 
