@@ -2308,6 +2308,7 @@ dependencies = [
  "eyre",
  "flate2",
  "futures",
+ "itertools 0.14.0",
  "moka",
  "ordered-float",
  "rand 0.9.1",

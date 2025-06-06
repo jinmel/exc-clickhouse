@@ -1,22 +1,25 @@
-use super::{StreamEndpoint, StreamType, Subscription};
+use super::{StreamSymbols, StreamType, Subscription};
+use itertools::Itertools;
 use serde::Serialize;
 use tokio::time::Duration;
 
 #[derive(Debug, Clone)]
 pub struct BinanceSubscription {
-    endpoints: Vec<StreamEndpoint>,
+    symbols: Vec<StreamSymbols>,
 }
 
 impl BinanceSubscription {
     pub fn new() -> Self {
-        Self { endpoints: vec![] }
+        Self { symbols: vec![] }
     }
 
-    pub fn add_markets(&mut self, markets: Vec<StreamEndpoint>) {
-        self.endpoints.extend(markets);
+    pub fn add_markets(&mut self, symbols: Vec<StreamSymbols>) {
+        self.symbols.extend(symbols);
     }
+}
 
-    pub fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
+impl Subscription for BinanceSubscription {
+    fn to_json(&self) -> Result<Vec<serde_json::Value>, serde_json::Error> {
         #[derive(Serialize)]
         struct SubscriptionMessage {
             method: String,
@@ -25,7 +28,7 @@ impl BinanceSubscription {
         }
 
         let pararms = self
-            .endpoints
+            .symbols
             .iter()
             .map(|market| {
                 let stream_type = match market.stream_type {
@@ -45,42 +48,35 @@ impl BinanceSubscription {
             params: pararms,
             id: Some(id.to_string()),
         };
-        serde_json::to_value(subscription_message)
-    }
-}
-
-impl Subscription for BinanceSubscription {
-    fn messages(&self) -> Vec<tokio_tungstenite::tungstenite::Message> {
-        let subscription_message = self.to_json().unwrap();
-        vec![tokio_tungstenite::tungstenite::Message::Text(
-            subscription_message.to_string().into(),
-        )]
+        Ok(vec![serde_json::to_value(subscription_message)?])
     }
 
     fn heartbeat(&self) -> Option<tokio_tungstenite::tungstenite::Message> {
         None
     }
 
-    fn heartbeat_interval(&self) -> Duration {
-        Duration::from_secs(30)
+    fn heartbeat_interval(&self) -> Option<Duration> {
+        None
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct BybitSubscription {
-    endpoints: Vec<StreamEndpoint>,
+    symbols: Vec<StreamSymbols>,
 }
 
 impl BybitSubscription {
     pub fn new() -> Self {
-        Self { endpoints: vec![] }
+        Self { symbols: vec![] }
     }
 
-    pub fn add_markets(&mut self, markets: Vec<StreamEndpoint>) {
-        self.endpoints.extend(markets);
+    pub fn add_markets(&mut self, markets: Vec<StreamSymbols>) {
+        self.symbols.extend(markets);
     }
+}
 
-    pub fn to_json(&self) -> Result<serde_json::Value, serde_json::Error> {
+impl Subscription for BybitSubscription {
+    fn to_json(&self) -> Result<Vec<serde_json::Value>, serde_json::Error> {
         #[derive(Serialize)]
         struct SubscriptionMessage {
             req_id: Option<String>,
@@ -89,7 +85,7 @@ impl BybitSubscription {
         }
 
         let args = self
-            .endpoints
+            .symbols
             .iter()
             .map(|market| {
                 let stream_type = match market.stream_type {
@@ -104,21 +100,22 @@ impl BybitSubscription {
             })
             .collect::<Vec<String>>();
 
-        let subscription_message = SubscriptionMessage {
-            req_id: None,
-            op: "subscribe",
-            args,
-        };
-        serde_json::to_value(subscription_message)
-    }
-}
+        let subscription_messages = args
+            .iter()
+            .chunks(5)
+            .into_iter()
+            .map(|args| {
+                let subscription_message = SubscriptionMessage {
+                    req_id: None,
+                    op: "subscribe",
+                    args: args.cloned().collect(),
+                };
+                let value = serde_json::to_value(subscription_message)?;
+                Ok(value)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
-impl Subscription for BybitSubscription {
-    fn messages(&self) -> Vec<tokio_tungstenite::tungstenite::Message> {
-        let subscription_message = self.to_json().unwrap();
-        vec![tokio_tungstenite::tungstenite::Message::Text(
-            subscription_message.to_string().into(),
-        )]
+        Ok(subscription_messages)
     }
 
     fn heartbeat(&self) -> Option<tokio_tungstenite::tungstenite::Message> {
@@ -139,7 +136,7 @@ impl Subscription for BybitSubscription {
         ))
     }
 
-    fn heartbeat_interval(&self) -> Duration {
-        Duration::from_secs(20)
+    fn heartbeat_interval(&self) -> Option<Duration> {
+        Some(Duration::from_secs(20))
     }
 }

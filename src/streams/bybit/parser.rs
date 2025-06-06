@@ -73,6 +73,7 @@ impl Parser<NormalizedEvent> for BybitParser {
             .map_err(|e| ExchangeStreamError::MessageError(format!("Failed to parse JSON: {e}")))?;
 
         if value.get("topic").is_none() {
+            tracing::debug!("Subscription ack or other message: {:?}", value);
             // Subscription ack or other message
             return Ok(None);
         }

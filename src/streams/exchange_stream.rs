@@ -65,17 +65,22 @@ where
                 tracing::trace!("Connecting to {}", url);
                 let (mut ws, response) = tokio_tungstenite::connect_async(&url)
                     .await
-                    .map_err(|e| ExchangeStreamError::ConnectionError(e.to_string())).unwrap();
+                    .map_err(|e| ExchangeStreamError::ConnectionError(e.to_string()))
+                    .unwrap();
                 tracing::trace!(?response, "Connected to {}", url);
                 let connected_at = Instant::now();
-                let messages = sub.messages();
+                let messages = sub
+                    .messages()
+                    .map_err(|e| ExchangeStreamError::SubscriptionError(e.to_string()))?;
                 let mut msg_stream = futures::stream::iter(messages.into_iter().map(Ok));
                 ws.send_all(&mut msg_stream)
                     .await
                     .map_err(|e| ExchangeStreamError::StreamError(e.to_string()))?;
 
                 // Create interval for periodic messages (e.g., every 30 seconds)
-                let mut interval = tokio::time::interval(sub.heartbeat_interval());
+                let mut interval = tokio::time::interval(
+                    sub.heartbeat_interval().unwrap_or(Duration::from_secs(30)),
+                );
                 interval.tick().await; // Skip the first immediate tick
 
                 let mut timeout_sleep: Pin<Box<dyn std::future::Future<Output = ()> + Send>> =

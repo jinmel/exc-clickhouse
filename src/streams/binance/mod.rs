@@ -4,7 +4,7 @@ use crate::streams::binance::parser::BinanceParser;
 use crate::{
     models::NormalizedEvent,
     streams::{
-        ExchangeStreamError, StreamEndpoint, StreamType, WebsocketStream,
+        ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
         exchange_stream::ExchangeStream, subscription::BinanceSubscription,
     },
 };
@@ -88,7 +88,7 @@ impl BinanceClientBuilder {
         subscription.add_markets(
             self.symbols
                 .iter()
-                .map(|s| StreamEndpoint {
+                .map(|s| StreamSymbols {
                     symbol: s.clone(),
                     stream_type: StreamType::Trade,
                 })
@@ -97,7 +97,7 @@ impl BinanceClientBuilder {
         subscription.add_markets(
             self.symbols
                 .iter()
-                .map(|s| StreamEndpoint {
+                .map(|s| StreamSymbols {
                     symbol: s.clone(),
                     stream_type: StreamType::Quote,
                 })

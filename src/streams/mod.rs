@@ -30,16 +30,22 @@ pub enum StreamType {
 }
 
 #[derive(Debug, Clone)]
-pub struct StreamEndpoint {
+pub struct StreamSymbols {
     pub stream_type: StreamType,
     pub symbol: String,
 }
 
 // Returns subscription message
 pub trait Subscription {
-    fn messages(&self) -> Vec<tokio_tungstenite::tungstenite::Message>;
+    fn to_json(&self) -> Result<Vec<serde_json::Value>, serde_json::Error>;
+    fn messages(&self) -> Result<Vec<tokio_tungstenite::tungstenite::Message>, serde_json::Error> {
+        let subscription_messages = self.to_json()?;
+        Ok(subscription_messages.iter().map(|message| {
+            tokio_tungstenite::tungstenite::Message::Text(message.to_string().into())
+        }).collect())
+    }
     fn heartbeat(&self) -> Option<tokio_tungstenite::tungstenite::Message>;
-    fn heartbeat_interval(&self) -> Duration;
+    fn heartbeat_interval(&self) -> Option<Duration>;
 }
 
 #[derive(Debug, thiserror::Error, Clone)]
