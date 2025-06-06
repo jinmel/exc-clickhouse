@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::{
     models::{NormalizedQuote, NormalizedTrade},
-    streams::{ExchangeClient, ExchangeStream, ExchangeStreamError},
+    streams::{exchange_stream::ExchangeStream, ExchangeStreamError},
 };
 
 pub const DEFAULT_UPBIT_WS_URL: &str = "wss://api.upbit.com/websocket/v1";

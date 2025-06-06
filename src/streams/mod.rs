@@ -2,6 +2,7 @@ pub mod binance;
 pub mod bybit;
 pub mod exchange_stream;
 pub mod subscription;
+// pub mod upbit;  // Commented out - uses different API pattern
 
 use crate::models::NormalizedEvent;
 use async_trait::async_trait;
@@ -64,4 +65,6 @@ pub enum ExchangeStreamError {
     ConnectionError(String),
     #[error("Subscription error: {0}")]
     SubscriptionError(String),
+    #[error("Invalid configuration: {0}")]
+    InvalidConfiguration(String),
 }

@@ -5,7 +5,7 @@ use crate::{
     models::NormalizedEvent,
     streams::{
         ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
-        exchange_stream::ExchangeStream, subscription::BybitSubscription,
+        exchange_stream::{ExchangeStream, ExchangeStreamBuilder}, subscription::BybitSubscription,
     },
 };
 
@@ -28,17 +28,13 @@ impl BybitClient {
 #[async_trait]
 impl WebsocketStream for BybitClient {
     type Error = ExchangeStreamError;
-    type EventStream = ExchangeStream<NormalizedEvent, BybitParser, BybitSubscription>;
+    type EventStream = ExchangeStream<NormalizedEvent>;
 
     async fn stream_events(&self) -> Result<Self::EventStream, Self::Error> {
         tracing::debug!("Bybit URL: {}", self.base_url);
         let parser = BybitParser::new();
-        let mut stream =
-            ExchangeStream::new(&self.base_url, None, parser, self.subscription.clone()).await?;
-        let res = stream.run().await;
-        if res.is_err() {
-            tracing::error!("Error running exchange stream: {:?}", res.err());
-        }
+        let stream = ExchangeStreamBuilder::new(&self.base_url, parser, self.subscription.clone())
+            .build();
         Ok(stream)
     }
 }
