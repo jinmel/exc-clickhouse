@@ -13,7 +13,7 @@ pub struct SymbolsConfigEntry {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SymbolsConfig {
-    pub entries: Vec<SymbolsConfigEntry>,
+pub entries: Vec<SymbolsConfigEntry>,
 }
 
 impl SymbolsConfig {

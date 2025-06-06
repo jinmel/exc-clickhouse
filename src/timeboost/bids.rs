@@ -383,6 +383,7 @@ mod tests {
     pub const PREFIX: &str = "uw2/validated-timeboost-bids/";
 
     #[tokio::test]
+    #[ignore]
     async fn test_get_latest_bid_file() {
         let client = S3Client::new(BUCKET_NAME, PREFIX).await.unwrap();
         let _ = client
@@ -392,6 +393,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_read_file() {
         let client = S3Client::new(BUCKET_NAME, PREFIX)
             .await
@@ -413,6 +415,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_get_all_bid_files() {
         let client = S3Client::new(BUCKET_NAME, PREFIX)
             .await

@@ -1,8 +1,4 @@
-use crate::symbols::{
-    SymbolsConfig,
-    SymbolsConfigEntry,
-    fetch_binance_top_spot_pairs,
-};
+use crate::symbols::{SymbolsConfig, SymbolsConfigEntry, fetch_binance_top_spot_pairs};
 use clap::{Args, Parser, Subcommand};
 use dotenv::dotenv;
 use eyre::WrapErr;
@@ -17,10 +13,7 @@ use tracing_subscriber::{EnvFilter, FmtSubscriber};
 use crate::{
     clickhouse::{ClickHouseConfig, ClickHouseService},
     models::{ClickhouseMessage, NormalizedEvent},
-    streams::{
-        ExchangeStreamError, WebsocketStream,
-        binance::BinanceClient,
-    },
+    streams::{ExchangeStreamError, WebsocketStream, binance::BinanceClient, bybit::BybitClient},
 };
 
 mod clickhouse;
@@ -94,6 +87,10 @@ struct StreamArgs {
     #[arg(long)]
     skip_binance: bool,
 
+    /// Skip Bybit stream
+    #[arg(long)]
+    skip_bybit: bool,
+
     /// Skip Ethereum block metadata
     #[arg(long)]
     skip_ethereum: bool,
@@ -130,6 +127,7 @@ struct StreamArgs {
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
 enum TaskType {
     BinanceStream,
+    BybitStream,
     EthereumBlockMetadata,
     ClickHouseInsert,
     FetchTimeboostBids,
@@ -139,6 +137,7 @@ impl std::fmt::Display for TaskType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             TaskType::BinanceStream => write!(f, "Binance"),
+            TaskType::BybitStream => write!(f, "Bybit"),
             TaskType::EthereumBlockMetadata => write!(f, "Ethereum"),
             TaskType::ClickHouseInsert => write!(f, "ClickHouse"),
             TaskType::FetchTimeboostBids => write!(f, "Timeboost"),
@@ -268,7 +267,12 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         None
     };
 
-    if args.skip_binance && args.skip_ethereum && args.skip_clickhouse && args.skip_timeboost {
+    if args.skip_binance
+        && args.skip_bybit
+        && args.skip_ethereum
+        && args.skip_clickhouse
+        && args.skip_timeboost
+    {
         tracing::warn!("No tasks were enabled. Use --help to see available options.");
         return Ok(());
     }
@@ -295,6 +299,26 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
                 (
                     TaskType::BinanceStream,
                     binance_stream_task(tx, symbols, batch_size).await,
+                )
+            });
+        }
+
+        if !args.skip_bybit {
+            let config = read_symbols(&args.symbols_file)?;
+            let symbols: Vec<String> = config
+                .entries
+                .iter()
+                .filter(|e| e.exchange.eq_ignore_ascii_case("bybit"))
+                .flat_map(|e| e.symbols.iter().cloned())
+                .collect();
+            let batch_size = args.batch_size;
+            let tx = msg_tx.clone();
+
+            tracing::info!("Spawning bybit stream for symbols: {:?}", symbols);
+            set.spawn(async move {
+                (
+                    TaskType::BybitStream,
+                    bybit_stream_task(tx, symbols, batch_size).await,
                 )
             });
         }
@@ -443,6 +467,41 @@ async fn binance_stream_task(
                     }
                     Err(e) => {
                         // TODO: handle error
+                        tracing::error!("Error parsing event: {:?}", e);
+                        None
+                    }
+                }
+            },
+        )
+        .chunks(batch_size);
+    pin_mut!(chunks);
+    while let Some(chunk) = chunks.next().await {
+        let res = evt_tx.send(chunk);
+        if res.is_err() {
+            tracing::error!("Failed to send chunk to channel");
+        }
+    }
+    Ok(())
+}
+
+async fn bybit_stream_task(
+    evt_tx: mpsc::UnboundedSender<Vec<ClickhouseMessage>>,
+    symbols: Vec<String>,
+    batch_size: usize,
+) -> eyre::Result<()> {
+    let bybit = BybitClient::builder().add_symbols(symbols).build()?;
+    let combined_stream = bybit.stream_events().await?;
+    let chunks = combined_stream
+        .filter_map(
+            |event: Result<NormalizedEvent, ExchangeStreamError>| async move {
+                match event {
+                    Ok(NormalizedEvent::Trade(trade)) => {
+                        Some(ClickhouseMessage::Cex(NormalizedEvent::Trade(trade)))
+                    }
+                    Ok(NormalizedEvent::Quote(quote)) => {
+                        Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
+                    }
+                    Err(e) => {
                         tracing::error!("Error parsing event: {:?}", e);
                         None
                     }
