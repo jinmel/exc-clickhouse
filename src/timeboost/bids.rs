@@ -99,7 +99,7 @@ impl From<CsvBidData> for BidData {
 const FIRST_ROUND: u64 = 53516;
 const ROUND_DURATION: u64 = 60;
 
-pub async fn insert_all_timeboost_bids() -> eyre::Result<()> {
+pub async fn backfill_timeboost_bids() -> eyre::Result<()> {
     let first_round_at =
         DateTime::parse_from_str("2025-04-17T13:53:38+00:00", "%Y-%m-%dT%H:%M:%S%z")?;
     let inner = HistoricalBidsService::new().await?;

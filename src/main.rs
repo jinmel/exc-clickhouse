@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{Args, Parser, Subcommand};
 use dotenv::dotenv;
 use eyre::WrapErr;
 use futures::pin_mut;
@@ -32,6 +32,25 @@ mod symbols;
 #[command(about = "Exchange data collector to ClickHouse database")]
 #[command(version)]
 struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+
+    /// Log level (trace, debug, info, warn, error)
+    #[arg(short, long, default_value = "info")]
+    log_level: String,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// One-time database tasks
+    Db,
+
+    /// Run streaming tasks
+    Stream(StreamArgs),
+}
+
+#[derive(Args, Clone)]
+struct StreamArgs {
     /// Path to symbols file
     #[arg(short, long, default_value = "symbols.yaml")]
     symbols_file: String,
@@ -39,13 +58,6 @@ struct Cli {
     /// Batch size for processing events
     #[arg(short, long, default_value_t = 500)]
     batch_size: usize,
-
-    #[arg(long)]
-    insert_all_timeboost_bids: bool,
-
-    /// Log level (trace, debug, info, warn, error)
-    #[arg(short, long, default_value = "info")]
-    log_level: String,
 
     /// Skip Binance stream
     #[arg(long)]
@@ -175,25 +187,32 @@ async fn main() -> eyre::Result<()> {
         .finish();
     tracing::subscriber::set_global_default(subscriber)?;
 
-    if cli.insert_all_timeboost_bids {
-        tracing::info!("Inserting all timeboost bids");
-        timeboost::bids::insert_all_timeboost_bids().await?;
-        tracing::info!("All timeboost bids inserted");
-        return Ok(());
+    match cli.command {
+        Commands::Db => {
+            tracing::info!("Backfilling timeboost bids");
+            timeboost::bids::backfill_timeboost_bids().await?;
+            tracing::info!("Timeboost bids backfill complete");
+            return Ok(());
+        }
+        Commands::Stream(args) => {
+            run_stream(args).await
+        }
     }
+}
 
+async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
     // Initialize task supervisor if restart is enabled
-    let mut supervisor = if cli.enable_restart {
+    let mut supervisor = if args.enable_restart {
         Some(TaskSupervisor::new(
-            cli.max_restart_attempts,
-            cli.restart_delay_seconds,
-            cli.max_restart_delay_seconds,
+            args.max_restart_attempts,
+            args.restart_delay_seconds,
+            args.max_restart_delay_seconds,
         ))
     } else {
         None
     };
 
-    if cli.skip_binance && cli.skip_ethereum && cli.skip_clickhouse && cli.skip_timeboost {
+    if args.skip_binance && args.skip_ethereum && args.skip_clickhouse && args.skip_timeboost {
         tracing::warn!("No tasks were enabled. Use --help to see available options.");
         return Ok(());
     }
@@ -205,15 +224,15 @@ async fn main() -> eyre::Result<()> {
         let mut set = tokio::task::JoinSet::new();
 
         // Spawn tasks
-        if !cli.skip_binance {
-            let config = read_symbols(&cli.symbols_file)?;
+        if !args.skip_binance {
+            let config = read_symbols(&args.symbols_file)?;
             let symbols: Vec<String> = config
                 .entries
                 .iter()
                 .filter(|e| e.exchange.eq_ignore_ascii_case("binance"))
                 .flat_map(|e| e.symbols.iter().cloned().map(|s| s.to_lowercase()))
                 .collect();
-            let batch_size = cli.batch_size;
+            let batch_size = args.batch_size;
             let tx = msg_tx.clone();
 
             tracing::info!("Spawning binance stream for symbols: {:?}", symbols);
@@ -225,8 +244,8 @@ async fn main() -> eyre::Result<()> {
             });
         }
 
-        if !cli.skip_ethereum {
-            let rpc_url = cli
+        if !args.skip_ethereum {
+            let rpc_url = args
                 .rpc_url
                 .clone()
                 .or_else(|| std::env::var("RPC_URL").ok())
@@ -247,7 +266,7 @@ async fn main() -> eyre::Result<()> {
             });
         }
 
-        if !cli.skip_clickhouse {
+        if !args.skip_clickhouse {
             tracing::info!("Spawning clickhouse writer task");
             set.spawn(async move {
                 (
@@ -257,7 +276,7 @@ async fn main() -> eyre::Result<()> {
             });
         }
 
-        if !cli.skip_timeboost {
+        if !args.skip_timeboost {
             tracing::info!("Spawning timeboost bids task");
             let tx = msg_tx.clone();
             set.spawn(async move {
