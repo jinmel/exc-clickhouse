@@ -1,7 +1,6 @@
-use super::{StreamType, Subscription, StreamEndpoint};
+use super::{StreamEndpoint, StreamType, Subscription};
 use serde::Serialize;
 use tokio::time::Duration;
-
 
 #[derive(Debug, Clone)]
 pub struct BinanceSubscription {
@@ -92,13 +91,21 @@ impl BybitSubscription {
             args: Vec<String>,
         }
 
-        let args = self.endpoints.iter().map(|market| {
-            let stream_type = match market.stream_type {
-                StreamType::Trade => "publicTrade",
-                StreamType::Quote => "orderbook.200",
-            };
-            format!("{stream_type}.{symbol}", symbol = market.symbol, stream_type = stream_type)
-        }).collect::<Vec<String>>();
+        let args = self
+            .endpoints
+            .iter()
+            .map(|market| {
+                let stream_type = match market.stream_type {
+                    StreamType::Trade => "publicTrade",
+                    StreamType::Quote => "orderbook.200",
+                };
+                format!(
+                    "{stream_type}.{symbol}",
+                    symbol = market.symbol,
+                    stream_type = stream_type
+                )
+            })
+            .collect::<Vec<String>>();
 
         let subscription_message = SubscriptionMessage {
             req_id: None,
@@ -130,7 +137,9 @@ impl Subscription for BybitSubscription {
         };
 
         let ping_message = serde_json::to_value(ping).unwrap();
-        Some(tokio_tungstenite::tungstenite::Message::Text(ping_message.to_string().into()))
+        Some(tokio_tungstenite::tungstenite::Message::Text(
+            ping_message.to_string().into(),
+        ))
     }
 
     fn heartbeat_interval(&self) -> Duration {

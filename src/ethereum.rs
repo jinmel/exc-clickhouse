@@ -1,3 +1,4 @@
+use crate::models::{ClickhouseMessage, EthereumMetadataMessage};
 use crate::tower_utils::DelayLayer;
 use alloy::providers::DynProvider;
 use alloy::providers::{Provider, ProviderBuilder};
@@ -11,7 +12,6 @@ use futures::{Stream, pin_mut};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::sync::mpsc;
-use crate::models::{ClickhouseMessage, EthereumMetadataMessage};
 
 #[derive(Debug, Clone, Row, Serialize, Deserialize)]
 pub struct BlockMetadata {
@@ -62,18 +62,25 @@ impl BlockMetadataFetcher {
     }
 }
 
-pub async fn fetch_blocks_task(rpc_url: String, msg_tx: mpsc::UnboundedSender<Vec<ClickhouseMessage>>) -> eyre::Result<()> {
+pub async fn fetch_blocks_task(
+    rpc_url: String,
+    msg_tx: mpsc::UnboundedSender<Vec<ClickhouseMessage>>,
+) -> eyre::Result<()> {
     let fetcher = BlockMetadataFetcher::new(rpc_url).await?;
     let block_stream = fetcher.create_block_metadata_stream().await;
-    let block_stream = block_stream.filter_map(|result| async move {
-        match result {
-            Ok(block) => Some(ClickhouseMessage::Ethereum(EthereumMetadataMessage::Block(block))),
-            Err(e) => {
-                tracing::error!("Error in block stream: {:?}", e);
-                None
+    let block_stream = block_stream
+        .filter_map(|result| async move {
+            match result {
+                Ok(block) => Some(ClickhouseMessage::Ethereum(EthereumMetadataMessage::Block(
+                    block,
+                ))),
+                Err(e) => {
+                    tracing::error!("Error in block stream: {:?}", e);
+                    None
+                }
             }
-        }
-    }).chunks(10);
+        })
+        .chunks(10);
     pin_mut!(block_stream);
     while let Some(chunk) = block_stream.next().await {
         let res = msg_tx.send(chunk);

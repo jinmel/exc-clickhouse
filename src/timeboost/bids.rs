@@ -1,4 +1,5 @@
 use crate::clickhouse::{ClickHouseConfig, ClickHouseService};
+use crate::models::{ClickhouseMessage, ExpresslaneMessage};
 use aws_config::BehaviorVersion;
 use aws_sdk_s3::Client;
 use chrono::{DateTime, Utc};
@@ -10,13 +11,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::Read;
 use std::task::{Context, Poll};
+use tokio::sync::mpsc;
 use tokio::time::Duration;
 use tower::Service;
 use tower::limit::RateLimitLayer;
 use tower::timeout::TimeoutLayer;
 use tower::util::ServiceExt;
-use tokio::sync::mpsc;
-use crate::models::{ClickhouseMessage, ExpresslaneMessage};
 
 // ClickHouse table schema for proper time filtering:
 // CREATE TABLE timeboost.bids
@@ -140,7 +140,9 @@ pub async fn backfill_timeboost_bids() -> eyre::Result<()> {
     Ok(())
 }
 
-pub async fn fetch_bids_task(msg_tx: mpsc::UnboundedSender<Vec<ClickhouseMessage>>) -> eyre::Result<()> {
+pub async fn fetch_bids_task(
+    msg_tx: mpsc::UnboundedSender<Vec<ClickhouseMessage>>,
+) -> eyre::Result<()> {
     let inner = HistoricalBidsService::new().await?;
     let mut svc = tower::ServiceBuilder::new()
         .layer(TimeoutLayer::new(Duration::from_secs(10)))
@@ -154,13 +156,10 @@ pub async fn fetch_bids_task(msg_tx: mpsc::UnboundedSender<Vec<ClickhouseMessage
             .await
             .map_err(|e| eyre::eyre!("Service not ready: {}", e))?;
         tracing::trace!("Service is ready");
-        let mut bids = svc
-            .call(HistoricalBidsRequest::Latest)
-            .await
-            .map_err(|e| {
-                tracing::error!("Failed to fetch timeboost bids: {}", e);
-                eyre::eyre!("Service call failed: {}", e)
-            })?;
+        let mut bids = svc.call(HistoricalBidsRequest::Latest).await.map_err(|e| {
+            tracing::error!("Failed to fetch timeboost bids: {}", e);
+            eyre::eyre!("Service call failed: {}", e)
+        })?;
         tracing::debug!("Got {} bids from s3", bids.len());
         if bids.is_empty() {
             tracing::warn!("No bids found from s3");
