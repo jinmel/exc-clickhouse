@@ -170,7 +170,13 @@ impl ClickHouseService {
         inserter.end().await.wrap_err("failed to write bids")
     }
 
-    fn get_inserter<T: Row>(&self, table: &str, max_rows: u64, period_sec: u64, period_bias: f64) -> eyre::Result<Inserter<T>> {
+    fn get_inserter<T: Row>(
+        &self,
+        table: &str,
+        max_rows: u64,
+        period_sec: u64,
+        period_bias: f64,
+    ) -> eyre::Result<Inserter<T>> {
         let inserter: Inserter<T> = self
             .client
             .inserter(table)?

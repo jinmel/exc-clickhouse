@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use eyre::WrapErr;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SymbolsConfigEntry {
