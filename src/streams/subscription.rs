@@ -140,3 +140,43 @@ impl Subscription for BybitSubscription {
         Some(Duration::from_secs(20))
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct CoinbaseSubscription {
+    symbols: Vec<StreamSymbols>,
+}
+
+impl CoinbaseSubscription {
+    pub fn new() -> Self {
+        Self { symbols: vec![] }
+    }
+
+    pub fn add_markets(&mut self, markets: Vec<StreamSymbols>) {
+        self.symbols.extend(markets);
+    }
+}
+
+impl Subscription for CoinbaseSubscription {
+    fn to_json(&self) -> Result<Vec<serde_json::Value>, serde_json::Error> {
+        let products = self
+            .symbols
+            .iter()
+            .map(|m| m.symbol.clone())
+            .unique()
+            .collect::<Vec<String>>();
+        let message = serde_json::json!({
+            "type": "subscribe",
+            "product_ids": products,
+            "channels": ["matches", "ticker"],
+        });
+        Ok(vec![message])
+    }
+
+    fn heartbeat(&self) -> Option<tokio_tungstenite::tungstenite::Message> {
+        None
+    }
+
+    fn heartbeat_interval(&self) -> Option<Duration> {
+        None
+    }
+}
