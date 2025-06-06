@@ -140,3 +140,64 @@ impl Subscription for BybitSubscription {
         Some(Duration::from_secs(20))
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct OkxSubscription {
+    symbols: Vec<StreamSymbols>,
+}
+
+impl OkxSubscription {
+    pub fn new() -> Self {
+        Self { symbols: vec![] }
+    }
+
+    pub fn add_markets(&mut self, markets: Vec<StreamSymbols>) {
+        self.symbols.extend(markets);
+    }
+}
+
+impl Subscription for OkxSubscription {
+    fn to_json(&self) -> Result<Vec<serde_json::Value>, serde_json::Error> {
+        #[derive(Serialize)]
+        struct Arg<'a> {
+            channel: &'a str,
+            instId: &'a str,
+        }
+        #[derive(Serialize)]
+        struct SubscriptionMessage<'a> {
+            id: Option<String>,
+            op: &'static str,
+            args: Vec<Arg<'a>>,
+        }
+
+        let args = self
+            .symbols
+            .iter()
+            .map(|market| {
+                let channel = match market.stream_type {
+                    StreamType::Trade => "trades",
+                    StreamType::Quote => "tickers",
+                };
+                Arg {
+                    channel,
+                    instId: &market.symbol,
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let msg = SubscriptionMessage {
+            id: None,
+            op: "subscribe",
+            args,
+        };
+        Ok(vec![serde_json::to_value(msg)?])
+    }
+
+    fn heartbeat(&self) -> Option<tokio_tungstenite::tungstenite::Message> {
+        Some(tokio_tungstenite::tungstenite::Message::Text("ping".into()))
+    }
+
+    fn heartbeat_interval(&self) -> Option<Duration> {
+        Some(Duration::from_secs(20))
+    }
+}
