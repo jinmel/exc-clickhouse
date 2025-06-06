@@ -75,6 +75,9 @@ struct FetchBinanceSymbolsArgs {
     /// Also insert trading pairs into ClickHouse
     #[arg(long)]
     update_clickhouse: bool,
+
+    #[arg(long)]
+    limit: usize,
 }
 
 #[derive(Args, Clone)]
@@ -225,7 +228,7 @@ async fn main() -> eyre::Result<()> {
             }
             DbCommands::FetchBinanceSymbols(args) => {
                 tracing::info!("Fetching top Binance SPOT symbols");
-                let pairs = fetch_binance_top_spot_pairs(200).await?;
+                let pairs = fetch_binance_top_spot_pairs(args.limit).await?;
                 let symbols: Vec<String> = pairs.iter().map(|p| p.pair.clone()).collect();
                 let cfg = SymbolsConfig {
                     entries: vec![SymbolsConfigEntry {

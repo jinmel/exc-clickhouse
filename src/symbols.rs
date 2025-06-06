@@ -1,8 +1,8 @@
+use clickhouse::Row;
 use eyre::WrapErr;
 use serde::{Deserialize, Serialize};
-use clickhouse::Row;
-use std::collections::HashMap;
 use std::cmp::Ordering;
+use std::collections::HashMap;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SymbolsConfigEntry {
@@ -44,7 +44,6 @@ struct BinanceSymbolInfo {
     #[serde(rename = "quoteAsset")]
     quote_asset: String,
 }
-
 
 #[derive(Debug, Clone, Row, Serialize, Deserialize)]
 pub struct TradingPair {
@@ -104,10 +103,16 @@ struct BinanceTicker24 {
     quote_volume: String,
 }
 
+pub const QUOTE_ASSETS: [&str; 4] = ["USDT", "USDC", "BTC", "ETH"];
+
 pub async fn fetch_binance_top_spot_pairs(limit: usize) -> eyre::Result<Vec<TradingPair>> {
     const TICKER_URL: &str = "https://data-api.binance.vision/api/v3/ticker/24hr";
 
-    let all_pairs = fetch_binance_spot_pairs().await?;
+    let all_pairs = fetch_binance_spot_pairs().await?
+        .into_iter()
+        .filter(|p| QUOTE_ASSETS.contains(&p.quote_asset.as_str()))
+        .collect::<Vec<_>>();
+
     let map: HashMap<String, TradingPair> =
         all_pairs.into_iter().map(|p| (p.pair.clone(), p)).collect();
 
@@ -143,11 +148,9 @@ pub async fn fetch_binance_top_spot_pairs(limit: usize) -> eyre::Result<Vec<Trad
 
 #[allow(dead_code)]
 pub async fn fetch_binance_spot_symbols() -> eyre::Result<Vec<String>> {
-    Ok(
-        fetch_binance_spot_pairs()
-            .await?
-            .into_iter()
-            .map(|p| p.pair)
-            .collect(),
-    )
+    Ok(fetch_binance_spot_pairs()
+        .await?
+        .into_iter()
+        .map(|p| p.pair)
+        .collect())
 }
