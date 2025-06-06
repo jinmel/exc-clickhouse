@@ -81,7 +81,7 @@ where
                     if let Some(dur) = timeout {
                         // Sleep until (connected_at + dur)
                         let wake_at = connected_at + dur;
-                        let sleep = tokio::time::sleep_until(wake_at.into());
+                        let sleep = tokio::time::sleep_until(wake_at);
                         Box::pin(sleep)
                     } else {
                         // never fires

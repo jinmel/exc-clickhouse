@@ -1,8 +1,8 @@
 use crate::{
-    models::{NormalizedEvent, NormalizedQuote, NormalizedTrade},
+    models::NormalizedEvent,
     streams::{
         ExchangeStreamError, Parser,
-        binance::model::{BookTickerEvent, Response, TradeEvent},
+        binance::model::Response,
     },
 };
 

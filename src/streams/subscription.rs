@@ -13,10 +13,6 @@ impl BinanceSubscription {
         Self { endpoints: vec![] }
     }
 
-    pub fn add_market(&mut self, market: StreamEndpoint) {
-        self.endpoints.push(market);
-    }
-
     pub fn add_markets(&mut self, markets: Vec<StreamEndpoint>) {
         self.endpoints.extend(markets);
     }

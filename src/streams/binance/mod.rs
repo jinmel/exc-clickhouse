@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use url::Url;
 
 use crate::streams::binance::parser::BinanceParser;
 use crate::{
@@ -41,13 +40,15 @@ impl WebsocketStream for BinanceClient {
         tracing::debug!("Binance URL: {}", self.base_url);
         let timeout = Duration::from_secs(23 * 60 * 60); // Binance has 24 hour timeout.
         let parser = BinanceParser::new();
-        ExchangeStream::new(
+        let mut stream = ExchangeStream::new(
             &self.base_url,
             Some(timeout),
             parser,
             self.subscription.clone(),
         )
-        .await
+        .await?;
+        stream.run().await?;
+        Ok(stream)
     }
 }
 
