@@ -12,6 +12,7 @@ use tokio::time::Duration;
 
 /// Default WebSocket URL for Binance
 pub const DEFAULT_BINANCE_WS_URL: &str = "wss://stream.binance.com:9443/stream";
+#[allow(unused)]
 pub const MARKET_ONLY_BINANCE_WS_URL: &str = "wss://data-stream.binance.vision/stream";
 #[allow(unused)]
 pub const US_BINANCE_WS_URL: &str = "wss://stream.binance.us:9443";
@@ -74,11 +75,6 @@ impl BinanceClientBuilder {
     pub fn add_symbols(mut self, symbols: Vec<impl Into<String>>) -> Self {
         self.symbols
             .extend(symbols.into_iter().map(|s| s.into().to_lowercase()));
-        self
-    }
-
-    pub fn with_base_url(mut self, base_url: String) -> Self {
-        self.base_url = base_url;
         self
     }
 

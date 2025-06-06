@@ -68,11 +68,6 @@ impl BybitClientBuilder {
         self
     }
 
-    pub fn with_base_url(mut self, base_url: String) -> Self {
-        self.base_url = base_url;
-        self
-    }
-
     pub fn build(self) -> eyre::Result<BybitClient> {
         let mut subscription = BybitSubscription::new();
         subscription.add_markets(

@@ -57,17 +57,8 @@ pub enum ExchangeStreamError {
     StreamNotConnected(String),
     #[error("Parse error: {0}")]
     MessageError(String),
-    #[error("Invalid configuration: {0}")]
-    InvalidConfiguration(String),
     #[error("Connection error: {0}")]
     ConnectionError(String),
     #[error("Subscription error: {0}")]
     SubscriptionError(String),
-}
-
-#[derive(Debug, thiserror::Error, Clone)]
-#[non_exhaustive]
-pub enum ParserError {
-    #[error("Parse error: {0}")]
-    ParseError(String),
 }
