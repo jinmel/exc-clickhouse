@@ -19,4 +19,46 @@ impl SymbolsConfig {
             serde_yaml::from_reader(reader).wrap_err("Failed to parse YAML")?;
         Ok(Self { entries })
     }
+
+    pub fn to_yaml<W: std::io::Write>(&self, writer: W) -> eyre::Result<()> {
+        serde_yaml::to_writer(writer, self).wrap_err("Failed to write YAML")
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct BinanceExchangeInfo {
+    symbols: Vec<BinanceSymbolInfo>,
+}
+
+#[derive(Debug, Deserialize)]
+struct BinanceSymbolInfo {
+    symbol: String,
+    status: String,
+    #[serde(rename = "permissionSets")]
+    permission_sets: Option<Vec<Vec<String>>>,
+}
+
+pub async fn fetch_binance_spot_symbols() -> eyre::Result<Vec<String>> {
+    const BINANCE_URL: &str = "https://api.binance.com/api/v3/exchangeInfo";
+
+    let resp = reqwest::get(BINANCE_URL).await?.error_for_status()?;
+    let info: BinanceExchangeInfo = resp.json().await?;
+
+    let symbols = info
+        .symbols
+        .into_iter()
+        .filter(|s| {
+            if s.status != "TRADING" {
+                return false;
+            }
+            if let Some(psets) = &s.permission_sets {
+                if let Some(first) = psets.get(0) {
+                    return first.iter().any(|p| p == "SPOT");
+                }
+            }
+            false
+        })
+        .map(|s| s.symbol)
+        .collect();
+    Ok(symbols)
 }

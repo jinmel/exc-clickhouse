@@ -1,4 +1,4 @@
-use crate::symbols::SymbolsConfig;
+use crate::symbols::{SymbolsConfig, SymbolsConfigEntry, fetch_binance_spot_symbols};
 use clap::{Args, Parser, Subcommand};
 use dotenv::dotenv;
 use eyre::WrapErr;
@@ -43,10 +43,31 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// One-time database tasks
-    Db,
+    Db(DbCmd),
 
     /// Run streaming tasks
     Stream(StreamArgs),
+}
+
+#[derive(Subcommand, Clone)]
+enum DbCommands {
+    /// Backfill timeboost bids
+    Timeboost,
+    /// Fetch Binance SPOT symbols
+    FetchBinanceSymbols(FetchBinanceSymbolsArgs),
+}
+
+#[derive(Args, Clone)]
+struct DbCmd {
+    #[command(subcommand)]
+    command: DbCommands,
+}
+
+#[derive(Args, Clone)]
+struct FetchBinanceSymbolsArgs {
+    /// Output YAML file path
+    #[arg(short, long)]
+    output: String,
 }
 
 #[derive(Args, Clone)]
@@ -188,12 +209,30 @@ async fn main() -> eyre::Result<()> {
     tracing::subscriber::set_global_default(subscriber)?;
 
     match cli.command {
-        Commands::Db => {
-            tracing::info!("Backfilling timeboost bids");
-            timeboost::bids::backfill_timeboost_bids().await?;
-            tracing::info!("Timeboost bids backfill complete");
-            return Ok(());
-        }
+        Commands::Db(db_cmd) => match db_cmd.command {
+            DbCommands::Timeboost => {
+                tracing::info!("Backfilling timeboost bids");
+                timeboost::bids::backfill_timeboost_bids().await?;
+                tracing::info!("Timeboost bids backfill complete");
+                return Ok(());
+            }
+            DbCommands::FetchBinanceSymbols(args) => {
+                tracing::info!("Fetching Binance SPOT symbols");
+                let symbols = fetch_binance_spot_symbols().await?;
+                let cfg = SymbolsConfig {
+                    entries: vec![SymbolsConfigEntry {
+                        exchange: "Binance".to_string(),
+                        market: "SPOT".to_string(),
+                        symbols,
+                    }],
+                };
+                let file = std::fs::File::create(&args.output)
+                    .wrap_err("Failed to create output YAML file")?;
+                cfg.to_yaml(file)?;
+                tracing::info!("Symbols written to {}", args.output);
+                return Ok(());
+            }
+        },
         Commands::Stream(args) => run_stream(args).await,
     }
 }
@@ -371,9 +410,7 @@ async fn binance_stream_task(
     symbols: Vec<String>,
     batch_size: usize,
 ) -> eyre::Result<()> {
-    let binance = BinanceClient::builder()
-        .add_symbols(symbols)
-        .build()?;
+    let binance = BinanceClient::builder().add_symbols(symbols).build()?;
     let combined_stream = binance.stream_events().await?;
     let chunks = combined_stream
         .filter_map(
