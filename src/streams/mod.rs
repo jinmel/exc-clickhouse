@@ -10,9 +10,6 @@ use futures::stream::Stream;
 use serde::{Deserialize, Serialize};
 use tokio::time::Duration;
 
-// Re-export commonly used types
-// pub use exchange_stream::{ExchangeStream, ExchangeStreamBuilder};
-
 #[async_trait]
 pub trait WebsocketStream {
     type Error: std::error::Error + Send + Sync + 'static;

@@ -156,6 +156,3 @@ where
         Box::pin(stream)
     }
 }
-
-// Keep the old name as an alias for the builder to maintain some backwards compatibility
-pub type ExchangeStream<T, P, S> = ExchangeStreamBuilder<T, P, S>;

@@ -5,7 +5,7 @@ use crate::{
     models::NormalizedEvent,
     streams::{
         ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
-        exchange_stream::ExchangeStream, subscription::BinanceSubscription,
+        exchange_stream::ExchangeStreamBuilder, subscription::BinanceSubscription,
     },
 };
 use futures::stream::Stream;
@@ -43,7 +43,7 @@ impl WebsocketStream for BinanceClient {
         tracing::debug!("Binance URL: {}", self.base_url);
         let timeout = Duration::from_secs(23 * 60 * 60); // Binance has 24 hour timeout.
         let parser = BinanceParser::new();
-        let stream = ExchangeStream::new(
+        let stream = ExchangeStreamBuilder::new(
             &self.base_url,
             Some(timeout),
             parser,
