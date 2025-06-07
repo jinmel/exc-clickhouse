@@ -8,6 +8,12 @@ pub struct BinanceSubscription {
     symbols: Vec<StreamSymbols>,
 }
 
+impl Default for BinanceSubscription {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BinanceSubscription {
     pub fn new() -> Self {
         Self { symbols: vec![] }
@@ -63,6 +69,12 @@ impl Subscription for BinanceSubscription {
 #[derive(Debug, Clone)]
 pub struct BybitSubscription {
     symbols: Vec<StreamSymbols>,
+}
+
+impl Default for BybitSubscription {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl BybitSubscription {
@@ -146,6 +158,12 @@ pub struct OkxSubscription {
     symbols: Vec<StreamSymbols>,
 }
 
+impl Default for OkxSubscription {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl OkxSubscription {
     pub fn new() -> Self {
         Self { symbols: vec![] }
@@ -206,6 +224,12 @@ impl Subscription for OkxSubscription {
 #[derive(Debug, Clone)]
 pub struct CoinbaseSubscription {
     symbols: Vec<StreamSymbols>,
+}
+
+impl Default for CoinbaseSubscription {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl CoinbaseSubscription {

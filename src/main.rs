@@ -15,7 +15,7 @@ use crate::{
     models::{ClickhouseMessage, NormalizedEvent},
     streams::{
         ExchangeStreamError, WebsocketStream, binance::BinanceClient, bybit::BybitClient,
-        coinbase::CoinbaseClient, okx::OkxClient, kucoin::KucoinClient,
+        coinbase::CoinbaseClient, kucoin::KucoinClient, okx::OkxClient,
     },
 };
 

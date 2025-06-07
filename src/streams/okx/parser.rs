@@ -9,6 +9,12 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct OkxParser {}
 
+impl Default for OkxParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl OkxParser {
     pub fn new() -> Self {
         Self {}

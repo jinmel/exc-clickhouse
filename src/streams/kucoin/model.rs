@@ -33,29 +33,28 @@ impl TryInto<NormalizedTrade> for TradeEvent {
     type Error = ExchangeStreamError;
 
     fn try_into(self) -> Result<NormalizedTrade, Self::Error> {
-        let price = self
-            .data.price
-            .parse::<f64>()
-            .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid price value: {e}")))?;
-        let size = self
-            .data.size
-            .parse::<f64>()
-            .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid size value: {e}")))?;
+        let price =
+            self.data.price.parse::<f64>().map_err(|e| {
+                ExchangeStreamError::MessageError(format!("Invalid price value: {e}"))
+            })?;
+        let size =
+            self.data.size.parse::<f64>().map_err(|e| {
+                ExchangeStreamError::MessageError(format!("Invalid size value: {e}"))
+            })?;
         let side = match self.data.side.as_str() {
             "buy" => TradeSide::Buy,
             "sell" => TradeSide::Sell,
             other => {
                 return Err(ExchangeStreamError::MessageError(format!(
-                    "Unknown side: {}",
-                    other
+                    "Unknown side: {other}"
                 )));
             }
         };
 
-        let timestamp = self
-            .data.time
-            .parse::<u64>()
-            .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid time value: {e}")))?;
+        let timestamp =
+            self.data.time.parse::<u64>().map_err(|e| {
+                ExchangeStreamError::MessageError(format!("Invalid time value: {e}"))
+            })?;
 
         Ok(NormalizedTrade::new(
             ExchangeName::Kucoin,
@@ -94,27 +93,29 @@ impl TryInto<NormalizedQuote> for TickerEvent {
     type Error = ExchangeStreamError;
 
     fn try_into(self) -> Result<NormalizedQuote, Self::Error> {
-        let ask_price = self
-            .data.best_ask
-            .parse::<f64>()
-            .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid ask price: {e}")))?;
+        let ask_price =
+            self.data.best_ask.parse::<f64>().map_err(|e| {
+                ExchangeStreamError::MessageError(format!("Invalid ask price: {e}"))
+            })?;
         let ask_amount = self
-            .data.best_ask_size
+            .data
+            .best_ask_size
             .parse::<f64>()
             .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid ask size: {e}")))?;
-        let bid_price = self
-            .data.best_bid
-            .parse::<f64>()
-            .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid bid price: {e}")))?;
+        let bid_price =
+            self.data.best_bid.parse::<f64>().map_err(|e| {
+                ExchangeStreamError::MessageError(format!("Invalid bid price: {e}"))
+            })?;
         let bid_amount = self
-            .data.best_bid_size
+            .data
+            .best_bid_size
             .parse::<f64>()
             .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid bid size: {e}")))?;
 
-        let symbol = &self.topic
-            .split(':')
-            .nth(1)
-            .ok_or_else(|| ExchangeStreamError::MessageError("Invalid topic format".to_string()))?;
+        let symbol =
+            &self.topic.split(':').nth(1).ok_or_else(|| {
+                ExchangeStreamError::MessageError("Invalid topic format".to_string())
+            })?;
 
         Ok(NormalizedQuote::new(
             ExchangeName::Kucoin,

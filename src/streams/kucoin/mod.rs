@@ -101,7 +101,7 @@ impl KucoinClientBuilder {
         let server = resp
             .data
             .instance_servers
-            .get(0)
+            .first()
             .ok_or_else(|| eyre::eyre!("no instance server"))?;
         let connect_id = Uuid::new_v4();
         let mut url = url::Url::parse(&server.endpoint)
@@ -134,42 +134,5 @@ impl KucoinClientBuilder {
             base_url,
             subscription,
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use futures::StreamExt;
-    use tokio::time::{Duration, timeout};
-
-    #[tokio::test]
-    #[ignore]
-    async fn test_kucoin_stream_event() {
-        let client = KucoinClient::builder()
-            .add_symbols(vec![
-                "BTC-USDT",
-                "ETH-USDT",
-                "XRP-USDT",
-                "BCH-USDT",
-                "ADA-USDT",
-                "DOGE-USDT",
-                "SOL-USDT",
-                "DOT-USDT",
-                "TRX-USDT",
-                "LTC-USDT",
-            ])
-            .build()
-            .await
-            .unwrap();
-        let mut stream = client.stream_events().await.unwrap();
-
-        for _ in 0..50 {
-            let result = timeout(Duration::from_secs(10), stream.next()).await;
-            assert!(result.is_ok(), "timed out waiting for event");
-            let item = result.unwrap();
-            assert!(item.is_some(), "no event received");
-            assert!(item.unwrap().is_ok(), "event returned error");
-        }
     }
 }

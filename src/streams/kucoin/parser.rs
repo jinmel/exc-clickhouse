@@ -7,6 +7,12 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct KucoinParser {}
 
+impl Default for KucoinParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl KucoinParser {
     pub fn new() -> Self {
         Self {}
