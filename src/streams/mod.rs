@@ -2,6 +2,7 @@ pub mod binance;
 pub mod bybit;
 pub mod exchange_stream;
 pub mod subscription;
+// pub mod upbit; // TODO: Needs refactoring to use new builder pattern
 
 use crate::models::NormalizedEvent;
 use async_trait::async_trait;
@@ -58,7 +59,7 @@ pub enum ExchangeStreamError {
     StreamError(String),
     #[error("Stream not connected: {0}")]
     StreamNotConnected(String),
-    #[error("Parse error: {0}")]
+    #[error("Message error: {0}")]
     MessageError(String),
     #[error("Connection error: {0}")]
     ConnectionError(String),
