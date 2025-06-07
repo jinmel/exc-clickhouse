@@ -5,9 +5,8 @@ use crate::streams::kucoin::parser::KucoinParser;
 use crate::{
     models::NormalizedEvent,
     streams::{
-        exchange_stream::ExchangeStream,
-        subscription::KucoinSubscription,
         ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
+        exchange_stream::ExchangeStream, subscription::KucoinSubscription,
     },
 };
 
@@ -34,7 +33,8 @@ impl WebsocketStream for KucoinClient {
 
     async fn stream_events(&self) -> Result<Self::EventStream, Self::Error> {
         let parser = KucoinParser::new();
-        let mut stream = ExchangeStream::new(&self.base_url, None, parser, self.subscription.clone()).await?;
+        let mut stream =
+            ExchangeStream::new(&self.base_url, None, parser, self.subscription.clone()).await?;
         let res = stream.run().await;
         if res.is_err() {
             tracing::error!("Error running exchange stream: {:?}", res.err());
@@ -104,13 +104,12 @@ impl KucoinClientBuilder {
             .get(0)
             .ok_or_else(|| eyre::eyre!("no instance server"))?;
         let connect_id = Uuid::new_v4();
-        let base_url = format!(
-            "{}?token={}&connectId={}",
-            server.endpoint.trim_end_matches('/'),
-            resp.data.token,
-            connect_id
-        );
-
+        let mut url = url::Url::parse(&server.endpoint)
+            .map_err(|e| eyre::eyre!("Failed to parse URL: {}", e))?;
+        url.query_pairs_mut()
+            .append_pair("token", &resp.data.token)
+            .append_pair("connectId", &connect_id.to_string());
+        let base_url = url.to_string();
         let mut subscription = KucoinSubscription::new(Duration::from_millis(server.ping_interval));
         subscription.add_markets(
             self.symbols
@@ -131,7 +130,10 @@ impl KucoinClientBuilder {
                 .collect(),
         );
 
-        Ok(KucoinClient { base_url, subscription })
+        Ok(KucoinClient {
+            base_url,
+            subscription,
+        })
     }
 }
 
@@ -139,15 +141,23 @@ impl KucoinClientBuilder {
 mod tests {
     use super::*;
     use futures::StreamExt;
-    use tokio::time::{timeout, Duration};
+    use tokio::time::{Duration, timeout};
 
     #[tokio::test]
     #[ignore]
     async fn test_kucoin_stream_event() {
         let client = KucoinClient::builder()
             .add_symbols(vec![
-                "BTC-USDT", "ETH-USDT", "XRP-USDT", "BCH-USDT", "ADA-USDT",
-                "DOGE-USDT", "SOL-USDT", "DOT-USDT", "TRX-USDT", "LTC-USDT",
+                "BTC-USDT",
+                "ETH-USDT",
+                "XRP-USDT",
+                "BCH-USDT",
+                "ADA-USDT",
+                "DOGE-USDT",
+                "SOL-USDT",
+                "DOT-USDT",
+                "TRX-USDT",
+                "LTC-USDT",
             ])
             .build()
             .await

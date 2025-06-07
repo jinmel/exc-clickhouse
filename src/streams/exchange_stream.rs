@@ -62,7 +62,7 @@ where
 
         let handle = tokio::spawn(async move {
             loop {
-                tracing::trace!("Connecting to {}", url);
+                tracing::trace!("Connecting to {}", &url);
                 let (mut ws, response) = tokio_tungstenite::connect_async(&url)
                     .await
                     .map_err(|e| ExchangeStreamError::ConnectionError(e.to_string()))
