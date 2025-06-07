@@ -242,3 +242,78 @@ impl Subscription for CoinbaseSubscription {
         None
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct KucoinSubscription {
+    symbols: Vec<StreamSymbols>,
+    ping_interval: Duration,
+}
+
+impl KucoinSubscription {
+    pub fn new(ping_interval: Duration) -> Self {
+        Self {
+            symbols: vec![],
+            ping_interval,
+        }
+    }
+
+    pub fn add_markets(&mut self, markets: Vec<StreamSymbols>) {
+        self.symbols.extend(markets);
+    }
+}
+
+impl Subscription for KucoinSubscription {
+    fn to_json(&self) -> Result<Vec<serde_json::Value>, serde_json::Error> {
+        #[derive(Serialize)]
+        struct SubscriptionMessage {
+            id: String,
+            #[serde(rename = "type")]
+            typ: &'static str,
+            topic: String,
+            #[serde(rename = "privateChannel")]
+            private_channel: bool,
+            response: bool,
+        }
+
+        let msgs = self
+            .symbols
+            .iter()
+            .map(|m| {
+                let topic_type = match m.stream_type {
+                    StreamType::Trade => "/market/match",
+                    StreamType::Quote => "/market/ticker",
+                };
+                let topic = format!("{}:{}", topic_type, m.symbol);
+                let msg = SubscriptionMessage {
+                    id: rand::random::<u64>().to_string(),
+                    typ: "subscribe",
+                    topic,
+                    private_channel: false,
+                    response: true,
+                };
+                serde_json::to_value(msg)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(msgs)
+    }
+
+    fn heartbeat(&self) -> Option<tokio_tungstenite::tungstenite::Message> {
+        #[derive(Serialize)]
+        struct PingMessage {
+            id: String,
+            #[serde(rename = "type")]
+            typ: &'static str,
+        }
+        let msg = PingMessage {
+            id: rand::random::<u64>().to_string(),
+            typ: "ping",
+        };
+        Some(tokio_tungstenite::tungstenite::Message::Text(
+            serde_json::to_string(&msg).unwrap().into(),
+        ))
+    }
+
+    fn heartbeat_interval(&self) -> Option<Duration> {
+        Some(self.ping_interval)
+    }
+}

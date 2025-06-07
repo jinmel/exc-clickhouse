@@ -15,6 +15,8 @@ pub enum ExchangeName {
     Coinbase,
     #[serde(rename = "kraken")]
     Kraken,
+    #[serde(rename = "kucoin")]
+    Kucoin,
     #[serde(rename = "upbit")]
     Upbit,
 }
@@ -27,6 +29,7 @@ impl std::fmt::Display for ExchangeName {
             ExchangeName::Okx => write!(f, "okx"),
             ExchangeName::Coinbase => write!(f, "coinbase"),
             ExchangeName::Kraken => write!(f, "kraken"),
+            ExchangeName::Kucoin => write!(f, "kucoin"),
             ExchangeName::Upbit => write!(f, "upbit"),
         }
     }
