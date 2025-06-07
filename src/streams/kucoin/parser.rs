@@ -21,16 +21,20 @@ impl Parser<NormalizedEvent> for KucoinParser {
             .map_err(|e| ExchangeStreamError::MessageError(format!("Failed to parse JSON: {e}")))?;
 
         match value {
-            KucoinMessage::Trade { data, .. } => {
-                let trade: NormalizedTrade = data.try_into()?;
+            KucoinMessage::Trade(event) => {
+                let trade: NormalizedTrade = event.try_into()?;
                 Ok(Some(NormalizedEvent::Trade(trade)))
             }
-            KucoinMessage::Ticker { data, .. } => {
-                let quote: NormalizedQuote = data.try_into()?;
+            KucoinMessage::Ticker(event) => {
+                let quote: NormalizedQuote = event.try_into()?;
                 Ok(Some(NormalizedEvent::Quote(quote)))
             }
+            KucoinMessage::Ack(event) => {
+                tracing::debug!("received kucoin ack: {}", event.id);
+                Ok(None)
+            }
             KucoinMessage::Other { .. } => {
-                tracing::debug!("received unhandled kucoin message: {}", text);
+                tracing::warn!("received unhandled kucoin message: {}", text);
                 Ok(None)
             }
         }

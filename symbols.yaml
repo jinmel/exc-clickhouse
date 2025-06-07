@@ -116,3 +116,21 @@
     - UNI-USD
     - AAVE-USD
     - SUSHI-USD
+- exchange: "Kucoin"
+  market: "SPOT"
+  symbols:
+    - BTC-USDT
+    - ETH-USDT
+    - SOL-USDT
+    - LINK-USDT
+    - UNI-USDT
+    - AAVE-USDT
+    - SUSHI-USDT
+    - CRV-USDT
+    - GRT-USDT
+    - CAKE-USDT
+    - GMX-USDT
+    - MAGIC-USDT
+    - ARB-USDT
+    - PENDLE-USDT
+    - ANIME-USDT
