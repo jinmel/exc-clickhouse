@@ -14,7 +14,13 @@ use crate::{
     clickhouse::{ClickHouseConfig, ClickHouseService},
     models::{ClickhouseMessage, NormalizedEvent},
     streams::{
-        ExchangeStreamError, WebsocketStream, binance::BinanceClient, bybit::BybitClient,
+        ExchangeStreamError,
+        WebsocketStream,
+        binance::BinanceClient,
+        bybit::BybitClient,
+        kucoin::KucoinClient,
+    },
+}; 
         coinbase::CoinbaseClient, okx::OkxClient, kucoin::KucoinClient,
     },
 };
@@ -66,6 +72,12 @@ struct DbCmd {
 #[derive(Args, Clone)]
 struct FetchBinanceSymbolsArgs {
     /// Output YAML file path
+    /// Skip Kucoin stream
+    #[arg(long)]
+    skip_kucoin: bool,
+
+    KucoinStream,
+            TaskType::KucoinStream => write!(f, "Kucoin"),
     #[arg(short, long)]
     output: String,
     /// Also insert trading pairs into ClickHouse
@@ -246,6 +258,7 @@ async fn main() -> eyre::Result<()> {
                 tracing::info!("Timeboost bids backfill complete");
                 return Ok(());
             }
+        && args.skip_kucoin
             DbCommands::FetchBinanceSymbols(args) => {
                 tracing::info!("Fetching top Binance SPOT symbols");
                 let pairs = fetch_binance_top_spot_pairs(args.limit).await?;
@@ -298,6 +311,26 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         && args.skip_timeboost
     {
         tracing::warn!("No tasks were enabled. Use --help to see available options.");
+        if !args.skip_kucoin {
+            let config = read_symbols(&args.symbols_file)?;
+            let symbols: Vec<String> = config
+                .entries
+                .iter()
+                .filter(|e| e.exchange.eq_ignore_ascii_case("kucoin"))
+                .flat_map(|e| e.symbols.iter().cloned())
+                .collect();
+            let batch_size = args.batch_size;
+            let tx = msg_tx.clone();
+
+            tracing::info!("Spawning kucoin stream for symbols: {:?}", symbols);
+            set.spawn(async move {
+                (
+                    TaskType::KucoinStream,
+                    kucoin_stream_task(tx, symbols, batch_size).await,
+                )
+            });
+        }
+
         return Ok(());
     }
 
@@ -496,6 +529,44 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
                         }
                     }
                 }
+async fn kucoin_stream_task(
+    evt_tx: mpsc::UnboundedSender<Vec<ClickhouseMessage>>,
+    symbols: Vec<String>,
+    batch_size: usize,
+) -> eyre::Result<()> {
+    let kucoin = KucoinClient::builder()
+        .add_symbols(symbols)
+        .build()
+        .await?;
+    let combined_stream = kucoin.stream_events().await?;
+    let chunks = combined_stream
+        .filter_map(
+            |event: Result<NormalizedEvent, ExchangeStreamError>| async move {
+                match event {
+                    Ok(NormalizedEvent::Trade(trade)) => {
+                        Some(ClickhouseMessage::Cex(NormalizedEvent::Trade(trade)))
+                    }
+                    Ok(NormalizedEvent::Quote(quote)) => {
+                        Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
+                    }
+                    Err(e) => {
+                        tracing::error!("Error parsing event: {:?}", e);
+                        None
+                    }
+                }
+            },
+        )
+        .chunks(batch_size);
+    pin_mut!(chunks);
+    while let Some(chunk) = chunks.next().await {
+        let res = evt_tx.send(chunk);
+        if res.is_err() {
+            tracing::error!("Failed to send chunk to channel");
+        }
+    }
+    Ok(())
+}
+
             } => {
                 if !should_restart {
                     tracing::info!("All tasks completed or failed without restart enabled");
