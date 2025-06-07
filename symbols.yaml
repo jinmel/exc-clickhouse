@@ -87,3 +87,13 @@
     - UNIUSDT
     - UNIUSDC
     - PENDLEUSDT
+- exchange: "Coinbase"
+  market: "SPOT"
+  symbols:
+    - BTC-USD
+    - ETH-USD
+    - SOL-USD
+    - LINK-USD
+    - UNI-USD
+    - AAVE-USD
+    - SUSHI-USD

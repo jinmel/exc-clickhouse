@@ -22,7 +22,7 @@ impl Parser<NormalizedEvent> for CoinbaseParser {
             .map_err(|e| ExchangeStreamError::MessageError(format!("Failed to parse JSON: {e}")))?;
         let typ = value.get("type").and_then(|v| v.as_str()).unwrap_or("");
         match typ {
-            "match" => {
+            "match" | "last_match" => {
                 let msg: MatchEvent = serde_json::from_value(value).map_err(|e| {
                     ExchangeStreamError::MessageError(format!("Failed to parse match: {e}"))
                 })?;
@@ -38,7 +38,7 @@ impl Parser<NormalizedEvent> for CoinbaseParser {
             }
             "subscriptions" => Ok(None),
             _ => {
-                tracing::warn!("Unknown event type: {}", &typ);
+                tracing::warn!("Unknown event type: {} msg: {}", &typ, &text);
                 Ok(None)
             }
         }
