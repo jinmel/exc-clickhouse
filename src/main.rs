@@ -13,7 +13,10 @@ use tracing_subscriber::{EnvFilter, FmtSubscriber};
 use crate::{
     clickhouse::{ClickHouseConfig, ClickHouseService},
     models::{ClickhouseMessage, NormalizedEvent},
-    streams::{ExchangeStreamError, WebsocketStream, binance::BinanceClient, bybit::BybitClient, okx::OkxClient},
+    streams::{
+        ExchangeStreamError, WebsocketStream, binance::BinanceClient, bybit::BybitClient,
+        coinbase::CoinbaseClient, okx::OkxClient,
+    },
 };
 
 mod clickhouse;
@@ -95,6 +98,10 @@ struct StreamArgs {
     #[arg(long)]
     skip_okx: bool,
 
+    /// Skip Coinbase stream
+    #[arg(long)]
+    skip_coinbase: bool,
+
     /// Skip Ethereum block metadata
     #[arg(long)]
     skip_ethereum: bool,
@@ -133,6 +140,7 @@ enum TaskType {
     BinanceStream,
     BybitStream,
     OkxStream,
+    CoinbaseStream,
     EthereumBlockMetadata,
     ClickHouseInsert,
     FetchTimeboostBids,
@@ -143,6 +151,7 @@ impl std::fmt::Display for TaskType {
         match self {
             TaskType::BinanceStream => write!(f, "Binance"),
             TaskType::BybitStream => write!(f, "Bybit"),
+            TaskType::CoinbaseStream => write!(f, "Coinbase"),
             TaskType::EthereumBlockMetadata => write!(f, "Ethereum"),
             TaskType::ClickHouseInsert => write!(f, "ClickHouse"),
             TaskType::FetchTimeboostBids => write!(f, "Timeboost"),
@@ -351,6 +360,26 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
             });
         }
 
+        if !args.skip_coinbase {
+            let config = read_symbols(&args.symbols_file)?;
+            let symbols: Vec<String> = config
+                .entries
+                .iter()
+                .filter(|e| e.exchange.eq_ignore_ascii_case("coinbase"))
+                .flat_map(|e| e.symbols.iter().cloned())
+                .collect();
+            let batch_size = args.batch_size;
+            let tx = msg_tx.clone();
+
+            tracing::info!("Spawning coinbase stream for symbols: {:?}", symbols);
+            set.spawn(async move {
+                (
+                    TaskType::CoinbaseStream,
+                    coinbase_stream_task(tx, symbols, batch_size).await,
+                )
+            });
+        }
+
         if !args.skip_ethereum {
             let rpc_url = args
                 .rpc_url
@@ -554,6 +583,41 @@ async fn okx_stream_task(
 ) -> eyre::Result<()> {
     let okx = OkxClient::builder().add_symbols(symbols).build()?;
     let combined_stream = okx.stream_events().await?;
+    let chunks = combined_stream
+        .filter_map(
+            |event: Result<NormalizedEvent, ExchangeStreamError>| async move {
+                match event {
+                    Ok(NormalizedEvent::Trade(trade)) => {
+                        Some(ClickhouseMessage::Cex(NormalizedEvent::Trade(trade)))
+                    }
+                    Ok(NormalizedEvent::Quote(quote)) => {
+                        Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
+                    }
+                    Err(e) => {
+                        tracing::error!("Error parsing event: {:?}", e);
+                        None
+                    }
+                }
+            },
+        )
+        .chunks(batch_size);
+    pin_mut!(chunks);
+    while let Some(chunk) = chunks.next().await {
+        let res = evt_tx.send(chunk);
+        if res.is_err() {
+            tracing::error!("Failed to send chunk to channel");
+        }
+    }
+    Ok(())
+}
+
+async fn coinbase_stream_task(
+    evt_tx: mpsc::UnboundedSender<Vec<ClickhouseMessage>>,
+    symbols: Vec<String>,
+    batch_size: usize,
+) -> eyre::Result<()> {
+    let coinbase = CoinbaseClient::builder().add_symbols(symbols).build()?;
+    let combined_stream = coinbase.stream_events().await?;
     let chunks = combined_stream
         .filter_map(
             |event: Result<NormalizedEvent, ExchangeStreamError>| async move {

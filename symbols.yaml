@@ -106,3 +106,13 @@
     - PENDLE-USDT
     - ANIME-USDT
     - ENA-USDT
+- exchange: "Coinbase"
+  market: "SPOT"
+  symbols:
+    - BTC-USD
+    - ETH-USD
+    - SOL-USD
+    - LINK-USD
+    - UNI-USD
+    - AAVE-USD
+    - SUSHI-USD
