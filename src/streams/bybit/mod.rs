@@ -30,13 +30,15 @@ impl BybitClient {
 #[async_trait]
 impl WebsocketStream for BybitClient {
     type Error = ExchangeStreamError;
-    type EventStream = Pin<Box<dyn Stream<Item = Result<NormalizedEvent, ExchangeStreamError>> + Send + 'static>>;
+    type EventStream =
+        Pin<Box<dyn Stream<Item = Result<NormalizedEvent, ExchangeStreamError>> + Send + 'static>>;
 
     async fn stream_events(&self) -> Result<Self::EventStream, Self::Error> {
         tracing::debug!("Bybit URL: {}", self.base_url);
         let parser = BybitParser::new();
-        let stream = ExchangeStreamBuilder::new(&self.base_url, None, parser, self.subscription.clone())
-            .build();
+        let stream =
+            ExchangeStreamBuilder::new(&self.base_url, None, parser, self.subscription.clone())
+                .build();
         Ok(stream)
     }
 }

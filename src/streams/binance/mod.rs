@@ -37,7 +37,8 @@ impl BinanceClient {
 #[async_trait]
 impl WebsocketStream for BinanceClient {
     type Error = ExchangeStreamError;
-    type EventStream = Pin<Box<dyn Stream<Item = Result<NormalizedEvent, ExchangeStreamError>> + Send + 'static>>;
+    type EventStream =
+        Pin<Box<dyn Stream<Item = Result<NormalizedEvent, ExchangeStreamError>> + Send + 'static>>;
 
     async fn stream_events(&self) -> Result<Self::EventStream, Self::Error> {
         tracing::debug!("Binance URL: {}", self.base_url);

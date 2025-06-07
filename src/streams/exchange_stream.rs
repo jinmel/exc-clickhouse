@@ -27,12 +27,7 @@ where
     P: Parser<T> + Send + 'static + Clone + Unpin + Sync,
     S: Subscription + Send + 'static + Clone + Unpin,
 {
-    pub fn new(
-        url: &str,
-        timeout: Option<Duration>,
-        parser: P,
-        subscription: S,
-    ) -> Self {
+    pub fn new(url: &str, timeout: Option<Duration>, parser: P, subscription: S) -> Self {
         Self {
             timeout,
             parser,
@@ -52,7 +47,9 @@ where
         self
     }
 
-    pub fn build(self) -> Pin<Box<dyn Stream<Item = Result<T, ExchangeStreamError>> + Send + 'static>> {
+    pub fn build(
+        self,
+    ) -> Pin<Box<dyn Stream<Item = Result<T, ExchangeStreamError>> + Send + 'static>> {
         let url = self.url;
         let subscription = self.subscription;
         let parser = self.parser;
@@ -66,7 +63,7 @@ where
                     .map_err(|e| ExchangeStreamError::ConnectionError(e.to_string()))?;
                 tracing::trace!(?response, "Connected to {}", url);
                 let connected_at = Instant::now();
-                
+
                 let messages = subscription
                     .messages()
                     .map_err(|e| ExchangeStreamError::SubscriptionError(e.to_string()))?;
