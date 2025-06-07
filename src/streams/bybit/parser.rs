@@ -43,9 +43,7 @@ impl OrderBook {
 
     fn best_bid(&self) -> Option<(f64, f64)> {
         self.bids
-            .iter()
-            .rev()
-            .next()
+            .iter().next_back()
             .map(|(p, q)| (p.into_inner(), *q))
     }
 

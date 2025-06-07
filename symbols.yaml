@@ -87,6 +87,25 @@
     - UNIUSDT
     - UNIUSDC
     - PENDLEUSDT
+- exchange: "OKX"
+  market: "SPOT"
+  symbols:
+    - BTC-USDT
+    - ETH-USDT
+    - SOL-USDT
+    - LINK-USDT
+    - UNI-USDT
+    - AAVE-USDT
+    - SUSHI-USDT
+    - CRV-USDT
+    - GRT-USDT
+    - CAKE-USDT
+    - GMX-USDT
+    - MAGIC-USDT
+    - ARB-USDT
+    - PENDLE-USDT
+    - ANIME-USDT
+    - ENA-USDT
 - exchange: "Coinbase"
   market: "SPOT"
   symbols:

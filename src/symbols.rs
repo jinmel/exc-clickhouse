@@ -73,7 +73,7 @@ pub async fn fetch_binance_spot_pairs() -> eyre::Result<Vec<TradingPair>> {
             continue;
         }
         if let Some(psets) = &sym.permission_sets {
-            if let Some(first) = psets.get(0) {
+            if let Some(first) = psets.first() {
                 if !first.iter().any(|p| p == "SPOT") {
                     continue;
                 }
