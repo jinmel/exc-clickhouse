@@ -8,6 +8,12 @@ use super::model::{MatchEvent, TickerEvent};
 #[derive(Debug, Clone)]
 pub struct CoinbaseParser;
 
+impl Default for CoinbaseParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CoinbaseParser {
     pub fn new() -> Self {
         Self

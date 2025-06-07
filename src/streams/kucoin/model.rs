@@ -46,8 +46,7 @@ impl TryInto<NormalizedTrade> for TradeEvent {
             "sell" => TradeSide::Sell,
             other => {
                 return Err(ExchangeStreamError::MessageError(format!(
-                    "Unknown side: {}",
-                    other
+                    "Unknown side: {other}"
                 )));
             }
         };

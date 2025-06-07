@@ -101,7 +101,7 @@ impl KucoinClientBuilder {
         let server = resp
             .data
             .instance_servers
-            .get(0)
+            .first()
             .ok_or_else(|| eyre::eyre!("no instance server"))?;
         let connect_id = Uuid::new_v4();
         let mut url = url::Url::parse(&server.endpoint)

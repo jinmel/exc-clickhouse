@@ -6,6 +6,12 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct BinanceParser {}
 
+impl Default for BinanceParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BinanceParser {
     pub fn new() -> Self {
         Self {}
