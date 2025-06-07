@@ -7,9 +7,7 @@ use crate::{
 };
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
 pub struct MatchEvent {
-    #[serde(rename = "trade_id")]
     pub trade_id: u64,
     pub maker_order_id: Option<String>,
     pub taker_order_id: Option<String>,
@@ -58,9 +56,8 @@ impl TryInto<NormalizedTrade> for MatchEvent {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
 pub struct TickerEvent {
-    pub sequence: Option<u64>,
+    pub sequence: u64,
     pub product_id: String,
     pub price: String,
     pub best_bid: String,

@@ -224,7 +224,10 @@ impl ClickHouseService {
         Ok(())
     }
 
-    pub async fn write_trading_pairs(&self, pairs: Vec<crate::symbols::TradingPair>) -> eyre::Result<()> {
+    pub async fn write_trading_pairs(
+        &self,
+        pairs: Vec<crate::symbols::TradingPair>,
+    ) -> eyre::Result<()> {
         if pairs.is_empty() {
             return Ok(());
         }

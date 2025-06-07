@@ -33,13 +33,8 @@ impl WebsocketStream for CoinbaseClient {
     async fn stream_events(&self) -> Result<Self::EventStream, Self::Error> {
         tracing::debug!("Coinbase URL: {}", self.base_url);
         let parser = CoinbaseParser::new();
-        let mut stream = ExchangeStream::new(
-            &self.base_url,
-            None,
-            parser,
-            self.subscription.clone(),
-        )
-        .await?;
+        let mut stream =
+            ExchangeStream::new(&self.base_url, None, parser, self.subscription.clone()).await?;
         let res = stream.run().await;
         if res.is_err() {
             tracing::error!("Error running exchange stream: {:?}", res.err());

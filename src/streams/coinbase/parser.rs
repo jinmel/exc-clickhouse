@@ -37,7 +37,10 @@ impl Parser<NormalizedEvent> for CoinbaseParser {
                 Ok(Some(NormalizedEvent::Quote(quote)))
             }
             "subscriptions" => Ok(None),
-            _ => Ok(None),
+            _ => {
+                tracing::warn!("Unknown event type: {}", &typ);
+                Ok(None)
+            }
         }
     }
 }

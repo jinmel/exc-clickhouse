@@ -30,7 +30,9 @@ impl Parser<NormalizedEvent> for BinanceParser {
             Response::Quote(quote) => Some(NormalizedEvent::Quote(quote.try_into()?)),
             Response::Subscription(result) => {
                 if result.result.is_some() {
-                    return Err(ExchangeStreamError::SubscriptionError(format!("Subscription result: {result:?}")));
+                    return Err(ExchangeStreamError::SubscriptionError(format!(
+                        "Subscription result: {result:?}"
+                    )));
                 }
                 None
             }
