@@ -161,7 +161,8 @@ impl Subscription for OkxSubscription {
         #[derive(Serialize)]
         struct Arg<'a> {
             channel: &'a str,
-            instId: &'a str,
+            #[serde(rename = "instId")]
+            inst_id: &'a str,
         }
         #[derive(Serialize)]
         struct SubscriptionMessage<'a> {
@@ -180,7 +181,7 @@ impl Subscription for OkxSubscription {
                 };
                 Arg {
                     channel,
-                    instId: &market.symbol,
+                    inst_id: &market.symbol,
                 }
             })
             .collect::<Vec<_>>();
