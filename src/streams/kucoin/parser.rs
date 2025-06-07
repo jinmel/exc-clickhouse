@@ -1,8 +1,8 @@
+use super::model::KucoinMessage;
 use crate::{
-    models::{NormalizedEvent, NormalizedTrade, NormalizedQuote},
+    models::{NormalizedEvent, NormalizedQuote, NormalizedTrade},
     streams::{ExchangeStreamError, Parser},
 };
-use super::model::KucoinMessage;
 
 #[derive(Debug, Clone)]
 pub struct KucoinParser {}
@@ -17,9 +17,8 @@ impl Parser<NormalizedEvent> for KucoinParser {
     type Error = ExchangeStreamError;
 
     fn parse(&self, text: &str) -> Result<Option<NormalizedEvent>, Self::Error> {
-        let value: KucoinMessage = serde_json::from_str(text).map_err(|e| {
-            ExchangeStreamError::MessageError(format!("Failed to parse JSON: {e}"))
-        })?;
+        let value: KucoinMessage = serde_json::from_str(text)
+            .map_err(|e| ExchangeStreamError::MessageError(format!("Failed to parse JSON: {e}")))?;
 
         match value {
             KucoinMessage::Trade { data, .. } => {

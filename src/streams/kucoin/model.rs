@@ -20,12 +20,14 @@ impl TryInto<NormalizedTrade> for TradeData {
     type Error = ExchangeStreamError;
 
     fn try_into(self) -> Result<NormalizedTrade, Self::Error> {
-        let price = self.price.parse::<f64>().map_err(|e| {
-            ExchangeStreamError::MessageError(format!("Invalid price value: {e}"))
-        })?;
-        let size = self.size.parse::<f64>().map_err(|e| {
-            ExchangeStreamError::MessageError(format!("Invalid size value: {e}"))
-        })?;
+        let price = self
+            .price
+            .parse::<f64>()
+            .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid price value: {e}")))?;
+        let size = self
+            .size
+            .parse::<f64>()
+            .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid size value: {e}")))?;
         let side = match self.side.as_str() {
             "buy" => TradeSide::Buy,
             "sell" => TradeSide::Sell,
@@ -33,7 +35,7 @@ impl TryInto<NormalizedTrade> for TradeData {
                 return Err(ExchangeStreamError::MessageError(format!(
                     "Unknown side: {}",
                     other
-                )))
+                )));
             }
         };
         let symbol = self.symbol.unwrap_or_default();
@@ -65,18 +67,22 @@ impl TryInto<NormalizedQuote> for TickerData {
     type Error = ExchangeStreamError;
 
     fn try_into(self) -> Result<NormalizedQuote, Self::Error> {
-        let ask_price = self.best_ask.parse::<f64>().map_err(|e| {
-            ExchangeStreamError::MessageError(format!("Invalid ask price: {e}"))
-        })?;
-        let ask_amount = self.best_ask_size.parse::<f64>().map_err(|e| {
-            ExchangeStreamError::MessageError(format!("Invalid ask size: {e}"))
-        })?;
-        let bid_price = self.best_bid.parse::<f64>().map_err(|e| {
-            ExchangeStreamError::MessageError(format!("Invalid bid price: {e}"))
-        })?;
-        let bid_amount = self.best_bid_size.parse::<f64>().map_err(|e| {
-            ExchangeStreamError::MessageError(format!("Invalid bid size: {e}"))
-        })?;
+        let ask_price = self
+            .best_ask
+            .parse::<f64>()
+            .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid ask price: {e}")))?;
+        let ask_amount = self
+            .best_ask_size
+            .parse::<f64>()
+            .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid ask size: {e}")))?;
+        let bid_price = self
+            .best_bid
+            .parse::<f64>()
+            .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid bid price: {e}")))?;
+        let bid_amount = self
+            .best_bid_size
+            .parse::<f64>()
+            .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid bid size: {e}")))?;
         let symbol = self.symbol.unwrap_or_default();
         Ok(NormalizedQuote::new(
             ExchangeName::Kucoin,
@@ -93,7 +99,22 @@ impl TryInto<NormalizedQuote> for TickerData {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase", untagged)]
 pub enum KucoinMessage {
-    Trade { topic: String, subject: String, data: TradeData, #[serde(rename = "type")] typ: String },
-    Ticker { topic: String, subject: String, data: TickerData, #[serde(rename = "type")] typ: String },
-    Other { #[serde(rename = "type")] typ: String },
+    Trade {
+        topic: String,
+        subject: String,
+        data: TradeData,
+        #[serde(rename = "type")]
+        typ: String,
+    },
+    Ticker {
+        topic: String,
+        subject: String,
+        data: TickerData,
+        #[serde(rename = "type")]
+        typ: String,
+    },
+    Other {
+        #[serde(rename = "type")]
+        typ: String,
+    },
 }

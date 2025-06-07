@@ -149,7 +149,10 @@ pub struct KucoinSubscription {
 
 impl KucoinSubscription {
     pub fn new(ping_interval: Duration) -> Self {
-        Self { symbols: vec![], ping_interval }
+        Self {
+            symbols: vec![],
+            ping_interval,
+        }
     }
 
     pub fn add_markets(&mut self, markets: Vec<StreamSymbols>) {
