@@ -8,7 +8,6 @@ use crate::{
         exchange_stream::ExchangeStream, subscription::CoinbaseSubscription,
     },
 };
-use tokio::time::Duration;
 
 pub const DEFAULT_COINBASE_WS_URL: &str = "wss://ws-feed.exchange.coinbase.com";
 
@@ -36,7 +35,7 @@ impl WebsocketStream for CoinbaseClient {
         let parser = CoinbaseParser::new();
         let mut stream = ExchangeStream::new(
             &self.base_url,
-            Some(Duration::from_secs(23 * 60 * 60)),
+            None,
             parser,
             self.subscription.clone(),
         )
@@ -124,10 +123,20 @@ mod tests {
             .build()
             .unwrap();
         let mut stream = client.stream_events().await.unwrap();
-        let result = timeout(Duration::from_secs(10), stream.next()).await;
-        assert!(result.is_ok(), "timed out waiting for event");
-        let item = result.unwrap();
-        assert!(item.is_some(), "no event received");
-        assert!(item.unwrap().is_ok(), "event returned error");
+        let count = timeout(Duration::from_secs(30), async {
+            let mut received = 0;
+            while let Some(event) = stream.next().await {
+                if event.is_ok() {
+                    received += 1;
+                    if received >= 50 {
+                        break;
+                    }
+                }
+            }
+            received
+        })
+        .await
+        .expect("timed out waiting for events");
+        assert!(count >= 50, "insufficient events: {}", count);
     }
 }

@@ -1,8 +1,5 @@
-use chrono::DateTime;
-use chrono::Utc;
-
 use crate::{
-    models::{ExchangeName, NormalizedEvent, NormalizedQuote, NormalizedTrade, TradeSide},
+    models::{NormalizedEvent, NormalizedQuote, NormalizedTrade},
     streams::{ExchangeStreamError, Parser},
 };
 

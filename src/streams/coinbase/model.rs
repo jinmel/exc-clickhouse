@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -62,47 +62,35 @@ impl TryInto<NormalizedTrade> for MatchEvent {
 pub struct TickerEvent {
     pub sequence: Option<u64>,
     pub product_id: String,
-    pub price: Option<String>,
-    pub best_bid: Option<String>,
-    pub best_ask: Option<String>,
-    pub best_bid_size: Option<String>,
-    pub best_ask_size: Option<String>,
-    pub time: Option<String>,
+    pub price: String,
+    pub best_bid: String,
+    pub best_ask: String,
+    pub best_bid_size: String,
+    pub best_ask_size: String,
+    pub time: String,
 }
 
 impl TryInto<NormalizedQuote> for TickerEvent {
     type Error = ExchangeStreamError;
 
     fn try_into(self) -> Result<NormalizedQuote, Self::Error> {
-        let timestamp = if let Some(time) = self.time {
-            DateTime::parse_from_rfc3339(&time)
-                .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid time: {e}")))?
-                .timestamp_micros() as u64
-        } else {
-            Utc::now().timestamp_micros() as u64
-        };
+        let timestamp = DateTime::parse_from_rfc3339(&self.time)
+            .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid time: {e}")))?
+            .timestamp_micros() as u64;
         let bid_price = self
             .best_bid
-            .as_deref()
-            .unwrap_or("0")
             .parse::<f64>()
             .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid bid price: {e}")))?;
         let bid_amount = self
             .best_bid_size
-            .as_deref()
-            .unwrap_or("0")
             .parse::<f64>()
             .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid bid size: {e}")))?;
         let ask_price = self
             .best_ask
-            .as_deref()
-            .unwrap_or("0")
             .parse::<f64>()
             .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid ask price: {e}")))?;
         let ask_amount = self
             .best_ask_size
-            .as_deref()
-            .unwrap_or("0")
             .parse::<f64>()
             .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid ask size: {e}")))?;
         Ok(NormalizedQuote::new(
