@@ -317,3 +317,83 @@ impl Subscription for KucoinSubscription {
         Some(self.ping_interval)
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct KrakenSubscription {
+    symbols: Vec<StreamSymbols>,
+}
+
+impl KrakenSubscription {
+    pub fn new() -> Self {
+        Self { symbols: vec![] }
+    }
+
+    pub fn add_markets(&mut self, markets: Vec<StreamSymbols>) {
+        self.symbols.extend(markets);
+    }
+}
+
+impl Subscription for KrakenSubscription {
+    fn to_json(&self) -> Result<Vec<serde_json::Value>, serde_json::Error> {
+        #[derive(Serialize)]
+        struct SubscriptionType<'a> {
+            name: &'a str,
+        }
+
+        #[derive(Serialize)]
+        struct SubscribeMessage<'a> {
+            event: &'static str,
+            pair: Vec<String>,
+            subscription: SubscriptionType<'a>,
+        }
+
+        let trades: Vec<String> = self
+            .symbols
+            .iter()
+            .filter(|m| matches!(m.stream_type, StreamType::Trade))
+            .map(|m| m.symbol.clone())
+            .collect();
+        let quotes: Vec<String> = self
+            .symbols
+            .iter()
+            .filter(|m| matches!(m.stream_type, StreamType::Quote))
+            .map(|m| m.symbol.clone())
+            .collect();
+
+        let mut msgs = Vec::new();
+        if !trades.is_empty() {
+            let msg = SubscribeMessage {
+                event: "subscribe",
+                pair: trades,
+                subscription: SubscriptionType { name: "trade" },
+            };
+            msgs.push(serde_json::to_value(msg)?);
+        }
+        if !quotes.is_empty() {
+            let msg = SubscribeMessage {
+                event: "subscribe",
+                pair: quotes,
+                subscription: SubscriptionType { name: "ticker" },
+            };
+            msgs.push(serde_json::to_value(msg)?);
+        }
+
+        Ok(msgs)
+    }
+
+    fn heartbeat(&self) -> Option<tokio_tungstenite::tungstenite::Message> {
+        #[derive(Serialize)]
+        struct Ping<'a> {
+            event: &'a str,
+        }
+
+        let ping = Ping { event: "ping" };
+        Some(tokio_tungstenite::tungstenite::Message::Text(
+            serde_json::to_string(&ping).unwrap().into(),
+        ))
+    }
+
+    fn heartbeat_interval(&self) -> Option<Duration> {
+        Some(Duration::from_secs(20))
+    }
+}

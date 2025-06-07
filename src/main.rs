@@ -15,7 +15,7 @@ use crate::{
     models::{ClickhouseMessage, NormalizedEvent},
     streams::{
         ExchangeStreamError, WebsocketStream, binance::BinanceClient, bybit::BybitClient,
-        coinbase::CoinbaseClient, okx::OkxClient, kucoin::KucoinClient,
+        coinbase::CoinbaseClient, kraken::KrakenClient, kucoin::KucoinClient, okx::OkxClient,
     },
 };
 
@@ -106,6 +106,10 @@ struct StreamArgs {
     #[arg(long)]
     skip_kucoin: bool,
 
+    /// Skip Kraken stream
+    #[arg(long)]
+    skip_kraken: bool,
+
     /// Skip Ethereum block metadata
     #[arg(long)]
     skip_ethereum: bool,
@@ -146,6 +150,7 @@ enum TaskType {
     OkxStream,
     CoinbaseStream,
     KucoinStream,
+    KrakenStream,
     EthereumBlockMetadata,
     ClickHouseInsert,
     FetchTimeboostBids,
@@ -158,6 +163,7 @@ impl std::fmt::Display for TaskType {
             TaskType::BybitStream => write!(f, "Bybit"),
             TaskType::CoinbaseStream => write!(f, "Coinbase"),
             TaskType::KucoinStream => write!(f, "KuCoin"),
+            TaskType::KrakenStream => write!(f, "Kraken"),
             TaskType::EthereumBlockMetadata => write!(f, "Ethereum"),
             TaskType::ClickHouseInsert => write!(f, "ClickHouse"),
             TaskType::FetchTimeboostBids => write!(f, "Timeboost"),
@@ -293,6 +299,7 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         && args.skip_okx
         && args.skip_coinbase
         && args.skip_kucoin
+        && args.skip_kraken
         && args.skip_ethereum
         && args.skip_clickhouse
         && args.skip_timeboost
@@ -404,6 +411,26 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
                 (
                     TaskType::KucoinStream,
                     kucoin_stream_task(tx, symbols, batch_size).await,
+                )
+            });
+        }
+
+        if !args.skip_kraken {
+            let config = read_symbols(&args.symbols_file)?;
+            let symbols: Vec<String> = config
+                .entries
+                .iter()
+                .filter(|e| e.exchange.eq_ignore_ascii_case("kraken"))
+                .flat_map(|e| e.symbols.iter().cloned())
+                .collect();
+            let batch_size = args.batch_size;
+            let tx = msg_tx.clone();
+
+            tracing::info!("Spawning kraken stream for symbols: {:?}", symbols);
+            set.spawn(async move {
+                (
+                    TaskType::KrakenStream,
+                    kraken_stream_task(tx, symbols, batch_size).await,
                 )
             });
         }
@@ -681,6 +708,41 @@ async fn kucoin_stream_task(
 ) -> eyre::Result<()> {
     let kucoin = KucoinClient::builder().add_symbols(symbols).build().await?;
     let combined_stream = kucoin.stream_events().await?;
+    let chunks = combined_stream
+        .filter_map(
+            |event: Result<NormalizedEvent, ExchangeStreamError>| async move {
+                match event {
+                    Ok(NormalizedEvent::Trade(trade)) => {
+                        Some(ClickhouseMessage::Cex(NormalizedEvent::Trade(trade)))
+                    }
+                    Ok(NormalizedEvent::Quote(quote)) => {
+                        Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
+                    }
+                    Err(e) => {
+                        tracing::error!("Error parsing event: {:?}", e);
+                        None
+                    }
+                }
+            },
+        )
+        .chunks(batch_size);
+    pin_mut!(chunks);
+    while let Some(chunk) = chunks.next().await {
+        let res = evt_tx.send(chunk);
+        if res.is_err() {
+            tracing::error!("Failed to send chunk to channel");
+        }
+    }
+    Ok(())
+}
+
+async fn kraken_stream_task(
+    evt_tx: mpsc::UnboundedSender<Vec<ClickhouseMessage>>,
+    symbols: Vec<String>,
+    batch_size: usize,
+) -> eyre::Result<()> {
+    let kraken = KrakenClient::builder().add_symbols(symbols).build()?;
+    let combined_stream = kraken.stream_events().await?;
     let chunks = combined_stream
         .filter_map(
             |event: Result<NormalizedEvent, ExchangeStreamError>| async move {
