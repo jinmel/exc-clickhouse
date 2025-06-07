@@ -1,5 +1,6 @@
 pub mod binance;
 pub mod bybit;
+pub mod kucoin;
 pub mod exchange_stream;
 pub mod subscription;
 
