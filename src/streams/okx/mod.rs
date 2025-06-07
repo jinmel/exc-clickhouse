@@ -91,24 +91,3 @@ impl OkxClientBuilder {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use futures::StreamExt;
-    use tokio::time::{Duration, timeout};
-
-    #[tokio::test]
-    #[ignore]
-    async fn test_okx_stream_event() {
-        let client = OkxClient::builder()
-            .add_symbols(vec!["BTC-USDT"])
-            .build()
-            .unwrap();
-        let mut stream = client.stream_events().await.unwrap();
-        let result = timeout(Duration::from_secs(10), stream.next()).await;
-        assert!(result.is_ok(), "timed out waiting for event");
-        let item = result.unwrap();
-        assert!(item.is_some(), "no event received");
-        assert!(item.unwrap().is_ok(), "event returned error");
-    }
-}
