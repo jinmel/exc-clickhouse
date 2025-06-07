@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2024"
 authors = ["Eisen Labs"]
 description = "Exchange data collector to clickhouse db"
+[lib]
+path = "src/lib.rs"
+
 
 [dependencies]
 alloy = { version = "0.15.10", features = ["full"] }
