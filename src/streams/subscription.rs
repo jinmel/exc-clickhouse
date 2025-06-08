@@ -414,7 +414,7 @@ impl Subscription for KrakenSubscription {
             messages.push(serde_json::to_value(trade_message)?);
         }
 
-        // Create ticker subscription 
+        // Create ticker subscription
         if !quote_symbols.is_empty() {
             let ticker_message = SubscriptionMessage {
                 method: "subscribe".to_string(),

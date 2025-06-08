@@ -1,6 +1,9 @@
 use crate::{
     models::NormalizedEvent,
-    streams::{ExchangeStreamError, Parser, kraken::model::{KrakenMessage, Response}},
+    streams::{
+        ExchangeStreamError, Parser,
+        kraken::model::{KrakenMessage, Response},
+    },
 };
 
 #[derive(Debug, Clone)]
@@ -28,18 +31,26 @@ impl Parser<Vec<NormalizedEvent>> for KrakenParser {
         match message {
             KrakenMessage::Response(response) => match response {
                 Response::Trade(trade_msg) => {
-                    let normalized_trades = trade_msg.data.iter().map(|trade_data| {
-                        let normalized_trade = trade_data.clone().try_into()?;
-                        Ok(NormalizedEvent::Trade(normalized_trade))
-                    }).collect::<Result<Vec<NormalizedEvent>, Self::Error>>()?;
+                    let normalized_trades = trade_msg
+                        .data
+                        .iter()
+                        .map(|trade_data| {
+                            let normalized_trade = trade_data.clone().try_into()?;
+                            Ok(NormalizedEvent::Trade(normalized_trade))
+                        })
+                        .collect::<Result<Vec<NormalizedEvent>, Self::Error>>()?;
                     Ok(Some(normalized_trades))
                 }
                 Response::Ticker(ticker_msg) => {
                     // Process the first ticker in the data array
-                    let normalized_quotes = ticker_msg.data.iter().map(|ticker_data| {
-                        let normalized_quote = ticker_data.clone().try_into()?;
-                        Ok(NormalizedEvent::Quote(normalized_quote))
-                    }).collect::<Result<Vec<NormalizedEvent>, Self::Error>>()?;
+                    let normalized_quotes = ticker_msg
+                        .data
+                        .iter()
+                        .map(|ticker_data| {
+                            let normalized_quote = ticker_data.clone().try_into()?;
+                            Ok(NormalizedEvent::Quote(normalized_quote))
+                        })
+                        .collect::<Result<Vec<NormalizedEvent>, Self::Error>>()?;
                     Ok(Some(normalized_quotes))
                 }
                 Response::Status(_) => {
@@ -60,12 +71,12 @@ impl Parser<Vec<NormalizedEvent>> for KrakenParser {
                 Ok(None)
             }
             KrakenMessage::Subscription(sub_result) => {
-                if !sub_result.success {
-                    if let Some(error) = sub_result.error {
-                        return Err(ExchangeStreamError::SubscriptionError(format!(
-                            "Subscription failed: {error}"
-                        )));
-                    }
+                if !sub_result.success
+                    && let Some(error) = sub_result.error
+                {
+                    return Err(ExchangeStreamError::SubscriptionError(format!(
+                        "Subscription failed: {error}"
+                    )));
                 }
                 tracing::debug!("Subscription result: {:?}", sub_result);
                 Ok(None)

@@ -35,13 +35,8 @@ impl WebsocketStream for KrakenClient {
     async fn stream_events(&self) -> Result<Self::EventStream, Self::Error> {
         tracing::debug!("Kraken URL: {}", self.base_url);
         let parser = KrakenParser::new();
-        let mut stream = ExchangeStream::new(
-            &self.base_url,
-            None,
-            parser,
-            self.subscription.clone(),
-        )
-        .await?;
+        let mut stream =
+            ExchangeStream::new(&self.base_url, None, parser, self.subscription.clone()).await?;
         let res = stream.run().await;
         if res.is_err() {
             tracing::error!("Error running exchange stream: {:?}", res.err());
@@ -67,15 +62,14 @@ impl Default for KrakenClientBuilder {
 
 impl KrakenClientBuilder {
     pub fn add_symbols(mut self, symbols: Vec<impl Into<String>>) -> Self {
-        self.symbols
-            .extend(symbols.into_iter().map(|s| s.into()));
+        self.symbols.extend(symbols.into_iter().map(|s| s.into()));
         self
     }
 
     /// Build the Kraken instance
     pub fn build(self) -> eyre::Result<KrakenClient> {
         let mut subscription = KrakenSubscription::new();
-        
+
         // Add ticker subscriptions (quotes)
         subscription.add_markets(
             self.symbols
@@ -86,7 +80,7 @@ impl KrakenClientBuilder {
                 })
                 .collect(),
         );
-        
+
         // Add trade subscriptions
         subscription.add_markets(
             self.symbols

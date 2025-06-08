@@ -28,7 +28,12 @@ impl TryFrom<TradeData> for NormalizedTrade {
         let side = match trade.side.as_str() {
             "buy" => TradeSide::Buy,
             "sell" => TradeSide::Sell,
-            _ => return Err(ExchangeStreamError::MessageError(format!("Invalid trade side: {}", trade.side))),
+            _ => {
+                return Err(ExchangeStreamError::MessageError(format!(
+                    "Invalid trade side: {}",
+                    trade.side
+                )));
+            }
         };
 
         Ok(NormalizedTrade::new(
@@ -148,8 +153,7 @@ pub struct StatusData {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct HeartbeatMessage {
-}
+pub struct HeartbeatMessage {}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "channel")]
@@ -190,15 +194,15 @@ mod tests {
                 "connection_id": 3171616182403061789
             }]
         }"#;
-        
+
         // Test parsing directly as Response first
         let response: Response = serde_json::from_str(json).expect("Failed to parse as Response");
-        
+
         match response {
             Response::Status(status_msg) => {
                 assert_eq!(status_msg.message_type, "update");
                 assert_eq!(status_msg.data.len(), 1);
-                
+
                 let status_data = &status_msg.data[0];
                 assert_eq!(status_data.version, "2.0.10");
                 assert_eq!(status_data.system, "online");
@@ -222,19 +226,22 @@ mod tests {
             }]
         }"#;
         let parsed: KrakenMessage = serde_json::from_str(json).expect("Failed to parse JSON");
-        
+
         match parsed {
             KrakenMessage::Response(Response::Status(status_msg)) => {
                 assert_eq!(status_msg.message_type, "update");
                 assert_eq!(status_msg.data.len(), 1);
-                
+
                 let status_data = &status_msg.data[0];
                 assert_eq!(status_data.version, "2.0.10");
                 assert_eq!(status_data.system, "online");
                 assert_eq!(status_data.api_version, "v2");
                 assert_eq!(status_data.connection_id, 3171616182403061789);
             }
-            _ => panic!("Expected KrakenMessage::Response(Response::Status), got {:?}", parsed),
+            _ => panic!(
+                "Expected KrakenMessage::Response(Response::Status), got {:?}",
+                parsed
+            ),
         }
     }
 
@@ -247,7 +254,7 @@ mod tests {
             "time_out": "2025-06-08T01:29:06.857606Z"
         }"#;
         let parsed: KrakenMessage = serde_json::from_str(json).expect("Failed to parse JSON");
-        
+
         match parsed {
             KrakenMessage::Pong(pong_msg) => {
                 assert_eq!(pong_msg.method, "pong");
