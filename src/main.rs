@@ -85,31 +85,6 @@ struct StreamArgs {
     /// Batch size for processing events
     #[arg(short, long, default_value_t = 500)]
     batch_size: usize,
-
-    /// Skip Binance stream
-    #[arg(long)]
-    skip_binance: bool,
-
-    /// Skip Bybit stream
-    #[arg(long)]
-    skip_bybit: bool,
-
-    /// Skip OKX stream
-    #[arg(long)]
-    skip_okx: bool,
-
-    /// Skip Coinbase stream
-    #[arg(long)]
-    skip_coinbase: bool,
-
-    /// Skip Kraken stream
-    #[arg(long)]
-    skip_kraken: bool,
-
-    /// Skip KuCoin stream
-    #[arg(long)]
-    skip_kucoin: bool,
-
     /// Skip Ethereum block metadata
     #[arg(long)]
     skip_ethereum: bool,
@@ -283,6 +258,51 @@ async fn main() -> eyre::Result<()> {
 }
 
 async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
+    // Load symbols configuration once
+    let symbols_cfg = read_symbols(&args.symbols_file)?;
+
+    let binance_symbols: Vec<String> = symbols_cfg
+        .entries
+        .iter()
+        .filter(|e| e.exchange.eq_ignore_ascii_case("binance"))
+        .flat_map(|e| e.symbols.iter().cloned().map(|s| s.to_lowercase()))
+        .collect();
+
+    let bybit_symbols: Vec<String> = symbols_cfg
+        .entries
+        .iter()
+        .filter(|e| e.exchange.eq_ignore_ascii_case("bybit"))
+        .flat_map(|e| e.symbols.iter().cloned())
+        .collect();
+
+    let okx_symbols: Vec<String> = symbols_cfg
+        .entries
+        .iter()
+        .filter(|e| e.exchange.eq_ignore_ascii_case("okx"))
+        .flat_map(|e| e.symbols.iter().cloned())
+        .collect();
+
+    let coinbase_symbols: Vec<String> = symbols_cfg
+        .entries
+        .iter()
+        .filter(|e| e.exchange.eq_ignore_ascii_case("coinbase"))
+        .flat_map(|e| e.symbols.iter().cloned())
+        .collect();
+
+    let kraken_symbols: Vec<String> = symbols_cfg
+        .entries
+        .iter()
+        .filter(|e| e.exchange.eq_ignore_ascii_case("kraken"))
+        .flat_map(|e| e.symbols.iter().cloned())
+        .collect();
+
+    let kucoin_symbols: Vec<String> = symbols_cfg
+        .entries
+        .iter()
+        .filter(|e| e.exchange.eq_ignore_ascii_case("kucoin"))
+        .flat_map(|e| e.symbols.iter().cloned())
+        .collect();
+
     // Initialize task supervisor if restart is enabled
     let mut supervisor = if args.enable_restart {
         Some(TaskSupervisor::new(
@@ -294,16 +314,14 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         None
     };
 
-    if args.skip_binance
-        && args.skip_bybit
-        && args.skip_okx
-        && args.skip_coinbase
-        && args.skip_kraken
-        && args.skip_kucoin
-        && args.skip_ethereum
-        && args.skip_clickhouse
-        && args.skip_timeboost
-    {
+    let no_exchange = binance_symbols.is_empty()
+        && bybit_symbols.is_empty()
+        && okx_symbols.is_empty()
+        && coinbase_symbols.is_empty()
+        && kraken_symbols.is_empty()
+        && kucoin_symbols.is_empty();
+
+    if no_exchange && args.skip_ethereum && args.skip_clickhouse && args.skip_timeboost {
         tracing::warn!("No tasks were enabled. Use --help to see available options.");
         return Ok(());
     }
@@ -314,14 +332,8 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         let mut set = tokio::task::JoinSet::new();
 
         // Spawn tasks
-        if !args.skip_binance {
-            let config = read_symbols(&args.symbols_file)?;
-            let symbols: Vec<String> = config
-                .entries
-                .iter()
-                .filter(|e| e.exchange.eq_ignore_ascii_case("binance"))
-                .flat_map(|e| e.symbols.iter().cloned().map(|s| s.to_lowercase()))
-                .collect();
+        if !binance_symbols.is_empty() {
+            let symbols = binance_symbols.clone();
             let batch_size = args.batch_size;
             let tx = msg_tx.clone();
 
@@ -334,14 +346,8 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
             });
         }
 
-        if !args.skip_bybit {
-            let config = read_symbols(&args.symbols_file)?;
-            let symbols: Vec<String> = config
-                .entries
-                .iter()
-                .filter(|e| e.exchange.eq_ignore_ascii_case("bybit"))
-                .flat_map(|e| e.symbols.iter().cloned())
-                .collect();
+        if !bybit_symbols.is_empty() {
+            let symbols = bybit_symbols.clone();
             let batch_size = args.batch_size;
             let tx = msg_tx.clone();
 
@@ -354,15 +360,8 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
             });
         }
 
-        if !args.skip_okx {
-            let config = read_symbols(&args.symbols_file)?;
-            let symbols: Vec<String> = config
-                .entries
-                .iter()
-                .filter(|e| e.exchange.eq_ignore_ascii_case("okx"))
-                .flat_map(|e| e.symbols.iter().cloned())
-                .collect();
-
+        if !okx_symbols.is_empty() {
+            let symbols = okx_symbols.clone();
             let batch_size = args.batch_size;
             let tx = msg_tx.clone();
 
@@ -375,14 +374,8 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
             });
         }
 
-        if !args.skip_coinbase {
-            let config = read_symbols(&args.symbols_file)?;
-            let symbols: Vec<String> = config
-                .entries
-                .iter()
-                .filter(|e| e.exchange.eq_ignore_ascii_case("coinbase"))
-                .flat_map(|e| e.symbols.iter().cloned())
-                .collect();
+        if !coinbase_symbols.is_empty() {
+            let symbols = coinbase_symbols.clone();
             let batch_size = args.batch_size;
             let tx = msg_tx.clone();
 
@@ -395,14 +388,8 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
             });
         }
 
-        if !args.skip_kraken {
-            let config = read_symbols(&args.symbols_file)?;
-            let symbols: Vec<String> = config
-                .entries
-                .iter()
-                .filter(|e| e.exchange.eq_ignore_ascii_case("kraken"))
-                .flat_map(|e| e.symbols.iter().cloned())
-                .collect();
+        if !kraken_symbols.is_empty() {
+            let symbols = kraken_symbols.clone();
             let batch_size = args.batch_size;
             let tx = msg_tx.clone();
 
@@ -415,14 +402,8 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
             });
         }
 
-        if !args.skip_kucoin {
-            let config = read_symbols(&args.symbols_file)?;
-            let symbols: Vec<String> = config
-                .entries
-                .iter()
-                .filter(|e| e.exchange.eq_ignore_ascii_case("kucoin"))
-                .flat_map(|e| e.symbols.iter().cloned())
-                .collect();
+        if !kucoin_symbols.is_empty() {
+            let symbols = kucoin_symbols.clone();
             let batch_size = args.batch_size;
             let tx = msg_tx.clone();
 
