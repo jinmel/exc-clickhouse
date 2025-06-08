@@ -451,6 +451,6 @@ impl Subscription for KrakenSubscription {
     }
 
     fn heartbeat_interval(&self) -> Option<Duration> {
-        Some(Duration::from_secs(50)) // Send ping every 50 seconds
+        Some(Duration::from_secs(10)) // Send ping every 50 seconds
     }
 }

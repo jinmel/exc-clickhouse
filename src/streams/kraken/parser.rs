@@ -31,6 +31,7 @@ impl Parser<NormalizedEvent> for KrakenParser {
                     // Process the first trade in the data array
                     if let Some(trade_data) = trade_msg.data.first() {
                         let normalized_trade = trade_data.clone().try_into()?;
+                        tracing::trace!(?normalized_trade, "Received trade message");
                         Ok(Some(NormalizedEvent::Trade(normalized_trade)))
                     } else {
                         Ok(None)
@@ -40,6 +41,7 @@ impl Parser<NormalizedEvent> for KrakenParser {
                     // Process the first ticker in the data array
                     if let Some(ticker_data) = ticker_msg.data.first() {
                         let normalized_quote = ticker_data.clone().try_into()?;
+                        tracing::trace!(?normalized_quote, "Received ticker message");
                         Ok(Some(NormalizedEvent::Quote(normalized_quote)))
                     } else {
                         Ok(None)
@@ -58,6 +60,10 @@ impl Parser<NormalizedEvent> for KrakenParser {
                     Ok(None)
                 }
             },
+            KrakenMessage::Pong(_) => {
+                tracing::debug!("Received pong message");
+                Ok(None)
+            }
             KrakenMessage::Subscription(sub_result) => {
                 if !sub_result.success {
                     if let Some(error) = sub_result.error {

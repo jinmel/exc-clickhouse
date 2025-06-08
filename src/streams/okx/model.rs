@@ -8,13 +8,16 @@ use crate::{
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Arg {
     pub channel: String,
-    pub instId: String,
+    #[serde(rename = "instId")]
+    pub inst_id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Trade {
-    pub instId: String,
-    pub tradeId: String,
+    #[serde(rename = "instId")]
+    pub inst_id: String,
+    #[serde(rename = "tradeId")]
+    pub trade_id: String,
     pub px: String,
     pub sz: String,
     pub side: String,
@@ -50,7 +53,7 @@ impl TryInto<NormalizedTrade> for Trade {
         };
         Ok(NormalizedTrade::new(
             ExchangeName::Okx,
-            &self.instId,
+            &self.inst_id,
             ts * 1000,
             side,
             price,
@@ -67,14 +70,21 @@ pub struct TradesMessage {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Ticker {
-    pub instType: Option<String>,
-    pub instId: String,
+    #[serde(rename = "instType")]
+    pub inst_type: Option<String>,
+    #[serde(rename = "instId")]
+    pub inst_id: String,
     pub last: String,
-    pub lastSz: String,
-    pub askPx: String,
-    pub askSz: String,
-    pub bidPx: String,
-    pub bidSz: String,
+    #[serde(rename = "lastSz")]
+    pub last_sz: String,
+    #[serde(rename = "askPx")]
+    pub ask_px: String,
+    #[serde(rename = "askSz")]
+    pub ask_sz: String,
+    #[serde(rename = "bidPx")]
+    pub bid_px: String,
+    #[serde(rename = "bidSz")]
+    pub bid_sz: String,
     pub ts: String,
 }
 
@@ -83,19 +93,19 @@ impl TryInto<NormalizedQuote> for Ticker {
 
     fn try_into(self) -> Result<NormalizedQuote, Self::Error> {
         let ask_amount = self
-            .askSz
+            .ask_sz
             .parse::<f64>()
             .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid ask size: {e}")))?;
         let ask_price = self
-            .askPx
+            .ask_px
             .parse::<f64>()
             .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid ask price: {e}")))?;
         let bid_price = self
-            .bidPx
+            .bid_px
             .parse::<f64>()
             .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid bid price: {e}")))?;
         let bid_amount = self
-            .bidSz
+            .bid_sz
             .parse::<f64>()
             .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid bid size: {e}")))?;
         let ts = self
@@ -104,7 +114,7 @@ impl TryInto<NormalizedQuote> for Ticker {
             .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid timestamp: {e}")))?;
         Ok(NormalizedQuote::new(
             ExchangeName::Okx,
-            &self.instId,
+            &self.inst_id,
             ts * 1000,
             ask_amount,
             ask_price,

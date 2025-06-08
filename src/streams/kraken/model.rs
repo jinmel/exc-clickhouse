@@ -117,6 +117,22 @@ pub struct SubscriptionData {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PongMessage {
+    pub method: String,
+    pub result: Option<PongData>,
+    pub error: Option<String>,
+    pub success: Option<bool>,
+    pub req_id: Option<u64>,
+    pub time_in: String,
+    pub time_out: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PongData {
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct StatusMessage {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -154,6 +170,7 @@ pub enum Response {
 #[serde(untagged)]
 pub enum KrakenMessage {
     Response(Response),
+    Pong(PongMessage),
     Subscription(SubscriptionResult),
 }
 
@@ -218,6 +235,30 @@ mod tests {
                 assert_eq!(status_data.connection_id, 3171616182403061789);
             }
             _ => panic!("Expected KrakenMessage::Response(Response::Status), got {:?}", parsed),
+        }
+    }
+
+    #[test]
+    fn test_pong_message_parsing() {
+        let json = r#"{
+            "method": "pong",
+            "req_id": 6341134959799692503,
+            "time_in": "2025-06-08T01:29:06.857589Z",
+            "time_out": "2025-06-08T01:29:06.857606Z"
+        }"#;
+        let parsed: KrakenMessage = serde_json::from_str(json).expect("Failed to parse JSON");
+        
+        match parsed {
+            KrakenMessage::Pong(pong_msg) => {
+                assert_eq!(pong_msg.method, "pong");
+                assert_eq!(pong_msg.req_id, Some(6341134959799692503));
+                assert_eq!(pong_msg.time_in, "2025-06-08T01:29:06.857589Z");
+                assert_eq!(pong_msg.time_out, "2025-06-08T01:29:06.857606Z");
+                assert!(pong_msg.result.is_none());
+                assert!(pong_msg.error.is_none());
+                assert!(pong_msg.success.is_none()); // success field is not present in the JSON
+            }
+            _ => panic!("Expected KrakenMessage::Pong, got {:?}", parsed),
         }
     }
 }
