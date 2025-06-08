@@ -1,7 +1,7 @@
 # exc-clickhouse
 
 <div align="center">
-  <img src="exc-clickhouse.png" alt="exc-clickhouse logo" width="300" height="300"/>
+  <img src="logo.png" alt="exc-clickhouse logo" width="300" height="300"/>
 </div>
 
 A high-performance, real-time cryptocurrency off-chain data collector that streams market data from multiple sources and stores it in ClickHouse for analytics and research.
