@@ -1,6 +1,10 @@
 pub mod binance;
 pub mod bybit;
+pub mod coinbase;
 pub mod exchange_stream;
+pub mod kraken;
+pub mod kucoin;
+pub mod okx;
 pub mod subscription;
 // pub mod upbit; // TODO: Needs refactoring to use new builder pattern
 

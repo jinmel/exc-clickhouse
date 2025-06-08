@@ -1,70 +1,69 @@
 use async_trait::async_trait;
+use futures::stream::Stream;
+use std::pin::Pin;
 
-use crate::streams::bybit::parser::BybitParser;
+use crate::streams::okx::parser::OkxParser;
 use crate::{
     models::NormalizedEvent,
     streams::{
         ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
-        exchange_stream::ExchangeStreamBuilder, subscription::BybitSubscription,
+        exchange_stream::ExchangeStreamBuilder, subscription::OkxSubscription,
     },
 };
-use futures::stream::Stream;
-use std::pin::Pin;
 
-pub const DEFAULT_BYBIT_WS_URL: &str = "wss://stream.bybit.com/v5/public/spot";
+pub const DEFAULT_OKX_WS_URL: &str = "wss://ws.okx.com:8443/ws/v5/public";
 
 pub mod model;
 pub mod parser;
 
-pub struct BybitClient {
+pub struct OkxClient {
     base_url: String,
-    subscription: BybitSubscription,
+    subscription: OkxSubscription,
 }
 
-impl BybitClient {
-    pub fn builder() -> BybitClientBuilder {
-        BybitClientBuilder::default()
+impl OkxClient {
+    pub fn builder() -> OkxClientBuilder {
+        OkxClientBuilder::default()
     }
 }
 
 #[async_trait]
-impl WebsocketStream for BybitClient {
+impl WebsocketStream for OkxClient {
     type Error = ExchangeStreamError;
     type EventStream =
         Pin<Box<dyn Stream<Item = Result<NormalizedEvent, ExchangeStreamError>> + Send + 'static>>;
 
     async fn stream_events(&self) -> Result<Self::EventStream, Self::Error> {
-        tracing::debug!("Bybit URL: {}", self.base_url);
-        let parser = BybitParser::new();
+        tracing::debug!("Okx URL: {}", self.base_url);
+        let parser = OkxParser::new();
         let stream =
-            ExchangeStreamBuilder::new(&self.base_url, None, parser, self.subscription.clone())
-                .build();
+            ExchangeStreamBuilder::new(&self.base_url, None, parser, self.subscription.clone()).build();
         Ok(stream)
     }
 }
 
-pub struct BybitClientBuilder {
+pub struct OkxClientBuilder {
     symbols: Vec<String>,
     base_url: String,
 }
 
-impl Default for BybitClientBuilder {
+impl Default for OkxClientBuilder {
     fn default() -> Self {
         Self {
             symbols: vec![],
-            base_url: DEFAULT_BYBIT_WS_URL.to_string(),
+            base_url: DEFAULT_OKX_WS_URL.to_string(),
         }
     }
 }
 
-impl BybitClientBuilder {
+impl OkxClientBuilder {
     pub fn add_symbols(mut self, symbols: Vec<impl Into<String>>) -> Self {
         self.symbols.extend(symbols.into_iter().map(|s| s.into()));
         self
     }
 
-    pub fn build(self) -> eyre::Result<BybitClient> {
-        let mut subscription = BybitSubscription::new();
+    pub fn build(self) -> eyre::Result<OkxClient> {
+        let mut subscription = OkxSubscription::new();
         subscription.add_markets(
             self.symbols
                 .iter()
@@ -84,7 +83,7 @@ impl BybitClientBuilder {
                 .collect(),
         );
 
-        Ok(BybitClient {
+        Ok(OkxClient {
             subscription,
             base_url: self.base_url,
         })

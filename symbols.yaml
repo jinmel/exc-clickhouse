@@ -87,3 +87,62 @@
     - UNIUSDT
     - UNIUSDC
     - PENDLEUSDT
+- exchange: "OKX"
+  market: "SPOT"
+  symbols:
+    - BTC-USDT
+    - ETH-USDT
+    - SOL-USDT
+    - LINK-USDT
+    - UNI-USDT
+    - AAVE-USDT
+    - SUSHI-USDT
+    - CRV-USDT
+    - GRT-USDT
+    - CAKE-USDT
+    - GMX-USDT
+    - MAGIC-USDT
+    - ARB-USDT
+    - PENDLE-USDT
+    - ANIME-USDT
+    - ENA-USDT
+- exchange: "Coinbase"
+  market: "SPOT"
+  symbols:
+    - BTC-USD
+    - ETH-USD
+    - SOL-USD
+    - LINK-USD
+    - UNI-USD
+    - AAVE-USD
+    - SUSHI-USD
+- exchange: "Kucoin"
+  market: "SPOT"
+  symbols:
+    - BTC-USDT
+    - ETH-USDT
+    - SOL-USDT
+    - LINK-USDT
+    - UNI-USDT
+    - AAVE-USDT
+    - SUSHI-USDT
+    - CRV-USDT
+    - GRT-USDT
+    - CAKE-USDT
+    - GMX-USDT
+    - MAGIC-USDT
+    - ARB-USDT
+    - PENDLE-USDT
+    - ANIME-USDT
+- exchange: "Kraken"
+  market: "SPOT"
+  symbols:
+    - BTC/USD
+    - ETH/USD
+    - SOL/USD
+    - LINK/USD
+    - UNI/USD
+    - AAVE/USD
+    - SUSHI/USD
+    - CRV/USD
+    - GRT/USD

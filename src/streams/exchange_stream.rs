@@ -3,7 +3,9 @@ use crate::streams::Parser;
 use crate::streams::Subscription;
 use async_stream::try_stream;
 use futures::SinkExt;
-use futures::stream::{Stream, StreamExt};
+use futures::stream::Stream;
+use futures::stream::StreamExt;
+use std::fmt::Debug;
 use std::pin::Pin;
 use tokio::time::{Duration, Instant};
 use tokio_tungstenite::tungstenite::Message;
@@ -11,7 +13,7 @@ use tokio_tungstenite::tungstenite::Message;
 pub struct ExchangeStreamBuilder<T, P, S>
 where
     T: Send + 'static,
-    P: Parser<T> + Send + 'static + Clone + Unpin + Sync,
+    P: Parser<Vec<T>> + Send + 'static + Clone + Unpin + Sync,
     S: Subscription + Send + 'static + Clone + Unpin,
 {
     timeout: Option<Duration>,
@@ -23,8 +25,8 @@ where
 
 impl<T, P, S> ExchangeStreamBuilder<T, P, S>
 where
-    T: Send + 'static,
-    P: Parser<T> + Send + 'static + Clone + Unpin + Sync,
+    T: Send + 'static + Debug,
+    P: Parser<Vec<T>> + Send + 'static + Clone + Unpin + Sync,
     S: Subscription + Send + 'static + Clone + Unpin,
 {
     pub fn new(url: &str, timeout: Option<Duration>, parser: P, subscription: S) -> Self {
@@ -57,7 +59,7 @@ where
 
         let stream = try_stream! {
             loop {
-                tracing::trace!("Connecting to {}", url);
+                tracing::trace!("Connecting to {}", &url);
                 let (mut ws, response) = tokio_tungstenite::connect_async(&url)
                     .await
                     .map_err(|e| ExchangeStreamError::ConnectionError(e.to_string()))?;
@@ -97,7 +99,9 @@ where
                                 Some(Ok(Message::Text(text))) => {
                                     match parser.parse(&text) {
                                         Ok(Some(parsed)) => {
-                                            yield parsed;
+                                            for item in parsed {
+                                                yield item;
+                                            }
                                         }
                                         Ok(None) => {
                                             // No parsed result, continue
