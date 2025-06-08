@@ -26,7 +26,7 @@ where
 impl<T, P, S> ExchangeStreamBuilder<T, P, S>
 where
     T: Send + 'static + Debug,
-    P: Parser<Vec<T>> + Send + 'static + Clone + Unpin + Sync,
+    P: Parser<Vec<T>> + Send + 'static + Clone + Unpin + Sync + Debug,
     S: Subscription + Send + 'static + Clone + Unpin,
 {
     pub fn new(url: &str, timeout: Option<Duration>, parser: P, subscription: S) -> Self {
@@ -97,7 +97,7 @@ where
                                             // No parsed result, continue
                                         }
                                         Err(e) => {
-                                            tracing::error!("Parse error: {}", e);
+                                            tracing::error!("Parse error: {:?} for {:?}", e, &text);
                                             // Continue processing other messages
                                         }
                                     }

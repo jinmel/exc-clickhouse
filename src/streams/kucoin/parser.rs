@@ -39,8 +39,12 @@ impl Parser<Vec<NormalizedEvent>> for KucoinParser {
                 tracing::debug!("received kucoin ack: {}", event.id);
                 Ok(None)
             }
-            KucoinMessage::Other { .. } => {
-                tracing::warn!("received unhandled kucoin message: {}", text);
+            KucoinMessage::Welcome(event) => {
+                tracing::debug!("received kucoin welcome: {}", event.id);
+                Ok(None)
+            }
+            KucoinMessage::Pong(event) => {
+                tracing::debug!("received kucoin pong: {}", event.id);
                 Ok(None)
             }
         }

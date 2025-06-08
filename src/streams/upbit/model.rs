@@ -223,47 +223,176 @@ pub struct TradeEvent {
     pub stream_type: String,
 }
 
-impl TryInto<NormalizedQuote> for TradeEvent {
-  type Error = ExchangeStreamError;
+impl TryFrom<TickerEvent> for NormalizedQuote {
+    type Error = ExchangeStreamError;
 
-  fn try_into(self) -> Result<NormalizedQuote, Self::Error> {
-    let ask_amount = self.best_ask_size;
-    let ask_price = self.best_ask_price;
-    let bid_amount = self.best_bid_size;
-    let bid_price = self.best_bid_price;
-    let timestamp = self.trade_timestamp as u64 * 1000;
+    fn try_from(ticker: TickerEvent) -> Result<NormalizedQuote, Self::Error> {
+        let ask_amount = ticker.acc_ask_volume;
+        let ask_price = ticker.trade_price;
+        let bid_amount = ticker.acc_bid_volume;
+        let bid_price = ticker.trade_price;
+        let timestamp = ticker.trade_timestamp as u64 * 1000;
 
-    Ok(NormalizedQuote::new(
-      ExchangeName::Upbit,
-      &self.code,
-      timestamp,
-      ask_amount,
-      ask_price,
-      bid_amount,
-      bid_price,
-    ))
-  }
+        Ok(NormalizedQuote::new(
+            ExchangeName::Upbit,
+            &ticker.code,
+            timestamp,
+            ask_amount,
+            ask_price,
+            bid_amount,
+            bid_price,
+        ))
+    }
 }
 
-impl TryInto<NormalizedTrade> for TradeEvent {
-  type Error = ExchangeStreamError;
+impl TryFrom<TradeEvent> for NormalizedQuote {
+    type Error = ExchangeStreamError;
 
-  fn try_into(self) -> Result<NormalizedTrade, Self::Error> {
-    let timestamp = self.trade_timestamp as u64 * 1000;
+    fn try_from(trade: TradeEvent) -> Result<NormalizedQuote, Self::Error> {
+        let ask_amount = trade.best_ask_size;
+        let ask_price = trade.best_ask_price;
+        let bid_amount = trade.best_bid_size;
+        let bid_price = trade.best_bid_price;
+        let timestamp = trade.trade_timestamp as u64 * 1000;
 
-    let side = if self.ask_bid == "ASK" {
-      TradeSide::Sell
-    } else {
-      TradeSide::Buy
-    };
+        Ok(NormalizedQuote::new(
+            ExchangeName::Upbit,
+            &trade.code,
+            timestamp,
+            ask_amount,
+            ask_price,
+            bid_amount,
+            bid_price,
+        ))
+    }
+}
 
-    Ok(NormalizedTrade::new(
-      ExchangeName::Upbit,
-      &self.code,
-      timestamp,
-      side,
-      self.trade_price,
-      self.trade_volume,
-    ))
-  }
+impl TryFrom<TradeEvent> for NormalizedTrade {
+    type Error = ExchangeStreamError;
+
+    fn try_from(trade: TradeEvent) -> Result<NormalizedTrade, Self::Error> {
+        let timestamp = trade.trade_timestamp as u64 * 1000;
+
+        let side = if trade.ask_bid == "ASK" {
+            TradeSide::Sell
+        } else {
+            TradeSide::Buy
+        };
+
+        Ok(NormalizedTrade::new(
+            ExchangeName::Upbit,
+            &trade.code,
+            timestamp,
+            side,
+            trade.trade_price,
+            trade.trade_volume,
+        ))
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "ty")]
+pub enum UpbitEvent {
+    #[serde(rename = "ticker")]
+    Ticker(TickerEvent),
+    #[serde(rename = "trade")]
+    Trade(TradeEvent),
+    #[serde(other)]
+    Unknown,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum UpbitMessage {
+    Event(UpbitEvent),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ticker_event_parsing() {
+        let json = r#"{
+            "ty": "ticker",
+            "cd": "KRW-BTC",
+            "op": 50000000.0,
+            "hp": 51000000.0,
+            "lp": 49000000.0,
+            "tp": 50500000.0,
+            "pcp": 50000000.0,
+            "c": "RISE",
+            "cp": 500000.0,
+            "scp": 500000.0,
+            "cr": 0.01,
+            "scr": 0.01,
+            "tv": 0.5,
+            "atv": 100.0,
+            "atv24h": 200.0,
+            "atp": 5000000000.0,
+            "atp24h": 10000000000.0,
+            "tdt": "20230101",
+            "ttm": "120000",
+            "ttms": 1672531200000,
+            "ab": "BID",
+            "aav": 50.0,
+            "abv": 50.0,
+            "h52wp": 60000000.0,
+            "h52wdt": "2022-12-01",
+            "l52wp": 30000000.0,
+            "l52wdt": "2022-06-01",
+            "ms": "ACTIVE",
+            "mw": "NONE",
+            "tms": 1672531200000,
+            "st": "REALTIME"
+        }"#;
+
+        let parsed: UpbitMessage = serde_json::from_str(json).expect("Failed to parse JSON");
+        match parsed {
+            UpbitMessage::Event(UpbitEvent::Ticker(ticker)) => {
+                assert_eq!(ticker.typ, "ticker");
+                assert_eq!(ticker.code, "KRW-BTC");
+                assert_eq!(ticker.trade_price, 50500000.0);
+                assert_eq!(ticker.ask_bid, "BID");
+            }
+            _ => panic!("Expected Ticker event, got {:?}", parsed),
+        }
+    }
+
+    #[test]
+    fn test_trade_event_parsing() {
+        let json = r#"{
+            "ty": "trade",
+            "cd": "KRW-BTC",
+            "tp": 50500000.0,
+            "tv": 0.001,
+            "ab": "ASK",
+            "pcp": 50000000.0,
+            "c": "RISE",
+            "cp": 500000.0,
+            "td": "2023-01-01",
+            "ttm": "12:00:00",
+            "ttms": 1672531200000,
+            "tms": 1672531200000,
+            "sid": 123456789,
+            "bap": 50500000.0,
+            "bas": 1.0,
+            "bbp": 50400000.0,
+            "bbs": 1.0,
+            "st": "REALTIME"
+        }"#;
+
+        let parsed: UpbitMessage = serde_json::from_str(json).expect("Failed to parse JSON");
+        match parsed {
+            UpbitMessage::Event(UpbitEvent::Trade(trade)) => {
+                assert_eq!(trade.typ, "trade");
+                assert_eq!(trade.code, "KRW-BTC");
+                assert_eq!(trade.trade_price, 50500000.0);
+                assert_eq!(trade.ask_bid, "ASK");
+                assert_eq!(trade.best_ask_price, 50500000.0);
+                assert_eq!(trade.best_bid_price, 50400000.0);
+            }
+            _ => panic!("Expected Trade event, got {:?}", parsed),
+        }
+    }
 }

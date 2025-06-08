@@ -3,7 +3,7 @@ use crate::{
     streams::{ExchangeStreamError, Parser},
 };
 
-use super::model::{MatchEvent, TickerEvent};
+use super::model::CoinbaseMessage;
 
 #[derive(Debug, Clone)]
 pub struct CoinbaseParser;
@@ -24,27 +24,20 @@ impl Parser<Vec<NormalizedEvent>> for CoinbaseParser {
     type Error = ExchangeStreamError;
 
     fn parse(&self, text: &str) -> Result<Option<Vec<NormalizedEvent>>, Self::Error> {
-        let value: serde_json::Value = serde_json::from_str(text)
-            .map_err(|e| ExchangeStreamError::Message(format!("Failed to parse JSON: {e}")))?;
-        let typ = value.get("type").and_then(|v| v.as_str()).unwrap_or("");
-        match typ {
-            "match" | "last_match" => {
-                let msg: MatchEvent = serde_json::from_value(value).map_err(|e| {
-                    ExchangeStreamError::Message(format!("Failed to parse match: {e}"))
-                })?;
-                let trade: NormalizedTrade = msg.try_into()?;
+        let message: CoinbaseMessage = serde_json::from_str(text)
+            .map_err(|e| ExchangeStreamError::Message(format!("Failed to parse message: {e}")))?;
+        match message {
+            CoinbaseMessage::Match(event) => {
+                let trade: NormalizedTrade = event.try_into()?;
                 Ok(Some(vec![NormalizedEvent::Trade(trade)]))
             }
-            "ticker" => {
-                let msg: TickerEvent = serde_json::from_value(value).map_err(|e| {
-                    ExchangeStreamError::Message(format!("Failed to parse ticker: {e}"))
-                })?;
-                let quote: NormalizedQuote = msg.try_into()?;
+            CoinbaseMessage::Ticker(event) => {
+                let quote: NormalizedQuote = event.try_into()?;
                 Ok(Some(vec![NormalizedEvent::Quote(quote)]))
             }
-            "subscriptions" => Ok(None),
-            _ => {
-                tracing::warn!("Unknown event type: {} msg: {}", &typ, &text);
+            CoinbaseMessage::Subscriptions(_) => Ok(None),
+            CoinbaseMessage::Error(_) => {
+                tracing::warn!("Received error message: {}", text);
                 Ok(None)
             }
         }
