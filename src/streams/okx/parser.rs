@@ -21,10 +21,10 @@ impl OkxParser {
     }
 }
 
-impl Parser<NormalizedEvent> for OkxParser {
+impl Parser<Vec<NormalizedEvent>> for OkxParser {
     type Error = ExchangeStreamError;
 
-    fn parse(&self, text: &str) -> Result<Option<NormalizedEvent>, Self::Error> {
+    fn parse(&self, text: &str) -> Result<Option<Vec<NormalizedEvent>>, Self::Error> {
         let value: serde_json::Value = serde_json::from_str(text)
             .map_err(|e| ExchangeStreamError::MessageError(format!("Failed to parse JSON: {e}")))?;
 
@@ -43,20 +43,28 @@ impl Parser<NormalizedEvent> for OkxParser {
             let msg: TradesMessage = serde_json::from_value(value).map_err(|e| {
                 ExchangeStreamError::MessageError(format!("Failed to parse trade: {e}"))
             })?;
-            if let Some(trade) = msg.data.into_iter().next() {
-                let trade: crate::models::NormalizedTrade = trade.try_into()?;
-                return Ok(Some(NormalizedEvent::Trade(trade)));
-            }
-            return Ok(None);
+            let normalized_trades = msg
+                .data
+                .iter()
+                .map(|trade| {
+                    let normalized_trade = trade.clone().try_into()?;
+                    Ok(NormalizedEvent::Trade(normalized_trade))
+                })
+                .collect::<Result<Vec<NormalizedEvent>, Self::Error>>()?;
+            return Ok(Some(normalized_trades));
         } else if channel == "tickers" {
             let msg: TickersMessage = serde_json::from_value(value).map_err(|e| {
                 ExchangeStreamError::MessageError(format!("Failed to parse ticker: {e}"))
             })?;
-            if let Some(ticker) = msg.data.into_iter().next() {
-                let quote: crate::models::NormalizedQuote = ticker.try_into()?;
-                return Ok(Some(NormalizedEvent::Quote(quote)));
-            }
-            return Ok(None);
+            let normalized_quotes = msg
+                .data
+                .iter()
+                .map(|ticker| {
+                    let normalized_quote = ticker.clone().try_into()?;
+                    Ok(NormalizedEvent::Quote(normalized_quote))
+                })
+                .collect::<Result<Vec<NormalizedEvent>, Self::Error>>()?;
+            return Ok(Some(normalized_quotes));
         }
         Ok(None)
     }

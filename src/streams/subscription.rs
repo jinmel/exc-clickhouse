@@ -341,3 +341,116 @@ impl Subscription for KucoinSubscription {
         Some(self.ping_interval)
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct KrakenSubscription {
+    symbols: Vec<StreamSymbols>,
+}
+
+impl Default for KrakenSubscription {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl KrakenSubscription {
+    pub fn new() -> Self {
+        Self { symbols: vec![] }
+    }
+
+    pub fn add_markets(&mut self, markets: Vec<StreamSymbols>) {
+        self.symbols.extend(markets);
+    }
+}
+
+impl Subscription for KrakenSubscription {
+    fn to_json(&self) -> Result<Vec<serde_json::Value>, serde_json::Error> {
+        #[derive(Serialize)]
+        struct SubscriptionParams {
+            channel: String,
+            symbol: Vec<String>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            snapshot: Option<bool>,
+        }
+
+        #[derive(Serialize)]
+        struct SubscriptionMessage {
+            method: String,
+            params: SubscriptionParams,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            req_id: Option<u64>,
+        }
+
+        // Group symbols by stream type
+        let trade_symbols: Vec<String> = self
+            .symbols
+            .iter()
+            .filter(|s| matches!(s.stream_type, StreamType::Trade))
+            .map(|s| s.symbol.clone())
+            .unique()
+            .collect();
+
+        let quote_symbols: Vec<String> = self
+            .symbols
+            .iter()
+            .filter(|s| matches!(s.stream_type, StreamType::Quote))
+            .map(|s| s.symbol.clone())
+            .unique()
+            .collect();
+
+        let mut messages = Vec::new();
+
+        // Create trade subscription
+        if !trade_symbols.is_empty() {
+            let trade_message = SubscriptionMessage {
+                method: "subscribe".to_string(),
+                params: SubscriptionParams {
+                    channel: "trade".to_string(),
+                    symbol: trade_symbols,
+                    snapshot: Some(true),
+                },
+                req_id: Some(rand::random::<u64>()),
+            };
+            messages.push(serde_json::to_value(trade_message)?);
+        }
+
+        // Create ticker subscription
+        if !quote_symbols.is_empty() {
+            let ticker_message = SubscriptionMessage {
+                method: "subscribe".to_string(),
+                params: SubscriptionParams {
+                    channel: "ticker".to_string(),
+                    symbol: quote_symbols,
+                    snapshot: Some(true),
+                },
+                req_id: Some(rand::random::<u64>()),
+            };
+            messages.push(serde_json::to_value(ticker_message)?);
+        }
+
+        Ok(messages)
+    }
+
+    fn heartbeat(&self) -> Option<tokio_tungstenite::tungstenite::Message> {
+        #[derive(Serialize)]
+        struct PingMessage {
+            method: String,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            req_id: Option<u64>,
+        }
+
+        let ping = PingMessage {
+            method: "ping".to_string(),
+            req_id: Some(rand::random::<u64>()),
+        };
+
+        let ping_message = serde_json::to_value(ping).unwrap();
+        Some(tokio_tungstenite::tungstenite::Message::Text(
+            ping_message.to_string().into(),
+        ))
+    }
+
+    fn heartbeat_interval(&self) -> Option<Duration> {
+        Some(Duration::from_secs(10)) // Send ping every 50 seconds
+    }
+}

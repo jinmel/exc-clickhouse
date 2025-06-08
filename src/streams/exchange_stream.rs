@@ -4,6 +4,7 @@ use crate::streams::Subscription;
 use futures::SinkExt;
 use futures::stream::Stream;
 use futures::stream::StreamExt;
+use std::fmt::Debug;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::time::{Duration, Instant};
@@ -13,7 +14,7 @@ use tokio_tungstenite::tungstenite::Message;
 pub struct ExchangeStream<T, P, S>
 where
     T: Send + 'static,
-    P: Parser<T> + Send + 'static + Clone + Unpin + Sync,
+    P: Parser<Vec<T>> + Send + 'static + Clone + Unpin + Sync,
     S: Subscription + Send + 'static + Clone + Unpin,
 {
     inner: Option<UnboundedReceiverStream<Result<T, ExchangeStreamError>>>,
@@ -26,8 +27,8 @@ where
 
 impl<T, P, S> ExchangeStream<T, P, S>
 where
-    T: Send + 'static,
-    P: Parser<T> + Send + 'static + Clone + Unpin + Sync,
+    T: Send + 'static + Debug,
+    P: Parser<Vec<T>> + Send + 'static + Clone + Unpin + Sync,
     S: Subscription + Send + 'static + Clone + Unpin,
 {
     pub async fn new(
@@ -104,8 +105,10 @@ where
                                         .parse(&text)
                                         .map_err(|e| ExchangeStreamError::MessageError(e.to_string()))?;
                                     if let Some(parsed) = parsed {
-                                        tx.send(Ok(parsed))
-                                            .map_err(|e| ExchangeStreamError::StreamError(e.to_string()))?;
+                                        for item in parsed {
+                                            tx.send(Ok(item))
+                                                .map_err(|e| ExchangeStreamError::StreamError(e.to_string()))?;
+                                        }
                                     }
                                 }
                                 Some(Ok(Message::Close(frame))) => {
@@ -162,7 +165,7 @@ where
 impl<T, P, S> Stream for ExchangeStream<T, P, S>
 where
     T: Send + 'static,
-    P: Parser<T> + Send + 'static + Clone + Unpin + Sync,
+    P: Parser<Vec<T>> + Send + 'static + Clone + Unpin + Sync,
     S: Subscription + Send + 'static + Clone + Unpin,
 {
     type Item = Result<T, ExchangeStreamError>;
@@ -180,7 +183,7 @@ where
 impl<T, P, S> Drop for ExchangeStream<T, P, S>
 where
     T: Send + 'static,
-    P: Parser<T> + Send + 'static + Clone + Unpin + Sync,
+    P: Parser<Vec<T>> + Send + 'static + Clone + Unpin + Sync,
     S: Subscription + Send + 'static + Clone + Unpin,
 {
     fn drop(&mut self) {

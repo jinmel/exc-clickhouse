@@ -64,10 +64,10 @@ impl BybitParser {
     }
 }
 
-impl Parser<NormalizedEvent> for BybitParser {
+impl Parser<Vec<NormalizedEvent>> for BybitParser {
     type Error = ExchangeStreamError;
 
-    fn parse(&self, text: &str) -> Result<Option<NormalizedEvent>, Self::Error> {
+    fn parse(&self, text: &str) -> Result<Option<Vec<NormalizedEvent>>, Self::Error> {
         let value: serde_json::Value = serde_json::from_str(text)
             .map_err(|e| ExchangeStreamError::MessageError(format!("Failed to parse JSON: {e}")))?;
 
@@ -85,7 +85,7 @@ impl Parser<NormalizedEvent> for BybitParser {
             })?;
             if let Some(trade) = msg.data.into_iter().next() {
                 let trade: NormalizedTrade = trade.try_into()?;
-                return Ok(Some(NormalizedEvent::Trade(trade)));
+                return Ok(Some(vec![NormalizedEvent::Trade(trade)]));
             }
             return Ok(None);
         } else if topic.starts_with("orderbook") {
@@ -145,7 +145,7 @@ impl Parser<NormalizedEvent> for BybitParser {
                     bid_price,
                     bid_qty,
                 );
-                return Ok(Some(NormalizedEvent::Quote(quote)));
+                return Ok(Some(vec![NormalizedEvent::Quote(quote)]));
             }
             return Ok(None);
         }
