@@ -28,7 +28,7 @@ impl Parser<Vec<NormalizedEvent>> for KucoinParser {
 
         match value {
             KucoinMessage::Trade(event) => {
-                let trade: NormalizedTrade = event.data.try_into()?;
+                let trade: NormalizedTrade = event.try_into()?;
                 Ok(Some(vec![NormalizedEvent::Trade(trade)]))
             }
             KucoinMessage::Ticker(event) => {

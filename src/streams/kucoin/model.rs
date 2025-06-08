@@ -19,10 +19,11 @@ pub struct TradeData {
     pub trade_id: String,
 }
 
-impl TryFrom<TradeData> for NormalizedTrade {
+impl TryFrom<TradeEvent> for NormalizedTrade {
     type Error = ExchangeStreamError;
 
-    fn try_from(trade: TradeData) -> Result<NormalizedTrade, Self::Error> {
+    fn try_from(trade_event: TradeEvent) -> Result<NormalizedTrade, Self::Error> {
+        let trade = trade_event.data;
         let price = trade
             .price
             .parse::<f64>()
