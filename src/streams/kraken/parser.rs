@@ -26,7 +26,7 @@ impl Parser<Vec<NormalizedEvent>> for KrakenParser {
 
     fn parse(&self, text: &str) -> Result<Option<Vec<NormalizedEvent>>, Self::Error> {
         let message: KrakenMessage = serde_json::from_str(text)
-            .map_err(|e| ExchangeStreamError::MessageError(format!("Failed to parse JSON: {e}")))?;
+            .map_err(|e| ExchangeStreamError::Message(format!("Failed to parse JSON: {e}")))?;
 
         match message {
             KrakenMessage::Response(response) => match response {
@@ -74,7 +74,7 @@ impl Parser<Vec<NormalizedEvent>> for KrakenParser {
                 if !sub_result.success
                     && let Some(error) = sub_result.error
                 {
-                    return Err(ExchangeStreamError::SubscriptionError(format!(
+                    return Err(ExchangeStreamError::Subscription(format!(
                         "Subscription failed: {error}"
                     )));
                 }

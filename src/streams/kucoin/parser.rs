@@ -24,7 +24,7 @@ impl Parser<Vec<NormalizedEvent>> for KucoinParser {
 
     fn parse(&self, text: &str) -> Result<Option<Vec<NormalizedEvent>>, Self::Error> {
         let value: KucoinMessage = serde_json::from_str(text)
-            .map_err(|e| ExchangeStreamError::MessageError(format!("Failed to parse JSON: {e}")))?;
+            .map_err(|e| ExchangeStreamError::Message(format!("Failed to parse JSON: {e}")))?;
 
         match value {
             KucoinMessage::Trade(event) => {

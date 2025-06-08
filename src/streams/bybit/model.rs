@@ -27,15 +27,15 @@ impl TryInto<NormalizedTrade> for TradeData {
         let price = self
             .price
             .parse::<f64>()
-            .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid price value: {e}")))?;
+            .map_err(|e| ExchangeStreamError::Message(format!("Invalid price value: {e}")))?;
         let amount = self.size.parse::<f64>().map_err(|e| {
-            ExchangeStreamError::MessageError(format!("Invalid quantity value: {e}"))
+            ExchangeStreamError::Message(format!("Invalid quantity value: {e}"))
         })?;
         let side = match self.side.as_str() {
             "Buy" => TradeSide::Buy,
             "Sell" => TradeSide::Sell,
             _ => {
-                return Err(ExchangeStreamError::MessageError(format!(
+                return Err(ExchangeStreamError::Message(format!(
                     "Unknown trade side: {}",
                     self.side
                 )));

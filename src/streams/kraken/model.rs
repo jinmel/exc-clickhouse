@@ -22,14 +22,14 @@ impl TryFrom<TradeData> for NormalizedTrade {
     fn try_from(trade: TradeData) -> Result<NormalizedTrade, Self::Error> {
         // Parse timestamp from RFC3339 format
         let timestamp = chrono::DateTime::parse_from_rfc3339(&trade.timestamp)
-            .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid timestamp: {e}")))?
+            .map_err(|e| ExchangeStreamError::Message(format!("Invalid timestamp: {e}")))?
             .timestamp_micros() as u64;
 
         let side = match trade.side.as_str() {
             "buy" => TradeSide::Buy,
             "sell" => TradeSide::Sell,
             _ => {
-                return Err(ExchangeStreamError::MessageError(format!(
+                return Err(ExchangeStreamError::Message(format!(
                     "Invalid trade side: {}",
                     trade.side
                 )));
@@ -71,7 +71,7 @@ impl TryFrom<TickerData> for NormalizedQuote {
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_err(|e| {
-                ExchangeStreamError::MessageError(format!("Failed to get timestamp: {e}"))
+                ExchangeStreamError::Message(format!("Failed to get timestamp: {e}"))
             })?
             .as_micros() as u64;
 

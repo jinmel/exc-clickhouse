@@ -52,17 +52,17 @@ where
                 tracing::trace!("Connecting to {}", &url);
                 let (mut ws, response) = tokio_tungstenite::connect_async(&url)
                     .await
-                    .map_err(|e| ExchangeStreamError::ConnectionError(e.to_string()))?;
+                    .map_err(|e| ExchangeStreamError::Connection(e.to_string()))?;
                 tracing::trace!(?response, "Connected to {}", url);
                 let connected_at = Instant::now();
 
                 let messages = subscription
                     .messages()
-                    .map_err(|e| ExchangeStreamError::SubscriptionError(e.to_string()))?;
+                    .map_err(|e| ExchangeStreamError::Subscription(e.to_string()))?;
                 let mut msg_stream = futures::stream::iter(messages.into_iter().map(Ok));
                 ws.send_all(&mut msg_stream)
                     .await
-                    .map_err(|e| ExchangeStreamError::StreamError(e.to_string()))?;
+                    .map_err(|e| ExchangeStreamError::Stream(e.to_string()))?;
 
                 // Create interval for periodic messages (e.g., every 30 seconds)
                 let mut interval = tokio::time::interval(
