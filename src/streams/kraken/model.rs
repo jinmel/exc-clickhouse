@@ -70,9 +70,7 @@ impl TryFrom<TickerData> for NormalizedQuote {
         // Use current timestamp since Kraken ticker doesn't include timestamp
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|e| {
-                ExchangeStreamError::Message(format!("Failed to get timestamp: {e}"))
-            })?
+            .map_err(|e| ExchangeStreamError::Message(format!("Failed to get timestamp: {e}")))?
             .as_micros() as u64;
 
         Ok(NormalizedQuote::new(

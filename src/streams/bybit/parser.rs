@@ -80,9 +80,8 @@ impl Parser<Vec<NormalizedEvent>> for BybitParser {
         let topic = value["topic"].as_str().unwrap_or("");
 
         if topic.starts_with("publicTrade") {
-            let msg: TradeMessage = serde_json::from_value(value).map_err(|e| {
-                ExchangeStreamError::Message(format!("Failed to parse trade: {e}"))
-            })?;
+            let msg: TradeMessage = serde_json::from_value(value)
+                .map_err(|e| ExchangeStreamError::Message(format!("Failed to parse trade: {e}")))?;
             if let Some(trade) = msg.data.into_iter().next() {
                 let trade: NormalizedTrade = trade.try_into()?;
                 return Ok(Some(vec![NormalizedEvent::Trade(trade)]));

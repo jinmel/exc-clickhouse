@@ -34,9 +34,10 @@ impl TryInto<NormalizedTrade> for Trade {
             .px
             .parse::<f64>()
             .map_err(|e| ExchangeStreamError::Message(format!("Invalid price value: {e}")))?;
-        let amount = self.sz.parse::<f64>().map_err(|e| {
-            ExchangeStreamError::Message(format!("Invalid quantity value: {e}"))
-        })?;
+        let amount = self
+            .sz
+            .parse::<f64>()
+            .map_err(|e| ExchangeStreamError::Message(format!("Invalid quantity value: {e}")))?;
         let ts = self
             .ts
             .parse::<u64>()

@@ -1,7 +1,7 @@
+use crate::streams::kraken::parser::KrakenParser;
 use async_trait::async_trait;
 use futures::stream::Stream;
 use std::pin::Pin;
-use crate::streams::kraken::parser::KrakenParser;
 
 use crate::{
     models::NormalizedEvent,
@@ -39,7 +39,8 @@ impl WebsocketStream for KrakenClient {
         tracing::debug!("Kraken URL: {}", self.base_url);
         let parser = KrakenParser::new();
         let stream =
-            ExchangeStreamBuilder::new(&self.base_url, None, parser, self.subscription.clone()).build();
+            ExchangeStreamBuilder::new(&self.base_url, None, parser, self.subscription.clone())
+                .build();
         Ok(stream)
     }
 }

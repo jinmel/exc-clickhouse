@@ -37,7 +37,8 @@ impl WebsocketStream for OkxClient {
         tracing::debug!("Okx URL: {}", self.base_url);
         let parser = OkxParser::new();
         let stream =
-            ExchangeStreamBuilder::new(&self.base_url, None, parser, self.subscription.clone()).build();
+            ExchangeStreamBuilder::new(&self.base_url, None, parser, self.subscription.clone())
+                .build();
         Ok(stream)
     }
 }

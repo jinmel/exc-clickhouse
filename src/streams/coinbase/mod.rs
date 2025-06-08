@@ -37,7 +37,8 @@ impl WebsocketStream for CoinbaseClient {
         tracing::debug!("Coinbase URL: {}", self.base_url);
         let parser = CoinbaseParser::new();
         let stream =
-            ExchangeStreamBuilder::new(&self.base_url, None, parser, self.subscription.clone()).build();
+            ExchangeStreamBuilder::new(&self.base_url, None, parser, self.subscription.clone())
+                .build();
         Ok(stream)
     }
 }

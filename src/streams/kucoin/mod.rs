@@ -37,7 +37,8 @@ impl WebsocketStream for KucoinClient {
     async fn stream_events(&self) -> Result<Self::EventStream, Self::Error> {
         let parser = KucoinParser::new();
         let stream =
-            ExchangeStreamBuilder::new(&self.base_url, None, parser, self.subscription.clone()).build();
+            ExchangeStreamBuilder::new(&self.base_url, None, parser, self.subscription.clone())
+                .build();
         Ok(stream)
     }
 }

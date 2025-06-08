@@ -40,9 +40,8 @@ impl Parser<Vec<NormalizedEvent>> for OkxParser {
             .unwrap_or("");
 
         if channel == "trades" || channel == "trades-all" {
-            let msg: TradesMessage = serde_json::from_value(value).map_err(|e| {
-                ExchangeStreamError::Message(format!("Failed to parse trade: {e}"))
-            })?;
+            let msg: TradesMessage = serde_json::from_value(value)
+                .map_err(|e| ExchangeStreamError::Message(format!("Failed to parse trade: {e}")))?;
             let normalized_trades = msg
                 .data
                 .iter()
