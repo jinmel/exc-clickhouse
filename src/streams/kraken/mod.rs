@@ -35,11 +35,10 @@ impl WebsocketStream for KrakenClient {
 
     async fn stream_events(&self) -> Result<Self::EventStream, Self::Error> {
         tracing::debug!("Kraken URL: {}", self.base_url);
-        let timeout = Duration::from_secs(60); // Kraken heartbeat interval
         let parser = KrakenParser::new();
         let mut stream = ExchangeStream::new(
             &self.base_url,
-            Some(timeout),
+            None,
             parser,
             self.subscription.clone(),
         )

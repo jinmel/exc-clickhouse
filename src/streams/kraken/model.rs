@@ -84,7 +84,6 @@ impl TryFrom<TickerData> for NormalizedQuote {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TradeMessage {
-    pub channel: String,
     #[serde(rename = "type")]
     pub message_type: String,
     pub data: Vec<TradeData>,
@@ -92,7 +91,6 @@ pub struct TradeMessage {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TickerMessage {
-    pub channel: String,
     #[serde(rename = "type")]
     pub message_type: String,
     pub data: Vec<TickerData>,
@@ -120,7 +118,6 @@ pub struct SubscriptionData {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct StatusMessage {
-    pub channel: String,
     #[serde(rename = "type")]
     pub message_type: String,
     pub data: Vec<StatusData>,
@@ -136,9 +133,6 @@ pub struct StatusData {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct HeartbeatMessage {
-    pub channel: String,
-    #[serde(rename = "type")]
-    pub message_type: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -161,4 +155,69 @@ pub enum Response {
 pub enum KrakenMessage {
     Response(Response),
     Subscription(SubscriptionResult),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_response_status_parsing() {
+        let json = r#"{
+            "channel": "status",
+            "type": "update",
+            "data": [{
+                "version": "2.0.10",
+                "system": "online",
+                "api_version": "v2",
+                "connection_id": 3171616182403061789
+            }]
+        }"#;
+        
+        // Test parsing directly as Response first
+        let response: Response = serde_json::from_str(json).expect("Failed to parse as Response");
+        
+        match response {
+            Response::Status(status_msg) => {
+                assert_eq!(status_msg.message_type, "update");
+                assert_eq!(status_msg.data.len(), 1);
+                
+                let status_data = &status_msg.data[0];
+                assert_eq!(status_data.version, "2.0.10");
+                assert_eq!(status_data.system, "online");
+                assert_eq!(status_data.api_version, "v2");
+                assert_eq!(status_data.connection_id, 3171616182403061789);
+            }
+            _ => panic!("Expected Response::Status, got {:?}", response),
+        }
+    }
+
+    #[test]
+    fn test_status_message_parsing() {
+        let json = r#"{
+            "channel": "status",
+            "type": "update",
+            "data": [{
+                "version": "2.0.10",
+                "system": "online",
+                "api_version": "v2",
+                "connection_id": 3171616182403061789
+            }]
+        }"#;
+        let parsed: KrakenMessage = serde_json::from_str(json).expect("Failed to parse JSON");
+        
+        match parsed {
+            KrakenMessage::Response(Response::Status(status_msg)) => {
+                assert_eq!(status_msg.message_type, "update");
+                assert_eq!(status_msg.data.len(), 1);
+                
+                let status_data = &status_msg.data[0];
+                assert_eq!(status_data.version, "2.0.10");
+                assert_eq!(status_data.system, "online");
+                assert_eq!(status_data.api_version, "v2");
+                assert_eq!(status_data.connection_id, 3171616182403061789);
+            }
+            _ => panic!("Expected KrakenMessage::Response(Response::Status), got {:?}", parsed),
+        }
+    }
 }

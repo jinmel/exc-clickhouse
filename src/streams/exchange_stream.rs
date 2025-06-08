@@ -4,6 +4,7 @@ use crate::streams::Subscription;
 use futures::SinkExt;
 use futures::stream::Stream;
 use futures::stream::StreamExt;
+use std::fmt::Debug;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::time::{Duration, Instant};
@@ -26,7 +27,7 @@ where
 
 impl<T, P, S> ExchangeStream<T, P, S>
 where
-    T: Send + 'static,
+    T: Send + 'static + Debug,
     P: Parser<T> + Send + 'static + Clone + Unpin + Sync,
     S: Subscription + Send + 'static + Clone + Unpin,
 {
@@ -100,9 +101,11 @@ where
                         msg = ws.next() => {
                             match msg {
                                 Some(Ok(Message::Text(text))) => {
+                                    tracing::trace!(?text, "Received message");
                                     let parsed = parser
                                         .parse(&text)
                                         .map_err(|e| ExchangeStreamError::MessageError(e.to_string()))?;
+                                    tracing::trace!(?parsed, "Parsed message");
                                     if let Some(parsed) = parsed {
                                         tx.send(Ok(parsed))
                                             .map_err(|e| ExchangeStreamError::StreamError(e.to_string()))?;
