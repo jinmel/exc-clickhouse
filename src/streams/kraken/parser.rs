@@ -71,12 +71,12 @@ impl Parser<Vec<NormalizedEvent>> for KrakenParser {
                 Ok(None)
             }
             KrakenMessage::Subscription(sub_result) => {
-                if !sub_result.success
-                    && let Some(error) = sub_result.error
-                {
-                    return Err(ExchangeStreamError::Subscription(format!(
-                        "Subscription failed: {error}"
-                    )));
+                if !sub_result.success {
+                    if let Some(error) = sub_result.error {
+                        return Err(ExchangeStreamError::Subscription(format!(
+                            "Subscription failed: {error}"
+                        )));
+                    }
                 }
                 tracing::debug!("Subscription result: {:?}", sub_result);
                 Ok(None)
