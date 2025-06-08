@@ -19,31 +19,19 @@ pub struct TradeData {
     pub trade_id: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct TradeEvent {
-    pub topic: String,
-    pub subject: String,
-    pub data: TradeData,
-    #[serde(rename = "type")]
-    pub typ: String,
-}
-
-impl TryInto<NormalizedTrade> for TradeEvent {
+impl TryFrom<TradeData> for NormalizedTrade {
     type Error = ExchangeStreamError;
 
-    fn try_into(self) -> Result<NormalizedTrade, Self::Error> {
-        let price = self
-            .data
+    fn try_from(trade: TradeData) -> Result<NormalizedTrade, Self::Error> {
+        let price = trade
             .price
             .parse::<f64>()
             .map_err(|e| ExchangeStreamError::Message(format!("Invalid price value: {e}")))?;
-        let size = self
-            .data
+        let size = trade
             .size
             .parse::<f64>()
             .map_err(|e| ExchangeStreamError::Message(format!("Invalid size value: {e}")))?;
-        let side = match self.data.side.as_str() {
+        let side = match trade.side.as_str() {
             "buy" => TradeSide::Buy,
             "sell" => TradeSide::Sell,
             other => {
@@ -53,21 +41,30 @@ impl TryInto<NormalizedTrade> for TradeEvent {
             }
         };
 
-        let timestamp = self
-            .data
+        let timestamp = trade
             .time
             .parse::<u64>()
             .map_err(|e| ExchangeStreamError::Message(format!("Invalid time value: {e}")))?;
 
         Ok(NormalizedTrade::new(
             ExchangeName::Kucoin,
-            &self.data.symbol,
+            &trade.symbol,
             timestamp / 1000,
             side,
             price,
             size,
         ))
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct TradeEvent {
+    pub topic: String,
+    pub subject: String,
+    pub data: TradeData,
+    #[serde(rename = "type")]
+    pub typ: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -82,42 +79,32 @@ pub struct TickerData {
     pub sequence: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct TickerEvent {
-    pub topic: String,
-    pub subject: String,
-    pub data: TickerData,
-    #[serde(rename = "type")]
-    pub typ: String,
-}
-
-impl TryInto<NormalizedQuote> for TickerEvent {
+impl TryFrom<TickerEvent> for NormalizedQuote {
     type Error = ExchangeStreamError;
 
-    fn try_into(self) -> Result<NormalizedQuote, Self::Error> {
-        let ask_price = self
+    fn try_from(ticker: TickerEvent) -> Result<NormalizedQuote, Self::Error> {
+        let ask_price = ticker
             .data
             .best_ask
             .parse::<f64>()
             .map_err(|e| ExchangeStreamError::Message(format!("Invalid ask price: {e}")))?;
-        let ask_amount = self
+        let ask_amount = ticker
             .data
             .best_ask_size
             .parse::<f64>()
             .map_err(|e| ExchangeStreamError::Message(format!("Invalid ask size: {e}")))?;
-        let bid_price = self
+        let bid_price = ticker
             .data
             .best_bid
             .parse::<f64>()
             .map_err(|e| ExchangeStreamError::Message(format!("Invalid bid price: {e}")))?;
-        let bid_amount = self
+        let bid_amount = ticker
             .data
             .best_bid_size
             .parse::<f64>()
             .map_err(|e| ExchangeStreamError::Message(format!("Invalid bid size: {e}")))?;
 
-        let symbol = &self
+        let symbol = &ticker
             .topic
             .split(':')
             .nth(1)
@@ -126,13 +113,23 @@ impl TryInto<NormalizedQuote> for TickerEvent {
         Ok(NormalizedQuote::new(
             ExchangeName::Kucoin,
             symbol,
-            self.data.time * 1000,
+            ticker.data.time * 1000,
             ask_amount,
             ask_price,
             bid_price,
             bid_amount,
         ))
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct TickerEvent {
+    pub topic: String,
+    pub subject: String,
+    pub data: TickerData,
+    #[serde(rename = "type")]
+    pub typ: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -144,15 +141,29 @@ pub struct Ack {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase", untagged)]
+#[serde(rename_all = "camelCase")]
+pub struct WelcomeMessage {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub typ: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PongMessage {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub typ: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
 pub enum KucoinMessage {
     Trade(TradeEvent),
     Ticker(TickerEvent),
     Ack(Ack),
-    Other {
-        #[serde(rename = "type")]
-        typ: String,
-    },
+    Welcome(WelcomeMessage),
+    Pong(PongMessage),
 }
 
 #[cfg(test)]
@@ -174,8 +185,7 @@ mod tests {
                 "symbol": "UNI-USDT",
                 "takerOrderId": "6843fb1d02a36d0007d32121",
                 "time": "1749285661147000000",
-                "tradeId": "15489153933131777",
-                "type": "match"
+                "tradeId": "15489153933131777"
             }
         }"#;
 
@@ -197,6 +207,37 @@ mod tests {
                 assert_eq!(event.data.sequence, "15489153933131777");
             }
             _ => panic!("Expected KucoinMessage::Trade variant, got {:?}", parsed),
+        }
+    }
+
+    #[test]
+    fn test_ticker_message_parsing() {
+        let json = r#"{
+            "topic": "/market/ticker:BTC-USDT",
+            "type": "message",
+            "subject": "trade.ticker",
+            "data": {
+                "bestAsk": "50001.0",
+                "bestAskSize": "1.5",
+                "bestBid": "49999.0",
+                "bestBidSize": "2.0",
+                "time": 1640995200000,
+                "price": "50000.0",
+                "sequence": "123456789"
+            }
+        }"#;
+
+        let parsed: KucoinMessage = serde_json::from_str(json).expect("Failed to parse JSON");
+        match parsed {
+            KucoinMessage::Ticker(ticker) => {
+                assert_eq!(ticker.topic, "/market/ticker:BTC-USDT");
+                assert_eq!(ticker.subject, "trade.ticker");
+                assert_eq!(ticker.typ, "message");
+                assert_eq!(ticker.data.best_ask, "50001.0");
+                assert_eq!(ticker.data.best_bid, "49999.0");
+                assert_eq!(ticker.data.time, 1640995200000);
+            }
+            _ => panic!("Expected Ticker message, got {:?}", parsed),
         }
     }
 }

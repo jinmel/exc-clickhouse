@@ -36,26 +36,26 @@ pub struct TradeEvent {
     pub _ignore: bool,
 }
 
-impl TryInto<NormalizedTrade> for TradeEvent {
+impl TryFrom<TradeEvent> for NormalizedTrade {
     type Error = ExchangeStreamError;
 
-    fn try_into(self) -> Result<NormalizedTrade, Self::Error> {
+    fn try_from(trade: TradeEvent) -> Result<NormalizedTrade, Self::Error> {
         // Parse price and quantity strings to f64
-        let price = self
+        let price = trade
             .price
             .parse::<f64>()
             .map_err(|e| ExchangeStreamError::Message(format!("Invalid price value: {e}")))?;
 
-        let amount = self
+        let amount = trade
             .quantity
             .parse::<f64>()
             .map_err(|e| ExchangeStreamError::Message(format!("Invalid quantity value: {e}")))?;
 
         Ok(NormalizedTrade::new(
             ExchangeName::Binance,
-            &self.symbol,
-            self.event_time * 1000, // Convert milliseconds to microseconds
-            if self.is_buyer_maker {
+            &trade.symbol,
+            trade.event_time * 1000, // Convert milliseconds to microseconds
+            if trade.is_buyer_maker {
                 TradeSide::Sell
             } else {
                 TradeSide::Buy
@@ -88,37 +88,37 @@ pub struct BookTickerEvent {
     pub best_ask_quantity: String,
 }
 
-impl TryInto<NormalizedQuote> for BookTickerEvent {
+impl TryFrom<BookTickerEvent> for NormalizedQuote {
     type Error = ExchangeStreamError;
 
-    fn try_into(self) -> Result<NormalizedQuote, Self::Error> {
+    fn try_from(ticker: BookTickerEvent) -> Result<NormalizedQuote, Self::Error> {
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_err(|e| ExchangeStreamError::Message(format!("Failed to get timestamp: {e}")))?
             .as_micros() as u64;
 
         // Parse ask and bid values
-        let ask_amount = self.best_ask_quantity.parse::<f64>().map_err(|e| {
+        let ask_amount = ticker.best_ask_quantity.parse::<f64>().map_err(|e| {
             ExchangeStreamError::Message(format!("Invalid ask quantity value: {e}"))
         })?;
 
-        let ask_price = self
+        let ask_price = ticker
             .best_ask
             .parse::<f64>()
             .map_err(|e| ExchangeStreamError::Message(format!("Invalid ask price value: {e}")))?;
 
-        let bid_price = self
+        let bid_price = ticker
             .best_bid
             .parse::<f64>()
             .map_err(|e| ExchangeStreamError::Message(format!("Invalid bid price value: {e}")))?;
 
-        let bid_amount = self.best_bid_quantity.parse::<f64>().map_err(|e| {
+        let bid_amount = ticker.best_bid_quantity.parse::<f64>().map_err(|e| {
             ExchangeStreamError::Message(format!("Invalid bid quantity value: {e}"))
         })?;
 
         Ok(NormalizedQuote::new(
             ExchangeName::Binance,
-            &self.symbol,
+            &ticker.symbol,
             timestamp,
             ask_amount,
             ask_price,
@@ -135,10 +135,95 @@ pub struct SubscriptionResult {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
+pub struct ErrorMessage {
+    pub id: String,
+    pub error: ErrorDetail,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ErrorDetail {
+    pub code: i32,
+    pub msg: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
-pub enum Response {
+pub enum BinanceMessage {
     Trade(TradeEvent),
     Quote(BookTickerEvent),
     Subscription(SubscriptionResult),
+    Error(ErrorMessage),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_trade_event_parsing() {
+        let json = r#"{
+            "e": "trade",
+            "E": 1672531200000,
+            "s": "BTCUSDT",
+            "t": 12345,
+            "p": "50000.00",
+            "q": "0.001",
+            "T": 1672531200000,
+            "m": false,
+            "M": true
+        }"#;
+
+        let parsed: BinanceMessage = serde_json::from_str(json).expect("Failed to parse JSON");
+        match parsed {
+            BinanceMessage::Trade(trade) => {
+                assert_eq!(trade.event_type, "trade");
+                assert_eq!(trade.symbol, "BTCUSDT");
+                assert_eq!(trade.price, "50000.00");
+                assert_eq!(trade.quantity, "0.001");
+                assert_eq!(trade.is_buyer_maker, false);
+            }
+            _ => panic!("Expected Trade event, got {:?}", parsed),
+        }
+    }
+
+    #[test]
+    fn test_book_ticker_event_parsing() {
+        let json = r#"{
+            "u": 400900217,
+            "s": "BTCUSDT",
+            "b": "49999.99",
+            "B": "1.00000000",
+            "a": "50000.01",
+            "A": "0.50000000"
+        }"#;
+
+        let parsed: BinanceMessage = serde_json::from_str(json).expect("Failed to parse JSON");
+        match parsed {
+            BinanceMessage::Quote(ticker) => {
+                assert_eq!(ticker.symbol, "BTCUSDT");
+                assert_eq!(ticker.best_bid, "49999.99");
+                assert_eq!(ticker.best_ask, "50000.01");
+                assert_eq!(ticker.best_bid_quantity, "1.00000000");
+                assert_eq!(ticker.best_ask_quantity, "0.50000000");
+            }
+            _ => panic!("Expected BookTicker event, got {:?}", parsed),
+        }
+    }
+
+    #[test]
+    fn test_subscription_result_parsing() {
+        let json = r#"{
+            "result": null,
+            "id": "1"
+        }"#;
+
+        let parsed: BinanceMessage = serde_json::from_str(json).expect("Failed to parse JSON");
+        match parsed {
+            BinanceMessage::Subscription(sub) => {
+                assert_eq!(sub.id, "1");
+                assert!(sub.result.is_none());
+            }
+            _ => panic!("Expected Subscription result, got {:?}", parsed),
+        }
+    }
 }

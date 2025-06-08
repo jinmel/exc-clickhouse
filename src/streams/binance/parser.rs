@@ -1,6 +1,6 @@
 use crate::{
     models::NormalizedEvent,
-    streams::{ExchangeStreamError, Parser, binance::model::Response},
+    streams::{ExchangeStreamError, Parser, binance::model::BinanceMessage},
 };
 
 #[derive(Debug, Clone)]
@@ -27,20 +27,26 @@ impl Parser<Vec<NormalizedEvent>> for BinanceParser {
 
         let value = value.get("data").unwrap_or(&value);
 
-        let event = serde_json::from_value::<Response>(value.to_owned()).map_err(|e| {
+        let event = serde_json::from_value::<BinanceMessage>(value.to_owned()).map_err(|e| {
             ExchangeStreamError::Message(format!("Failed to parse NormalizedEvent: {e}"))
         })?;
 
         let normalized = match event {
-            Response::Trade(trade) => Some(vec![NormalizedEvent::Trade(trade.try_into()?)]),
-            Response::Quote(quote) => Some(vec![NormalizedEvent::Quote(quote.try_into()?)]),
-            Response::Subscription(result) => {
+            BinanceMessage::Trade(trade) => Some(vec![NormalizedEvent::Trade(trade.try_into()?)]),
+            BinanceMessage::Quote(quote) => Some(vec![NormalizedEvent::Quote(quote.try_into()?)]),
+            BinanceMessage::Subscription(result) => {
                 if result.result.is_some() {
                     return Err(ExchangeStreamError::Subscription(format!(
                         "Subscription result: {result:?}"
                     )));
                 }
                 None
+            }
+            BinanceMessage::Error(error) => {
+                return Err(ExchangeStreamError::Message(format!(
+                    "Binance error: code={}, msg={}",
+                    error.error.code, error.error.msg
+                )));
             }
         };
         Ok(normalized)
