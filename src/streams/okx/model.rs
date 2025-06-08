@@ -131,29 +131,117 @@ pub struct TickerMessage {
     pub data: Vec<TickerData>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct LoginMessage {
-    pub event: String,
-    pub code: Option<String>,
-    pub msg: Option<String>,
-    pub connId: Option<String>,
+
+
+use serde::de::{self, Deserializer, Visitor};
+use std::fmt;
+
+#[derive(Debug, Clone)]
+pub enum OkxDataMessage {
+    Trade(TradeMessage),
+    Ticker(TickerMessage),
+}
+
+impl<'de> serde::Deserialize<'de> for OkxDataMessage {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct OkxDataMessageVisitor;
+
+        impl<'de> Visitor<'de> for OkxDataMessageVisitor {
+            type Value = OkxDataMessage;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("an OKX data message")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<OkxDataMessage, V::Error>
+            where
+                V: de::MapAccess<'de>,
+            {
+                let mut arg: Option<Arg> = None;
+                let mut data: Option<serde_json::Value> = None;
+
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
+                        "arg" => {
+                            if arg.is_some() {
+                                return Err(de::Error::duplicate_field("arg"));
+                            }
+                            arg = Some(map.next_value()?);
+                        }
+                        "data" => {
+                            if data.is_some() {
+                                return Err(de::Error::duplicate_field("data"));
+                            }
+                            data = Some(map.next_value()?);
+                        }
+                        _ => {
+                            let _: serde_json::Value = map.next_value()?;
+                        }
+                    }
+                }
+
+                let arg = arg.ok_or_else(|| de::Error::missing_field("arg"))?;
+                let data = data.ok_or_else(|| de::Error::missing_field("data"))?;
+
+                match arg.channel.as_str() {
+                    "trades" | "trades-all" => {
+                        let trade_data: Vec<TradeData> = serde_json::from_value(data)
+                            .map_err(de::Error::custom)?;
+                        Ok(OkxDataMessage::Trade(TradeMessage { arg, data: trade_data }))
+                    }
+                    "tickers" => {
+                        let ticker_data: Vec<TickerData> = serde_json::from_value(data)
+                            .map_err(de::Error::custom)?;
+                        Ok(OkxDataMessage::Ticker(TickerMessage { arg, data: ticker_data }))
+                    }
+                    _ => Err(de::Error::custom(format!("Unknown channel: {}", arg.channel))),
+                }
+            }
+        }
+
+        deserializer.deserialize_map(OkxDataMessageVisitor)
+    }
+}
+
+impl serde::Serialize for OkxDataMessage {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            OkxDataMessage::Trade(trade_msg) => trade_msg.serialize(serializer),
+            OkxDataMessage::Ticker(ticker_msg) => ticker_msg.serialize(serializer),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ErrorMessage {
-    pub event: String,
-    pub code: String,
-    pub msg: String,
-    pub connId: Option<String>,
+#[serde(tag = "event")]
+pub enum OkxEventMessage {
+    #[serde(rename = "login")]
+    Login {
+        code: Option<String>,
+        msg: Option<String>,
+        #[serde(rename = "connId")]
+        conn_id: Option<String>,
+    },
+    #[serde(rename = "error")]
+    Error {
+        code: String,
+        msg: String,
+        #[serde(rename = "connId")]
+        conn_id: Option<String>,
+    },
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum OkxMessage {
-    Trade(TradeMessage),
-    Ticker(TickerMessage),
-    Login(LoginMessage),
-    Error(ErrorMessage),
+    Data(OkxDataMessage),
+    Event(OkxEventMessage),
 }
 
 #[cfg(test)]
@@ -179,7 +267,7 @@ mod tests {
 
         let parsed: OkxMessage = serde_json::from_str(json).expect("Failed to parse JSON");
         match parsed {
-            OkxMessage::Trade(trade_msg) => {
+            OkxMessage::Data(OkxDataMessage::Trade(trade_msg)) => {
                 assert_eq!(trade_msg.arg.channel, "trades");
                 assert_eq!(trade_msg.arg.inst_id, "BTC-USDT");
                 assert_eq!(trade_msg.data.len(), 1);
@@ -213,7 +301,7 @@ mod tests {
 
         let parsed: OkxMessage = serde_json::from_str(json).expect("Failed to parse JSON");
         match parsed {
-            OkxMessage::Ticker(ticker_msg) => {
+            OkxMessage::Data(OkxDataMessage::Ticker(ticker_msg)) => {
                 assert_eq!(ticker_msg.arg.channel, "tickers");
                 assert_eq!(ticker_msg.arg.inst_id, "BTC-USDT");
                 assert_eq!(ticker_msg.data.len(), 1);
@@ -223,6 +311,114 @@ mod tests {
                 assert_eq!(ticker_data.bid_px, "49999.0");
             }
             _ => panic!("Expected Ticker message, got {:?}", parsed),
+        }
+    }
+
+    #[test]
+    fn test_login_message_parsing() {
+        let json = r#"{
+            "event": "login",
+            "code": "0",
+            "msg": "",
+            "connId": "a4d3ae55"
+        }"#;
+
+        let parsed: OkxMessage = serde_json::from_str(json).expect("Failed to parse JSON");
+        match parsed {
+            OkxMessage::Event(OkxEventMessage::Login { code, msg, conn_id }) => {
+                assert_eq!(code, Some("0".to_string()));
+                assert_eq!(msg, Some("".to_string()));
+                assert_eq!(conn_id, Some("a4d3ae55".to_string()));
+            }
+            _ => panic!("Expected Login message, got {:?}", parsed),
+        }
+    }
+
+    #[test]
+    fn test_login_message_parsing_minimal() {
+        let json = r#"{
+            "event": "login"
+        }"#;
+
+        let parsed: OkxMessage = serde_json::from_str(json).expect("Failed to parse JSON");
+        match parsed {
+            OkxMessage::Event(OkxEventMessage::Login { code, msg, conn_id }) => {
+                assert_eq!(code, None);
+                assert_eq!(msg, None);
+                assert_eq!(conn_id, None);
+            }
+            _ => panic!("Expected Login message, got {:?}", parsed),
+        }
+    }
+
+    #[test]
+    fn test_error_message_parsing() {
+        let json = r#"{
+            "event": "error",
+            "code": "60012",
+            "msg": "Invalid request: {\"op\": \"subscribe\", \"args\": []}",
+            "connId": "a4d3ae55"
+        }"#;
+
+        let parsed: OkxMessage = serde_json::from_str(json).expect("Failed to parse JSON");
+        match parsed {
+            OkxMessage::Event(OkxEventMessage::Error { code, msg, conn_id }) => {
+                assert_eq!(code, "60012");
+                assert_eq!(msg, "Invalid request: {\"op\": \"subscribe\", \"args\": []}");
+                assert_eq!(conn_id, Some("a4d3ae55".to_string()));
+            }
+            _ => panic!("Expected Error message, got {:?}", parsed),
+        }
+    }
+
+    #[test]
+    fn test_error_message_parsing_without_conn_id() {
+        let json = r#"{
+            "event": "error",
+            "code": "60009",
+            "msg": "Login failed"
+        }"#;
+
+        let parsed: OkxMessage = serde_json::from_str(json).expect("Failed to parse JSON");
+        match parsed {
+            OkxMessage::Event(OkxEventMessage::Error { code, msg, conn_id }) => {
+                assert_eq!(code, "60009");
+                assert_eq!(msg, "Login failed");
+                assert_eq!(conn_id, None);
+            }
+            _ => panic!("Expected Error message, got {:?}", parsed),
+        }
+    }
+
+    #[test]
+    fn test_trades_all_channel_parsing() {
+        let json = r#"{
+            "arg": {
+                "channel": "trades-all",
+                "instId": "BTC-USDT"
+            },
+            "data": [{
+                "instId": "BTC-USDT",
+                "tradeId": "123456789",
+                "px": "50000.0",
+                "sz": "0.001",
+                "side": "buy",
+                "ts": "1640995200000"
+            }]
+        }"#;
+
+        let parsed: OkxMessage = serde_json::from_str(json).expect("Failed to parse JSON");
+        match parsed {
+            OkxMessage::Data(OkxDataMessage::Trade(trade_msg)) => {
+                assert_eq!(trade_msg.arg.channel, "trades-all");
+                assert_eq!(trade_msg.arg.inst_id, "BTC-USDT");
+                assert_eq!(trade_msg.data.len(), 1);
+                let trade_data = &trade_msg.data[0];
+                assert_eq!(trade_data.inst_id, "BTC-USDT");
+                assert_eq!(trade_data.px, "50000.0");
+                assert_eq!(trade_data.side, "buy");
+            }
+            _ => panic!("Expected Trade message, got {:?}", parsed),
         }
     }
 }

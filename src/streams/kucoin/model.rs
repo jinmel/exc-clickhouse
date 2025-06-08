@@ -185,7 +185,8 @@ mod tests {
                 "symbol": "UNI-USDT",
                 "takerOrderId": "6843fb1d02a36d0007d32121",
                 "time": "1749285661147000000",
-                "tradeId": "15489153933131777"
+                "tradeId": "15489153933131777",
+                "type": "match"
             }
         }"#;
 

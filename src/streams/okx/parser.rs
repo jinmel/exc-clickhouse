@@ -2,7 +2,7 @@ use crate::{
     models::NormalizedEvent,
     streams::{
         ExchangeStreamError, Parser,
-        okx::model::{TickerMessage, TradeMessage},
+        okx::model::{OkxMessage, OkxDataMessage},
     },
 };
 
@@ -25,46 +25,125 @@ impl Parser<Vec<NormalizedEvent>> for OkxParser {
     type Error = ExchangeStreamError;
 
     fn parse(&self, text: &str) -> Result<Option<Vec<NormalizedEvent>>, Self::Error> {
-        let value: serde_json::Value = serde_json::from_str(text)
+        let message: OkxMessage = serde_json::from_str(text)
             .map_err(|e| ExchangeStreamError::Message(format!("Failed to parse JSON: {e}")))?;
 
-        if value.get("event").is_some() {
-            // subscription ack or error
-            return Ok(None);
+        match message {
+            OkxMessage::Data(data_msg) => match data_msg {
+                OkxDataMessage::Trade(trade_msg) => {
+                    let normalized_trades = trade_msg
+                        .data
+                        .into_iter()
+                        .map(|trade| {
+                            let normalized_trade = trade.try_into()?;
+                            Ok(NormalizedEvent::Trade(normalized_trade))
+                        })
+                        .collect::<Result<Vec<NormalizedEvent>, Self::Error>>()?;
+                    Ok(Some(normalized_trades))
+                }
+                OkxDataMessage::Ticker(ticker_msg) => {
+                    let normalized_quotes = ticker_msg
+                        .data
+                        .into_iter()
+                        .map(|ticker| {
+                            let normalized_quote = ticker.try_into()?;
+                            Ok(NormalizedEvent::Quote(normalized_quote))
+                        })
+                        .collect::<Result<Vec<NormalizedEvent>, Self::Error>>()?;
+                    Ok(Some(normalized_quotes))
+                }
+            },
+            OkxMessage::Event(_) => {
+                // subscription ack or error
+                Ok(None)
+            }
         }
+    }
+}
 
-        let channel = value
-            .get("arg")
-            .and_then(|v| v.get("channel"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-        if channel == "trades" || channel == "trades-all" {
-            let msg: TradeMessage = serde_json::from_value(value)
-                .map_err(|e| ExchangeStreamError::Message(format!("Failed to parse trade: {e}")))?;
-            let normalized_trades = msg
-                .data
-                .iter()
-                .map(|trade| {
-                    let normalized_trade = trade.clone().try_into()?;
-                    Ok(NormalizedEvent::Trade(normalized_trade))
-                })
-                .collect::<Result<Vec<NormalizedEvent>, Self::Error>>()?;
-            return Ok(Some(normalized_trades));
-        } else if channel == "tickers" {
-            let msg: TickerMessage = serde_json::from_value(value).map_err(|e| {
-                ExchangeStreamError::Message(format!("Failed to parse ticker: {e}"))
-            })?;
-            let normalized_quotes = msg
-                .data
-                .iter()
-                .map(|ticker| {
-                    let normalized_quote = ticker.clone().try_into()?;
-                    Ok(NormalizedEvent::Quote(normalized_quote))
-                })
-                .collect::<Result<Vec<NormalizedEvent>, Self::Error>>()?;
-            return Ok(Some(normalized_quotes));
+    #[test]
+    fn test_parse_trade_message() {
+        let parser = OkxParser::new();
+        let json = r#"{
+            "arg": {
+                "channel": "trades",
+                "instId": "BTC-USDT"
+            },
+            "data": [{
+                "instId": "BTC-USDT",
+                "tradeId": "123456789",
+                "px": "50000.0",
+                "sz": "0.001",
+                "side": "buy",
+                "ts": "1640995200000"
+            }]
+        }"#;
+
+        let result = parser.parse(json).expect("Failed to parse");
+        assert!(result.is_some());
+        let events = result.unwrap();
+        assert_eq!(events.len(), 1);
+        
+        match &events[0] {
+            NormalizedEvent::Trade(trade) => {
+                assert_eq!(trade.symbol.as_str(), "BTC-USDT");
+                assert_eq!(trade.price, 50000.0);
+                assert_eq!(trade.amount, 0.001);
+            }
+            _ => panic!("Expected Trade event"),
         }
-        Ok(None)
+    }
+
+    #[test]
+    fn test_parse_ticker_message() {
+        let parser = OkxParser::new();
+        let json = r#"{
+            "arg": {
+                "channel": "tickers",
+                "instId": "BTC-USDT"
+            },
+            "data": [{
+                "instId": "BTC-USDT",
+                "last": "50000.0",
+                "lastSz": "0.001",
+                "askPx": "50001.0",
+                "askSz": "1.0",
+                "bidPx": "49999.0",
+                "bidSz": "1.0",
+                "ts": "1640995200000"
+            }]
+        }"#;
+
+        let result = parser.parse(json).expect("Failed to parse");
+        assert!(result.is_some());
+        let events = result.unwrap();
+        assert_eq!(events.len(), 1);
+        
+        match &events[0] {
+            NormalizedEvent::Quote(quote) => {
+                assert_eq!(quote.symbol.as_str(), "BTC-USDT");
+                assert_eq!(quote.ask_price, 50001.0);
+                assert_eq!(quote.bid_price, 49999.0);
+            }
+            _ => panic!("Expected Quote event"),
+        }
+    }
+
+    #[test]
+    fn test_parse_login_message() {
+        let parser = OkxParser::new();
+        let json = r#"{
+            "event": "login",
+            "code": "0",
+            "msg": "",
+            "connId": "a4d3ae55"
+        }"#;
+
+        let result = parser.parse(json).expect("Failed to parse");
+        assert!(result.is_none());
     }
 }
