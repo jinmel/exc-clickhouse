@@ -228,6 +228,12 @@ pub enum OkxEventMessage {
         #[serde(rename = "connId")]
         conn_id: Option<String>,
     },
+    #[serde(rename = "subscribe")]
+    Subscribe {
+        arg: Arg,
+        #[serde(rename = "connId")]
+        conn_id: Option<String>,
+    },
     #[serde(rename = "error")]
     Error {
         code: String,
@@ -419,6 +425,49 @@ mod tests {
                 assert_eq!(trade_data.side, "buy");
             }
             _ => panic!("Expected Trade message, got {:?}", parsed),
+        }
+    }
+
+    #[test]
+    fn test_subscribe_message_parsing() {
+        let json = r#"{
+            "event": "subscribe",
+            "arg": {
+                "channel": "tickers",
+                "instId": "PENDLE-USDT"
+            },
+            "connId": "78da8d48"
+        }"#;
+
+        let parsed: OkxMessage = serde_json::from_str(json).expect("Failed to parse JSON");
+        match parsed {
+            OkxMessage::Event(OkxEventMessage::Subscribe { arg, conn_id }) => {
+                assert_eq!(arg.channel, "tickers");
+                assert_eq!(arg.inst_id, "PENDLE-USDT");
+                assert_eq!(conn_id, Some("78da8d48".to_string()));
+            }
+            _ => panic!("Expected Subscribe message, got {:?}", parsed),
+        }
+    }
+
+    #[test]
+    fn test_subscribe_message_parsing_without_conn_id() {
+        let json = r#"{
+            "event": "subscribe",
+            "arg": {
+                "channel": "tickers",
+                "instId": "PENDLE-USDT"
+            }
+        }"#;
+
+        let parsed: OkxMessage = serde_json::from_str(json).expect("Failed to parse JSON");
+        match parsed {
+            OkxMessage::Event(OkxEventMessage::Subscribe { arg, conn_id }) => {
+                assert_eq!(arg.channel, "tickers");
+                assert_eq!(arg.inst_id, "PENDLE-USDT");
+                assert_eq!(conn_id, None);
+            }
+            _ => panic!("Expected Subscribe message, got {:?}", parsed),
         }
     }
 }

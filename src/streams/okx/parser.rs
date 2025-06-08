@@ -25,6 +25,11 @@ impl Parser<Vec<NormalizedEvent>> for OkxParser {
     type Error = ExchangeStreamError;
 
     fn parse(&self, text: &str) -> Result<Option<Vec<NormalizedEvent>>, Self::Error> {
+        if text.trim() == "pong" {
+            // handle pong before passing to json deserializer
+            return Ok(None);
+        }
+
         let message: OkxMessage = serde_json::from_str(text)
             .map_err(|e| ExchangeStreamError::Message(format!("Failed to parse JSON: {e}")))?;
 
@@ -53,10 +58,11 @@ impl Parser<Vec<NormalizedEvent>> for OkxParser {
                     Ok(Some(normalized_quotes))
                 }
             },
-            OkxMessage::Event(_) => {
+            OkxMessage::Event(event) => {
+                tracing::debug!("received event: {:?}", event);
                 // subscription ack or error
                 Ok(None)
-            }
+            },
         }
     }
 }
@@ -142,6 +148,31 @@ mod tests {
             "msg": "",
             "connId": "a4d3ae55"
         }"#;
+
+        let result = parser.parse(json).expect("Failed to parse");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_parse_subscribe_message() {
+        let parser = OkxParser::new();
+        let json = r#"{
+            "event": "subscribe",
+            "arg": {
+                "channel": "tickers",
+                "instId": "PENDLE-USDT"
+            },
+            "connId": "78da8d48"
+        }"#;
+
+        let result = parser.parse(json).expect("Failed to parse");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_pong_message() {
+        let parser = OkxParser::new();
+        let json = "pong";
 
         let result = parser.parse(json).expect("Failed to parse");
         assert!(result.is_none());

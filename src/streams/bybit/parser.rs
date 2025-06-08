@@ -53,7 +53,7 @@ impl OrderBook {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct BybitParser {
     books: Arc<Mutex<HashMap<String, OrderBook>>>,
 }
