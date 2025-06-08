@@ -53,6 +53,18 @@ impl TryFrom<TradeData> for NormalizedTrade {
     }
 }
 
+impl TryFrom<TradeMessage> for Vec<NormalizedTrade> {
+    type Error = ExchangeStreamError;
+
+    fn try_from(trade_msg: TradeMessage) -> Result<Vec<NormalizedTrade>, Self::Error> {
+        trade_msg
+            .data
+            .into_iter()
+            .map(|trade| trade.try_into())
+            .collect()
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TradeMessage {
@@ -139,7 +151,7 @@ pub struct SubscriptionResult {
     pub success: bool,
     pub ret_msg: String,
     pub conn_id: String,
-    pub req_id: String,
+    pub req_id: Option<String>,
     pub op: String,
 }
 
