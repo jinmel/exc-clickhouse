@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{ethereum::BlockMetadata, timeboost::bids::BidData};
 
-#[derive(Debug, Serialize, Deserialize, Copy, Clone)]
+#[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq, Eq)]
 pub enum ExchangeName {
     #[serde(rename = "binance")]
     Binance,
