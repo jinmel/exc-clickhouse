@@ -188,21 +188,19 @@ impl ClickHouseService {
 
     pub async fn handle_msg(&self, batch: &[ClickhouseMessage]) -> eyre::Result<()> {
         tracing::trace!("Writing {} messages to ClickHouse", batch.len());
-        let mut trade_inserter = self.get_inserter("cex.normalized_trades", 5000, 1, 0.1)?;
-        let mut quote_inserter = self.get_inserter("cex.normalized_quotes", 5000, 1, 0.1)?;
-        let mut block_inserter = self.get_inserter("ethereum.blocks", 100, 1, 0.1)?;
-        let mut bid_inserter = self.get_inserter("timeboost.bids", 100, 1, 0.1)?;
+        let mut trade_inserter: Inserter<ClickhouseTrade> = self.get_inserter("cex.normalized_trades", 5000, 1, 0.1)?;
+        let mut quote_inserter: Inserter<ClickhouseQuote> = self.get_inserter("cex.normalized_quotes", 5000, 1, 0.1)?;
+        let mut block_inserter: Inserter<BlockMetadata> = self.get_inserter("ethereum.blocks", 100, 1, 0.1)?;
+        let mut bid_inserter: Inserter<BidData> = self.get_inserter("timeboost.bids", 100, 1, 0.1)?;
 
         for msg in batch {
             match msg {
                 ClickhouseMessage::Cex(NormalizedEvent::Trade(trade)) => {
-                    let trade: ClickhouseTrade = trade.into();
-                    trade_inserter.write(&trade)?;
+                    trade_inserter.write(&trade.into())?;
                     trade_inserter.commit().await?;
                 }
                 ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)) => {
-                    let quote: ClickhouseQuote = quote.into();
-                    quote_inserter.write(&quote)?;
+                    quote_inserter.write(&quote.into())?;
                     quote_inserter.commit().await?;
                 }
                 ClickhouseMessage::Expresslane(ExpresslaneMessage::Bid(bid)) => {
