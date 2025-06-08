@@ -20,10 +20,10 @@ impl CoinbaseParser {
     }
 }
 
-impl Parser<NormalizedEvent> for CoinbaseParser {
+impl Parser<Vec<NormalizedEvent>> for CoinbaseParser {
     type Error = ExchangeStreamError;
 
-    fn parse(&self, text: &str) -> Result<Option<NormalizedEvent>, Self::Error> {
+    fn parse(&self, text: &str) -> Result<Option<Vec<NormalizedEvent>>, Self::Error> {
         let value: serde_json::Value = serde_json::from_str(text)
             .map_err(|e| ExchangeStreamError::MessageError(format!("Failed to parse JSON: {e}")))?;
         let typ = value.get("type").and_then(|v| v.as_str()).unwrap_or("");
@@ -33,14 +33,14 @@ impl Parser<NormalizedEvent> for CoinbaseParser {
                     ExchangeStreamError::MessageError(format!("Failed to parse match: {e}"))
                 })?;
                 let trade: NormalizedTrade = msg.try_into()?;
-                Ok(Some(NormalizedEvent::Trade(trade)))
+                Ok(Some(vec![NormalizedEvent::Trade(trade)]))
             }
             "ticker" => {
                 let msg: TickerEvent = serde_json::from_value(value).map_err(|e| {
                     ExchangeStreamError::MessageError(format!("Failed to parse ticker: {e}"))
                 })?;
                 let quote: NormalizedQuote = msg.try_into()?;
-                Ok(Some(NormalizedEvent::Quote(quote)))
+                Ok(Some(vec![NormalizedEvent::Quote(quote)]))
             }
             "subscriptions" => Ok(None),
             _ => {

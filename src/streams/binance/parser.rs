@@ -18,10 +18,10 @@ impl BinanceParser {
     }
 }
 
-impl Parser<NormalizedEvent> for BinanceParser {
+impl Parser<Vec<NormalizedEvent>> for BinanceParser {
     type Error = ExchangeStreamError;
 
-    fn parse(&self, text: &str) -> Result<Option<NormalizedEvent>, Self::Error> {
+    fn parse(&self, text: &str) -> Result<Option<Vec<NormalizedEvent>>, Self::Error> {
         let value: serde_json::Value = serde_json::from_str(text)
             .map_err(|e| ExchangeStreamError::MessageError(format!("Failed to parse JSON: {e}")))?;
 
@@ -32,8 +32,8 @@ impl Parser<NormalizedEvent> for BinanceParser {
         })?;
 
         let normalized = match event {
-            Response::Trade(trade) => Some(NormalizedEvent::Trade(trade.try_into()?)),
-            Response::Quote(quote) => Some(NormalizedEvent::Quote(quote.try_into()?)),
+            Response::Trade(trade) => Some(vec![NormalizedEvent::Trade(trade.try_into()?)]),
+            Response::Quote(quote) => Some(vec![NormalizedEvent::Quote(quote.try_into()?)]),
             Response::Subscription(result) => {
                 if result.result.is_some() {
                     return Err(ExchangeStreamError::SubscriptionError(format!(
