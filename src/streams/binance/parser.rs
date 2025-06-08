@@ -23,12 +23,12 @@ impl Parser<Vec<NormalizedEvent>> for BinanceParser {
 
     fn parse(&self, text: &str) -> Result<Option<Vec<NormalizedEvent>>, Self::Error> {
         let value: serde_json::Value = serde_json::from_str(text)
-            .map_err(|e| ExchangeStreamError::MessageError(format!("Failed to parse JSON: {e}")))?;
+            .map_err(|e| ExchangeStreamError::Message(format!("Failed to parse JSON: {e}")))?;
 
         let value = value.get("data").unwrap_or(&value);
 
         let event = serde_json::from_value::<Response>(value.to_owned()).map_err(|e| {
-            ExchangeStreamError::MessageError(format!("Failed to parse NormalizedEvent: {e}"))
+            ExchangeStreamError::Message(format!("Failed to parse NormalizedEvent: {e}"))
         })?;
 
         let normalized = match event {
@@ -36,7 +36,7 @@ impl Parser<Vec<NormalizedEvent>> for BinanceParser {
             Response::Quote(quote) => Some(vec![NormalizedEvent::Quote(quote.try_into()?)]),
             Response::Subscription(result) => {
                 if result.result.is_some() {
-                    return Err(ExchangeStreamError::SubscriptionError(format!(
+                    return Err(ExchangeStreamError::Subscription(format!(
                         "Subscription result: {result:?}"
                     )));
                 }

@@ -1,11 +1,13 @@
 use async_trait::async_trait;
+use futures::stream::Stream;
+use std::pin::Pin;
 
 use crate::streams::coinbase::parser::CoinbaseParser;
 use crate::{
     models::NormalizedEvent,
     streams::{
         ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
-        exchange_stream::ExchangeStream, subscription::CoinbaseSubscription,
+        exchange_stream::ExchangeStreamBuilder, subscription::CoinbaseSubscription,
     },
 };
 
@@ -28,17 +30,15 @@ impl CoinbaseClient {
 #[async_trait]
 impl WebsocketStream for CoinbaseClient {
     type Error = ExchangeStreamError;
-    type EventStream = ExchangeStream<NormalizedEvent, CoinbaseParser, CoinbaseSubscription>;
+    type EventStream =
+        Pin<Box<dyn Stream<Item = Result<NormalizedEvent, ExchangeStreamError>> + Send + 'static>>;
 
     async fn stream_events(&self) -> Result<Self::EventStream, Self::Error> {
         tracing::debug!("Coinbase URL: {}", self.base_url);
         let parser = CoinbaseParser::new();
-        let mut stream =
-            ExchangeStream::new(&self.base_url, None, parser, self.subscription.clone()).await?;
-        let res = stream.run().await;
-        if res.is_err() {
-            tracing::error!("Error running exchange stream: {:?}", res.err());
-        }
+        let stream =
+            ExchangeStreamBuilder::new(&self.base_url, None, parser, self.subscription.clone())
+                .build();
         Ok(stream)
     }
 }

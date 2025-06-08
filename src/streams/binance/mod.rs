@@ -5,9 +5,11 @@ use crate::{
     models::NormalizedEvent,
     streams::{
         ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
-        exchange_stream::ExchangeStream, subscription::BinanceSubscription,
+        exchange_stream::ExchangeStreamBuilder, subscription::BinanceSubscription,
     },
 };
+use futures::stream::Stream;
+use std::pin::Pin;
 use tokio::time::Duration;
 
 /// Default WebSocket URL for Binance
@@ -35,23 +37,20 @@ impl BinanceClient {
 #[async_trait]
 impl WebsocketStream for BinanceClient {
     type Error = ExchangeStreamError;
-    type EventStream = ExchangeStream<NormalizedEvent, BinanceParser, BinanceSubscription>;
+    type EventStream =
+        Pin<Box<dyn Stream<Item = Result<NormalizedEvent, ExchangeStreamError>> + Send + 'static>>;
 
     async fn stream_events(&self) -> Result<Self::EventStream, Self::Error> {
         tracing::debug!("Binance URL: {}", self.base_url);
         let timeout = Duration::from_secs(23 * 60 * 60); // Binance has 24 hour timeout.
         let parser = BinanceParser::new();
-        let mut stream = ExchangeStream::new(
+        let stream = ExchangeStreamBuilder::new(
             &self.base_url,
             Some(timeout),
             parser,
             self.subscription.clone(),
         )
-        .await?;
-        let res = stream.run().await;
-        if res.is_err() {
-            tracing::error!("Error running exchange stream: {:?}", res.err());
-        }
+        .build();
         Ok(stream)
     }
 }

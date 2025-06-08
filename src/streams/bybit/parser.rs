@@ -69,7 +69,7 @@ impl Parser<Vec<NormalizedEvent>> for BybitParser {
 
     fn parse(&self, text: &str) -> Result<Option<Vec<NormalizedEvent>>, Self::Error> {
         let value: serde_json::Value = serde_json::from_str(text)
-            .map_err(|e| ExchangeStreamError::MessageError(format!("Failed to parse JSON: {e}")))?;
+            .map_err(|e| ExchangeStreamError::Message(format!("Failed to parse JSON: {e}")))?;
 
         if value.get("topic").is_none() {
             tracing::debug!("Subscription ack or other message: {:?}", value);
@@ -80,9 +80,8 @@ impl Parser<Vec<NormalizedEvent>> for BybitParser {
         let topic = value["topic"].as_str().unwrap_or("");
 
         if topic.starts_with("publicTrade") {
-            let msg: TradeMessage = serde_json::from_value(value).map_err(|e| {
-                ExchangeStreamError::MessageError(format!("Failed to parse trade: {e}"))
-            })?;
+            let msg: TradeMessage = serde_json::from_value(value)
+                .map_err(|e| ExchangeStreamError::Message(format!("Failed to parse trade: {e}")))?;
             if let Some(trade) = msg.data.into_iter().next() {
                 let trade: NormalizedTrade = trade.try_into()?;
                 return Ok(Some(vec![NormalizedEvent::Trade(trade)]));
@@ -90,7 +89,7 @@ impl Parser<Vec<NormalizedEvent>> for BybitParser {
             return Ok(None);
         } else if topic.starts_with("orderbook") {
             let msg: OrderbookMessage = serde_json::from_value(value).map_err(|e| {
-                ExchangeStreamError::MessageError(format!("Failed to parse orderbook: {e}"))
+                ExchangeStreamError::Message(format!("Failed to parse orderbook: {e}"))
             })?;
             let mut books = self.books.lock().unwrap();
             let book = books.entry(msg.data.symbol.clone()).or_default();

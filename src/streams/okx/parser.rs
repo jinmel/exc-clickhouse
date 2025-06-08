@@ -26,7 +26,7 @@ impl Parser<Vec<NormalizedEvent>> for OkxParser {
 
     fn parse(&self, text: &str) -> Result<Option<Vec<NormalizedEvent>>, Self::Error> {
         let value: serde_json::Value = serde_json::from_str(text)
-            .map_err(|e| ExchangeStreamError::MessageError(format!("Failed to parse JSON: {e}")))?;
+            .map_err(|e| ExchangeStreamError::Message(format!("Failed to parse JSON: {e}")))?;
 
         if value.get("event").is_some() {
             // subscription ack or error
@@ -40,9 +40,8 @@ impl Parser<Vec<NormalizedEvent>> for OkxParser {
             .unwrap_or("");
 
         if channel == "trades" || channel == "trades-all" {
-            let msg: TradesMessage = serde_json::from_value(value).map_err(|e| {
-                ExchangeStreamError::MessageError(format!("Failed to parse trade: {e}"))
-            })?;
+            let msg: TradesMessage = serde_json::from_value(value)
+                .map_err(|e| ExchangeStreamError::Message(format!("Failed to parse trade: {e}")))?;
             let normalized_trades = msg
                 .data
                 .iter()
@@ -54,7 +53,7 @@ impl Parser<Vec<NormalizedEvent>> for OkxParser {
             return Ok(Some(normalized_trades));
         } else if channel == "tickers" {
             let msg: TickersMessage = serde_json::from_value(value).map_err(|e| {
-                ExchangeStreamError::MessageError(format!("Failed to parse ticker: {e}"))
+                ExchangeStreamError::Message(format!("Failed to parse ticker: {e}"))
             })?;
             let normalized_quotes = msg
                 .data

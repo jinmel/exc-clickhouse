@@ -1,4 +1,6 @@
 use async_trait::async_trait;
+use futures::stream::Stream;
+use std::pin::Pin;
 use uuid::Uuid;
 
 use crate::streams::kucoin::parser::KucoinParser;
@@ -6,7 +8,7 @@ use crate::{
     models::NormalizedEvent,
     streams::{
         ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
-        exchange_stream::ExchangeStream, subscription::KucoinSubscription,
+        exchange_stream::ExchangeStreamBuilder, subscription::KucoinSubscription,
     },
 };
 
@@ -29,16 +31,14 @@ impl KucoinClient {
 #[async_trait]
 impl WebsocketStream for KucoinClient {
     type Error = ExchangeStreamError;
-    type EventStream = ExchangeStream<NormalizedEvent, KucoinParser, KucoinSubscription>;
+    type EventStream =
+        Pin<Box<dyn Stream<Item = Result<NormalizedEvent, ExchangeStreamError>> + Send + 'static>>;
 
     async fn stream_events(&self) -> Result<Self::EventStream, Self::Error> {
         let parser = KucoinParser::new();
-        let mut stream =
-            ExchangeStream::new(&self.base_url, None, parser, self.subscription.clone()).await?;
-        let res = stream.run().await;
-        if res.is_err() {
-            tracing::error!("Error running exchange stream: {:?}", res.err());
-        }
+        let stream =
+            ExchangeStreamBuilder::new(&self.base_url, None, parser, self.subscription.clone())
+                .build();
         Ok(stream)
     }
 }

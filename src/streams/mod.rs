@@ -6,6 +6,7 @@ pub mod kraken;
 pub mod kucoin;
 pub mod okx;
 pub mod subscription;
+// pub mod upbit; // TODO: Needs refactoring to use new builder pattern
 
 use crate::models::NormalizedEvent;
 use async_trait::async_trait;
@@ -59,13 +60,11 @@ pub trait Subscription {
 #[non_exhaustive]
 pub enum ExchangeStreamError {
     #[error("Stream error: {0}")]
-    StreamError(String),
-    #[error("Stream not connected: {0}")]
-    StreamNotConnected(String),
-    #[error("Parse error: {0}")]
-    MessageError(String),
+    Stream(String),
+    #[error("Message error: {0}")]
+    Message(String),
     #[error("Connection error: {0}")]
-    ConnectionError(String),
+    Connection(String),
     #[error("Subscription error: {0}")]
-    SubscriptionError(String),
+    Subscription(String),
 }

@@ -33,19 +33,20 @@ impl TryInto<NormalizedTrade> for Trade {
         let price = self
             .px
             .parse::<f64>()
-            .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid price value: {e}")))?;
-        let amount = self.sz.parse::<f64>().map_err(|e| {
-            ExchangeStreamError::MessageError(format!("Invalid quantity value: {e}"))
-        })?;
+            .map_err(|e| ExchangeStreamError::Message(format!("Invalid price value: {e}")))?;
+        let amount = self
+            .sz
+            .parse::<f64>()
+            .map_err(|e| ExchangeStreamError::Message(format!("Invalid quantity value: {e}")))?;
         let ts = self
             .ts
             .parse::<u64>()
-            .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid timestamp: {e}")))?;
+            .map_err(|e| ExchangeStreamError::Message(format!("Invalid timestamp: {e}")))?;
         let side = match self.side.as_str() {
             "buy" => TradeSide::Buy,
             "sell" => TradeSide::Sell,
             _ => {
-                return Err(ExchangeStreamError::MessageError(format!(
+                return Err(ExchangeStreamError::Message(format!(
                     "Unknown trade side: {}",
                     self.side
                 )));
@@ -95,23 +96,23 @@ impl TryInto<NormalizedQuote> for Ticker {
         let ask_amount = self
             .ask_sz
             .parse::<f64>()
-            .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid ask size: {e}")))?;
+            .map_err(|e| ExchangeStreamError::Message(format!("Invalid ask size: {e}")))?;
         let ask_price = self
             .ask_px
             .parse::<f64>()
-            .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid ask price: {e}")))?;
+            .map_err(|e| ExchangeStreamError::Message(format!("Invalid ask price: {e}")))?;
         let bid_price = self
             .bid_px
             .parse::<f64>()
-            .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid bid price: {e}")))?;
+            .map_err(|e| ExchangeStreamError::Message(format!("Invalid bid price: {e}")))?;
         let bid_amount = self
             .bid_sz
             .parse::<f64>()
-            .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid bid size: {e}")))?;
+            .map_err(|e| ExchangeStreamError::Message(format!("Invalid bid size: {e}")))?;
         let ts = self
             .ts
             .parse::<u64>()
-            .map_err(|e| ExchangeStreamError::MessageError(format!("Invalid timestamp: {e}")))?;
+            .map_err(|e| ExchangeStreamError::Message(format!("Invalid timestamp: {e}")))?;
         Ok(NormalizedQuote::new(
             ExchangeName::Okx,
             &self.inst_id,
