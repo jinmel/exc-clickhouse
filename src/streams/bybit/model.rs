@@ -86,9 +86,13 @@ impl TryFrom<OrderbookData> for NormalizedQuote {
             .as_micros() as u64;
 
         // Get best bid and ask from the orderbook
-        let best_bid = orderbook.bids.first()
+        let best_bid = orderbook
+            .bids
+            .first()
             .ok_or_else(|| ExchangeStreamError::Message("No bids available".to_string()))?;
-        let best_ask = orderbook.asks.first()
+        let best_ask = orderbook
+            .asks
+            .first()
             .ok_or_else(|| ExchangeStreamError::Message("No asks available".to_string()))?;
 
         let bid_price = best_bid[0]

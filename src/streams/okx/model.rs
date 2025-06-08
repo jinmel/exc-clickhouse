@@ -131,8 +131,6 @@ pub struct TickerMessage {
     pub data: Vec<TickerData>,
 }
 
-
-
 use serde::de::{self, Deserializer, Visitor};
 use std::fmt;
 
@@ -188,16 +186,25 @@ impl<'de> serde::Deserialize<'de> for OkxDataMessage {
 
                 match arg.channel.as_str() {
                     "trades" | "trades-all" => {
-                        let trade_data: Vec<TradeData> = serde_json::from_value(data)
-                            .map_err(de::Error::custom)?;
-                        Ok(OkxDataMessage::Trade(TradeMessage { arg, data: trade_data }))
+                        let trade_data: Vec<TradeData> =
+                            serde_json::from_value(data).map_err(de::Error::custom)?;
+                        Ok(OkxDataMessage::Trade(TradeMessage {
+                            arg,
+                            data: trade_data,
+                        }))
                     }
                     "tickers" => {
-                        let ticker_data: Vec<TickerData> = serde_json::from_value(data)
-                            .map_err(de::Error::custom)?;
-                        Ok(OkxDataMessage::Ticker(TickerMessage { arg, data: ticker_data }))
+                        let ticker_data: Vec<TickerData> =
+                            serde_json::from_value(data).map_err(de::Error::custom)?;
+                        Ok(OkxDataMessage::Ticker(TickerMessage {
+                            arg,
+                            data: ticker_data,
+                        }))
                     }
-                    _ => Err(de::Error::custom(format!("Unknown channel: {}", arg.channel))),
+                    _ => Err(de::Error::custom(format!(
+                        "Unknown channel: {}",
+                        arg.channel
+                    ))),
                 }
             }
         }
@@ -370,7 +377,10 @@ mod tests {
         match parsed {
             OkxMessage::Event(OkxEventMessage::Error { code, msg, conn_id }) => {
                 assert_eq!(code, "60012");
-                assert_eq!(msg, "Invalid request: {\"op\": \"subscribe\", \"args\": []}");
+                assert_eq!(
+                    msg,
+                    "Invalid request: {\"op\": \"subscribe\", \"args\": []}"
+                );
                 assert_eq!(conn_id, Some("a4d3ae55".to_string()));
             }
             _ => panic!("Expected Error message, got {:?}", parsed),

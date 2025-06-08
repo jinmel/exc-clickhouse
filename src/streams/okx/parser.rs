@@ -2,7 +2,7 @@ use crate::{
     models::NormalizedEvent,
     streams::{
         ExchangeStreamError, Parser,
-        okx::model::{OkxMessage, OkxDataMessage},
+        okx::model::{OkxDataMessage, OkxMessage},
     },
 };
 
@@ -62,7 +62,7 @@ impl Parser<Vec<NormalizedEvent>> for OkxParser {
                 tracing::debug!("received event: {:?}", event);
                 // subscription ack or error
                 Ok(None)
-            },
+            }
         }
     }
 }
@@ -93,7 +93,7 @@ mod tests {
         assert!(result.is_some());
         let events = result.unwrap();
         assert_eq!(events.len(), 1);
-        
+
         match &events[0] {
             NormalizedEvent::Trade(trade) => {
                 assert_eq!(trade.symbol.as_str(), "BTC-USDT");
@@ -128,7 +128,7 @@ mod tests {
         assert!(result.is_some());
         let events = result.unwrap();
         assert_eq!(events.len(), 1);
-        
+
         match &events[0] {
             NormalizedEvent::Quote(quote) => {
                 assert_eq!(quote.symbol.as_str(), "BTC-USDT");
