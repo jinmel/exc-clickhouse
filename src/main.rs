@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::time::Duration;
 use tokio::sync::mpsc;
+use tower::{Service, ServiceBuilder, ServiceExt};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 use crate::{
@@ -116,6 +117,10 @@ struct StreamArgs {
     /// Maximum restart delay in seconds (for exponential backoff)
     #[arg(long, default_value_t = 300)]
     max_restart_delay_seconds: u64,
+
+    /// Rate limit for ClickHouse requests per second
+    #[arg(long, default_value_t = 5)]
+    clickhouse_rate_limit: u64,
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
@@ -328,90 +333,74 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
 
     loop {
         // Create new channel for each restart cycle
-        let (msg_tx, msg_rx) = mpsc::unbounded_channel::<Vec<ClickhouseMessage>>();
+        let (msg_tx, msg_rx) = mpsc::unbounded_channel::<ClickhouseMessage>();
         let mut set = tokio::task::JoinSet::new();
 
         // Spawn tasks
         if !binance_symbols.is_empty() {
             let symbols = binance_symbols.clone();
-            let batch_size = args.batch_size;
             let tx = msg_tx.clone();
 
             tracing::info!("Spawning binance stream for symbols: {:?}", symbols);
             set.spawn(async move {
                 (
                     TaskType::BinanceStream,
-                    binance_stream_task(tx, symbols, batch_size).await,
+                    binance_stream_task(tx, symbols).await,
                 )
             });
         }
 
         if !bybit_symbols.is_empty() {
             let symbols = bybit_symbols.clone();
-            let batch_size = args.batch_size;
             let tx = msg_tx.clone();
 
             tracing::info!("Spawning bybit stream for symbols: {:?}", symbols);
-            set.spawn(async move {
-                (
-                    TaskType::BybitStream,
-                    bybit_stream_task(tx, symbols, batch_size).await,
-                )
-            });
+            set.spawn(async move { (TaskType::BybitStream, bybit_stream_task(tx, symbols).await) });
         }
 
         if !okx_symbols.is_empty() {
             let symbols = okx_symbols.clone();
-            let batch_size = args.batch_size;
             let tx = msg_tx.clone();
 
             tracing::info!("Spawning okx stream for symbols: {:?}", symbols);
-            set.spawn(async move {
-                (
-                    TaskType::OkxStream,
-                    okx_stream_task(tx, symbols, batch_size).await,
-                )
-            });
+            set.spawn(async move { (TaskType::OkxStream, okx_stream_task(tx, symbols).await) });
         }
 
         if !coinbase_symbols.is_empty() {
             let symbols = coinbase_symbols.clone();
-            let batch_size = args.batch_size;
             let tx = msg_tx.clone();
 
             tracing::info!("Spawning coinbase stream for symbols: {:?}", symbols);
             set.spawn(async move {
                 (
                     TaskType::CoinbaseStream,
-                    coinbase_stream_task(tx, symbols, batch_size).await,
+                    coinbase_stream_task(tx, symbols).await,
                 )
             });
         }
 
         if !kraken_symbols.is_empty() {
             let symbols = kraken_symbols.clone();
-            let batch_size = args.batch_size;
             let tx = msg_tx.clone();
 
             tracing::info!("Spawning kraken stream for symbols: {:?}", symbols);
             set.spawn(async move {
                 (
                     TaskType::KrakenStream,
-                    kraken_stream_task(tx, symbols, batch_size).await,
+                    kraken_stream_task(tx, symbols).await,
                 )
             });
         }
 
         if !kucoin_symbols.is_empty() {
             let symbols = kucoin_symbols.clone();
-            let batch_size = args.batch_size;
             let tx = msg_tx.clone();
 
             tracing::info!("Spawning kucoin stream for symbols: {:?}", symbols);
             set.spawn(async move {
                 (
                     TaskType::KucoinStream,
-                    kucoin_stream_task(tx, symbols, batch_size).await,
+                    kucoin_stream_task(tx, symbols).await,
                 )
             });
         }
@@ -443,7 +432,8 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
             set.spawn(async move {
                 (
                     TaskType::ClickHouseInsert,
-                    clickhouse_writer_task(msg_rx).await,
+                    clickhouse_writer_task(msg_rx, args.clickhouse_rate_limit, args.batch_size)
+                        .await,
                 )
             });
         }
@@ -542,224 +532,211 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
 }
 
 async fn binance_stream_task(
-    evt_tx: mpsc::UnboundedSender<Vec<ClickhouseMessage>>,
+    evt_tx: mpsc::UnboundedSender<ClickhouseMessage>,
     symbols: Vec<String>,
-    batch_size: usize,
 ) -> eyre::Result<()> {
     let binance = BinanceClient::builder().add_symbols(symbols).build()?;
     let combined_stream = binance.stream_events().await?;
-    let chunks = combined_stream
-        .filter_map(
-            |event: Result<NormalizedEvent, ExchangeStreamError>| async move {
-                match event {
-                    Ok(NormalizedEvent::Trade(trade)) => {
-                        Some(ClickhouseMessage::Cex(NormalizedEvent::Trade(trade)))
-                    }
-                    Ok(NormalizedEvent::Quote(quote)) => {
-                        Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
-                    }
-                    Err(e) => {
-                        // TODO: handle error
-                        tracing::error!("Error streaming binance event: {:?}", e);
-                        None
-                    }
+    let stream = combined_stream.filter_map(
+        |event: Result<NormalizedEvent, ExchangeStreamError>| async move {
+            match event {
+                Ok(NormalizedEvent::Trade(trade)) => {
+                    Some(ClickhouseMessage::Cex(NormalizedEvent::Trade(trade)))
                 }
-            },
-        )
-        .chunks(batch_size);
-    pin_mut!(chunks);
-    while let Some(chunk) = chunks.next().await {
-        let res = evt_tx.send(chunk);
-        if res.is_err() {
-            tracing::error!("Failed to send chunk to channel");
+                Ok(NormalizedEvent::Quote(quote)) => {
+                    Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
+                }
+                Err(e) => {
+                    tracing::error!("Error streaming binance event: {:?}", e);
+                    None
+                }
+            }
+        },
+    );
+    pin_mut!(stream);
+    while let Some(msg) = stream.next().await {
+        if evt_tx.send(msg).is_err() {
+            tracing::error!("Failed to send message to channel");
         }
     }
     Ok(())
 }
 
 async fn bybit_stream_task(
-    evt_tx: mpsc::UnboundedSender<Vec<ClickhouseMessage>>,
+    evt_tx: mpsc::UnboundedSender<ClickhouseMessage>,
     symbols: Vec<String>,
-    batch_size: usize,
 ) -> eyre::Result<()> {
     let bybit = BybitClient::builder().add_symbols(symbols).build()?;
     let combined_stream = bybit.stream_events().await?;
-    let chunks = combined_stream
-        .filter_map(
-            |event: Result<NormalizedEvent, ExchangeStreamError>| async move {
-                match event {
-                    Ok(NormalizedEvent::Trade(trade)) => {
-                        Some(ClickhouseMessage::Cex(NormalizedEvent::Trade(trade)))
-                    }
-                    Ok(NormalizedEvent::Quote(quote)) => {
-                        Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
-                    }
-                    Err(e) => {
-                        tracing::error!("Error streaming bybit event: {:?}", e);
-                        None
-                    }
+    let stream = combined_stream.filter_map(
+        |event: Result<NormalizedEvent, ExchangeStreamError>| async move {
+            match event {
+                Ok(NormalizedEvent::Trade(trade)) => {
+                    Some(ClickhouseMessage::Cex(NormalizedEvent::Trade(trade)))
                 }
-            },
-        )
-        .chunks(batch_size);
-    pin_mut!(chunks);
-    while let Some(chunk) = chunks.next().await {
-        let res = evt_tx.send(chunk);
-        if res.is_err() {
-            tracing::error!("Failed to send chunk to channel");
+                Ok(NormalizedEvent::Quote(quote)) => {
+                    Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
+                }
+                Err(e) => {
+                    tracing::error!("Error streaming bybit event: {:?}", e);
+                    None
+                }
+            }
+        },
+    );
+    pin_mut!(stream);
+    while let Some(msg) = stream.next().await {
+        if evt_tx.send(msg).is_err() {
+            tracing::error!("Failed to send message to channel");
         }
     }
     Ok(())
 }
 
 async fn okx_stream_task(
-    evt_tx: mpsc::UnboundedSender<Vec<ClickhouseMessage>>,
+    evt_tx: mpsc::UnboundedSender<ClickhouseMessage>,
     symbols: Vec<String>,
-    batch_size: usize,
 ) -> eyre::Result<()> {
     let okx = OkxClient::builder().add_symbols(symbols).build()?;
     let combined_stream = okx.stream_events().await?;
-    let chunks = combined_stream
-        .filter_map(
-            |event: Result<NormalizedEvent, ExchangeStreamError>| async move {
-                match event {
-                    Ok(NormalizedEvent::Trade(trade)) => {
-                        Some(ClickhouseMessage::Cex(NormalizedEvent::Trade(trade)))
-                    }
-                    Ok(NormalizedEvent::Quote(quote)) => {
-                        Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
-                    }
-                    Err(e) => {
-                        tracing::error!("Error streaming okx event: {:?}", e);
-                        None
-                    }
+    let stream = combined_stream.filter_map(
+        |event: Result<NormalizedEvent, ExchangeStreamError>| async move {
+            match event {
+                Ok(NormalizedEvent::Trade(trade)) => {
+                    Some(ClickhouseMessage::Cex(NormalizedEvent::Trade(trade)))
                 }
-            },
-        )
-        .chunks(batch_size);
-    pin_mut!(chunks);
-    while let Some(chunk) = chunks.next().await {
-        let res = evt_tx.send(chunk);
-        if res.is_err() {
-            tracing::error!("Failed to send chunk to channel");
+                Ok(NormalizedEvent::Quote(quote)) => {
+                    Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
+                }
+                Err(e) => {
+                    tracing::error!("Error streaming okx event: {:?}", e);
+                    None
+                }
+            }
+        },
+    );
+    pin_mut!(stream);
+    while let Some(msg) = stream.next().await {
+        if evt_tx.send(msg).is_err() {
+            tracing::error!("Failed to send message to channel");
         }
     }
     Ok(())
 }
 
 async fn coinbase_stream_task(
-    evt_tx: mpsc::UnboundedSender<Vec<ClickhouseMessage>>,
+    evt_tx: mpsc::UnboundedSender<ClickhouseMessage>,
     symbols: Vec<String>,
-    batch_size: usize,
 ) -> eyre::Result<()> {
     let coinbase = CoinbaseClient::builder().add_symbols(symbols).build()?;
     let combined_stream = coinbase.stream_events().await?;
-    let chunks = combined_stream
-        .filter_map(
-            |event: Result<NormalizedEvent, ExchangeStreamError>| async move {
-                match event {
-                    Ok(NormalizedEvent::Trade(trade)) => {
-                        Some(ClickhouseMessage::Cex(NormalizedEvent::Trade(trade)))
-                    }
-                    Ok(NormalizedEvent::Quote(quote)) => {
-                        Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
-                    }
-                    Err(e) => {
-                        tracing::error!("Error streaming coinbase event: {:?}", e);
-                        None
-                    }
+    let stream = combined_stream.filter_map(
+        |event: Result<NormalizedEvent, ExchangeStreamError>| async move {
+            match event {
+                Ok(NormalizedEvent::Trade(trade)) => {
+                    Some(ClickhouseMessage::Cex(NormalizedEvent::Trade(trade)))
                 }
-            },
-        )
-        .chunks(batch_size);
-    pin_mut!(chunks);
-    while let Some(chunk) = chunks.next().await {
-        let res = evt_tx.send(chunk);
-        if res.is_err() {
-            tracing::error!("Failed to send chunk to channel");
+                Ok(NormalizedEvent::Quote(quote)) => {
+                    Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
+                }
+                Err(e) => {
+                    tracing::error!("Error streaming coinbase event: {:?}", e);
+                    None
+                }
+            }
+        },
+    );
+    pin_mut!(stream);
+    while let Some(msg) = stream.next().await {
+        if evt_tx.send(msg).is_err() {
+            tracing::error!("Failed to send message to channel");
         }
     }
     Ok(())
 }
 
 async fn kraken_stream_task(
-    evt_tx: mpsc::UnboundedSender<Vec<ClickhouseMessage>>,
+    evt_tx: mpsc::UnboundedSender<ClickhouseMessage>,
     symbols: Vec<String>,
-    batch_size: usize,
 ) -> eyre::Result<()> {
     let kraken = KrakenClient::builder().add_symbols(symbols).build()?;
     let combined_stream = kraken.stream_events().await?;
-    let chunks = combined_stream
-        .filter_map(
-            |event: Result<NormalizedEvent, ExchangeStreamError>| async move {
-                match event {
-                    Ok(NormalizedEvent::Trade(trade)) => {
-                        Some(ClickhouseMessage::Cex(NormalizedEvent::Trade(trade)))
-                    }
-                    Ok(NormalizedEvent::Quote(quote)) => {
-                        Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
-                    }
-                    Err(e) => {
-                        tracing::error!("Error streaming kraken event: {:?}", e);
-                        None
-                    }
+    let stream = combined_stream.filter_map(
+        |event: Result<NormalizedEvent, ExchangeStreamError>| async move {
+            match event {
+                Ok(NormalizedEvent::Trade(trade)) => {
+                    Some(ClickhouseMessage::Cex(NormalizedEvent::Trade(trade)))
                 }
-            },
-        )
-        .chunks(batch_size);
-    pin_mut!(chunks);
-    while let Some(chunk) = chunks.next().await {
-        let res = evt_tx.send(chunk);
-        if res.is_err() {
-            tracing::error!("Failed to send chunk to channel");
+                Ok(NormalizedEvent::Quote(quote)) => {
+                    Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
+                }
+                Err(e) => {
+                    tracing::error!("Error streaming kraken event: {:?}", e);
+                    None
+                }
+            }
+        },
+    );
+    pin_mut!(stream);
+    while let Some(msg) = stream.next().await {
+        if evt_tx.send(msg).is_err() {
+            tracing::error!("Failed to send message to channel");
         }
     }
     Ok(())
 }
 
 async fn kucoin_stream_task(
-    evt_tx: mpsc::UnboundedSender<Vec<ClickhouseMessage>>,
+    evt_tx: mpsc::UnboundedSender<ClickhouseMessage>,
     symbols: Vec<String>,
-    batch_size: usize,
 ) -> eyre::Result<()> {
     let kucoin = KucoinClient::builder().add_symbols(symbols).build().await?;
     let combined_stream = kucoin.stream_events().await?;
-    let chunks = combined_stream
-        .filter_map(
-            |event: Result<NormalizedEvent, ExchangeStreamError>| async move {
-                match event {
-                    Ok(NormalizedEvent::Trade(trade)) => {
-                        Some(ClickhouseMessage::Cex(NormalizedEvent::Trade(trade)))
-                    }
-                    Ok(NormalizedEvent::Quote(quote)) => {
-                        Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
-                    }
-                    Err(e) => {
-                        tracing::error!("Error parsing event: {:?}", e);
-                        None
-                    }
+    let stream = combined_stream.filter_map(
+        |event: Result<NormalizedEvent, ExchangeStreamError>| async move {
+            match event {
+                Ok(NormalizedEvent::Trade(trade)) => {
+                    Some(ClickhouseMessage::Cex(NormalizedEvent::Trade(trade)))
                 }
-            },
-        )
-        .chunks(batch_size);
-    pin_mut!(chunks);
-    while let Some(chunk) = chunks.next().await {
-        let res = evt_tx.send(chunk);
-        if res.is_err() {
-            tracing::error!("Failed to send chunk to channel");
+                Ok(NormalizedEvent::Quote(quote)) => {
+                    Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
+                }
+                Err(e) => {
+                    tracing::error!("Error parsing event: {:?}", e);
+                    None
+                }
+            }
+        },
+    );
+    pin_mut!(stream);
+    while let Some(msg) = stream.next().await {
+        if evt_tx.send(msg).is_err() {
+            tracing::error!("Failed to send message to channel");
         }
     }
     Ok(())
 }
 
 async fn clickhouse_writer_task(
-    rx: mpsc::UnboundedReceiver<Vec<ClickhouseMessage>>,
+    mut rx: mpsc::UnboundedReceiver<ClickhouseMessage>,
+    rate_limit: u64,
+    batch_size: usize,
 ) -> eyre::Result<()> {
     let cfg = ClickHouseConfig::from_env()?;
     let clickhouse_svc = ClickHouseService::new(cfg);
-    pin_mut!(rx);
-    while let Some(batch) = rx.recv().await {
-        clickhouse_svc.handle_msg(batch).await?;
+    let mut service = ServiceBuilder::new()
+        .rate_limit(rate_limit, Duration::from_secs(1))
+        .service(clickhouse_svc);
+    let mut buffer = Vec::with_capacity(batch_size);
+
+    while rx.recv_many(&mut buffer, batch_size).await > 0 {
+        service.ready().await?;
+        service.call(std::mem::take(&mut buffer)).await?;
+    }
+
+    if !buffer.is_empty() {
+        service.ready().await?;
+        service.call(buffer).await?;
     }
     Ok(())
 }

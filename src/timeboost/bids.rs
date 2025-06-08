@@ -140,9 +140,7 @@ pub async fn backfill_timeboost_bids() -> eyre::Result<()> {
     Ok(())
 }
 
-pub async fn fetch_bids_task(
-    msg_tx: mpsc::UnboundedSender<Vec<ClickhouseMessage>>,
-) -> eyre::Result<()> {
+pub async fn fetch_bids_task(msg_tx: mpsc::UnboundedSender<ClickhouseMessage>) -> eyre::Result<()> {
     let inner = HistoricalBidsService::new().await?;
     let mut svc = tower::ServiceBuilder::new()
         .layer(TimeoutLayer::new(Duration::from_secs(10)))
@@ -170,11 +168,11 @@ pub async fn fetch_bids_task(
 
         let last_bid = bids.last().unwrap().clone();
         let last_bid_db = clickhouse.get_latest_bid().await.ok();
-        if let Some(last_bid_db) = last_bid_db
-            && last_bid_db.round == last_bid.round
-        {
-            tracing::debug!(?last_bid_db.round, ?last_bid.round, "No new round found");
-            continue;
+        if let Some(last_bid_db) = last_bid_db {
+            if last_bid_db.round == last_bid.round {
+                tracing::debug!(?last_bid_db.round, ?last_bid.round, "No new round found");
+                continue;
+            }
         }
 
         let bids = bids
@@ -190,9 +188,11 @@ pub async fn fetch_bids_task(
             })
             .map(|bid| ClickhouseMessage::Expresslane(ExpresslaneMessage::Bid(bid)))
             .collect::<Vec<_>>();
-        msg_tx
-            .send(bids)
-            .map_err(|_| eyre::eyre!("failed to send bids to channel"))?;
+        for bid_msg in bids {
+            msg_tx
+                .send(bid_msg)
+                .map_err(|_| eyre::eyre!("failed to send bids to channel"))?;
+        }
     }
 }
 

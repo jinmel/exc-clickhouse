@@ -1,4 +1,7 @@
 use std::time::Duration;
+use std::task::{Context, Poll};
+use std::pin::Pin;
+use std::future::Future;
 
 use crate::models::NormalizedQuote;
 use crate::models::NormalizedTrade;
@@ -15,6 +18,7 @@ use eyre::WrapErr;
 use futures::pin_mut;
 use futures::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
+use tower::Service;
 
 #[derive(Debug, Clone)]
 pub struct ClickHouseConfig {
@@ -60,8 +64,8 @@ struct ClickhouseQuote {
     pub bid_amount: f64,
 }
 
-impl From<NormalizedQuote> for ClickhouseQuote {
-    fn from(quote: NormalizedQuote) -> Self {
+impl From<&NormalizedQuote> for ClickhouseQuote {
+    fn from(quote: &NormalizedQuote) -> Self {
         Self {
             exchange: quote.exchange.to_string(),
             symbol: quote.symbol.to_string(),
@@ -84,8 +88,8 @@ struct ClickhouseTrade {
     pub amount: f64,
 }
 
-impl From<NormalizedTrade> for ClickhouseTrade {
-    fn from(trade: NormalizedTrade) -> Self {
+impl From<&NormalizedTrade> for ClickhouseTrade {
+    fn from(trade: &NormalizedTrade) -> Self {
         Self {
             exchange: trade.exchange.to_string(),
             symbol: trade.symbol.to_string(),
@@ -186,31 +190,29 @@ impl ClickHouseService {
         Ok(inserter)
     }
 
-    pub async fn handle_msg(&self, batch: Vec<ClickhouseMessage>) -> eyre::Result<()> {
+    pub async fn handle_msg(&self, batch: &[ClickhouseMessage]) -> eyre::Result<()> {
         tracing::trace!("Writing {} messages to ClickHouse", batch.len());
-        let mut trade_inserter = self.get_inserter("cex.normalized_trades", 5000, 1, 0.1)?;
-        let mut quote_inserter = self.get_inserter("cex.normalized_quotes", 5000, 1, 0.1)?;
-        let mut block_inserter = self.get_inserter("ethereum.blocks", 100, 1, 0.1)?;
-        let mut bid_inserter = self.get_inserter("timeboost.bids", 100, 1, 0.1)?;
+        let mut trade_inserter: Inserter<ClickhouseTrade> = self.get_inserter("cex.normalized_trades", 5000, 1, 0.1)?;
+        let mut quote_inserter: Inserter<ClickhouseQuote> = self.get_inserter("cex.normalized_quotes", 5000, 1, 0.1)?;
+        let mut block_inserter: Inserter<BlockMetadata> = self.get_inserter("ethereum.blocks", 100, 1, 0.1)?;
+        let mut bid_inserter: Inserter<BidData> = self.get_inserter("timeboost.bids", 100, 1, 0.1)?;
 
         for msg in batch {
             match msg {
                 ClickhouseMessage::Cex(NormalizedEvent::Trade(trade)) => {
-                    let trade: ClickhouseTrade = trade.into();
-                    trade_inserter.write(&trade)?;
+                    trade_inserter.write(&trade.into())?;
                     trade_inserter.commit().await?;
                 }
                 ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)) => {
-                    let quote: ClickhouseQuote = quote.into();
-                    quote_inserter.write(&quote)?;
+                    quote_inserter.write(&quote.into())?;
                     quote_inserter.commit().await?;
                 }
                 ClickhouseMessage::Expresslane(ExpresslaneMessage::Bid(bid)) => {
-                    bid_inserter.write(&bid)?;
+                    bid_inserter.write(bid)?;
                     bid_inserter.commit().await?;
                 }
                 ClickhouseMessage::Ethereum(EthereumMetadataMessage::Block(block)) => {
-                    block_inserter.write(&block)?;
+                    block_inserter.write(block)?;
                     block_inserter.commit().await?;
                 }
             }
@@ -241,45 +243,49 @@ impl ClickHouseService {
         inserter.end().await?;
         Ok(())
     }
+}
 
-    #[allow(dead_code)]
-    pub async fn write_events(
-        &self,
-        event_stream: impl Stream<Item = Vec<NormalizedEvent>>,
-    ) -> eyre::Result<()> {
-        let mut trade_inserter = self
-            .client
-            .inserter("cex.normalized_trades")?
-            .with_max_rows(5000)
-            .with_period(Some(Duration::from_secs(1)))
-            .with_period_bias(0.1);
+// Tower Service implementation for ClickHouseService
+//
+// This implementation allows ClickHouseService to be used as a Tower service,
+// enabling composition with other Tower middleware like rate limiting, timeouts, etc.
+//
+// Example usage:
+// ```rust
+// use tower::{Service, ServiceBuilder};
+// use tower::limit::RateLimitLayer;
+// use tower::timeout::TimeoutLayer;
+// use std::time::Duration;
+//
+// let config = ClickHouseConfig::from_env()?;
+// let clickhouse_service = ClickHouseService::new(config);
+//
+// // Compose with Tower middleware
+// let mut service = ServiceBuilder::new()
+//     .layer(TimeoutLayer::new(Duration::from_secs(30)))
+//     .layer(RateLimitLayer::new(100, Duration::from_secs(1)))
+//     .service(clickhouse_service);
+//
+// // Use the service
+// let message = ClickhouseMessage::Cex(NormalizedEvent::Trade(trade));
+// service.ready().await?;
+// service.call(message).await?;
+// ```
+impl Service<Vec<ClickhouseMessage>> for ClickHouseService {
+    type Response = ();
+    type Error = eyre::Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + 'static>>;
 
-        let mut quote_inserter = self
-            .client
-            .inserter("cex.normalized_quotes")?
-            .with_max_rows(5000)
-            .with_period(Some(Duration::from_secs(1)))
-            .with_period_bias(0.1);
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        // ClickHouse service is always ready to accept requests
+        Poll::Ready(Ok(()))
+    }
 
-        pin_mut!(event_stream);
-        while let Some(events) = event_stream.next().await {
-            for event in events {
-                match event {
-                    NormalizedEvent::Trade(trade) => {
-                        let trade: ClickhouseTrade = trade.into();
-                        trade_inserter.write(&trade)?;
-                        trade_inserter.commit().await?;
-                    }
-                    NormalizedEvent::Quote(quote) => {
-                        let quote: ClickhouseQuote = quote.into();
-                        quote_inserter.write(&quote)?;
-                        quote_inserter.commit().await?;
-                    }
-                }
-            }
-        }
-        trade_inserter.end().await?;
-        quote_inserter.end().await?;
-        Ok(())
+    fn call(&mut self, req: Vec<ClickhouseMessage>) -> Self::Future {
+        let service = self.clone();
+        Box::pin(async move {
+            // Convert single message to batch and use existing handle_msg function
+            service.handle_msg(&req).await
+        })
     }
 }
