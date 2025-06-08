@@ -68,7 +68,7 @@ pub async fn fetch_blocks_task(
 ) -> eyre::Result<()> {
     let fetcher = BlockMetadataFetcher::new(rpc_url).await?;
     let block_stream = fetcher.create_block_metadata_stream().await;
-    let mut block_stream = block_stream.filter_map(|result| async move {
+    let block_stream = block_stream.filter_map(|result| async move {
         match result {
             Ok(block) => Some(ClickhouseMessage::Ethereum(EthereumMetadataMessage::Block(
                 block,

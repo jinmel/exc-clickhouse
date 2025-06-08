@@ -60,8 +60,8 @@ struct ClickhouseQuote {
     pub bid_amount: f64,
 }
 
-impl From<NormalizedQuote> for ClickhouseQuote {
-    fn from(quote: NormalizedQuote) -> Self {
+impl From<&NormalizedQuote> for ClickhouseQuote {
+    fn from(quote: &NormalizedQuote) -> Self {
         Self {
             exchange: quote.exchange.to_string(),
             symbol: quote.symbol.to_string(),
@@ -84,8 +84,8 @@ struct ClickhouseTrade {
     pub amount: f64,
 }
 
-impl From<NormalizedTrade> for ClickhouseTrade {
-    fn from(trade: NormalizedTrade) -> Self {
+impl From<&NormalizedTrade> for ClickhouseTrade {
+    fn from(trade: &NormalizedTrade) -> Self {
         Self {
             exchange: trade.exchange.to_string(),
             symbol: trade.symbol.to_string(),
@@ -186,7 +186,7 @@ impl ClickHouseService {
         Ok(inserter)
     }
 
-    pub async fn handle_msg(&self, batch: Vec<ClickhouseMessage>) -> eyre::Result<()> {
+    pub async fn handle_msg(&self, batch: &[ClickhouseMessage]) -> eyre::Result<()> {
         tracing::trace!("Writing {} messages to ClickHouse", batch.len());
         let mut trade_inserter = self.get_inserter("cex.normalized_trades", 5000, 1, 0.1)?;
         let mut quote_inserter = self.get_inserter("cex.normalized_quotes", 5000, 1, 0.1)?;
@@ -206,11 +206,11 @@ impl ClickHouseService {
                     quote_inserter.commit().await?;
                 }
                 ClickhouseMessage::Expresslane(ExpresslaneMessage::Bid(bid)) => {
-                    bid_inserter.write(&bid)?;
+                    bid_inserter.write(bid)?;
                     bid_inserter.commit().await?;
                 }
                 ClickhouseMessage::Ethereum(EthereumMetadataMessage::Block(block)) => {
-                    block_inserter.write(&block)?;
+                    block_inserter.write(block)?;
                     block_inserter.commit().await?;
                 }
             }
@@ -239,47 +239,6 @@ impl ClickHouseService {
         }
         inserter.commit().await?;
         inserter.end().await?;
-        Ok(())
-    }
-
-    #[allow(dead_code)]
-    pub async fn write_events(
-        &self,
-        event_stream: impl Stream<Item = Vec<NormalizedEvent>>,
-    ) -> eyre::Result<()> {
-        let mut trade_inserter = self
-            .client
-            .inserter("cex.normalized_trades")?
-            .with_max_rows(5000)
-            .with_period(Some(Duration::from_secs(1)))
-            .with_period_bias(0.1);
-
-        let mut quote_inserter = self
-            .client
-            .inserter("cex.normalized_quotes")?
-            .with_max_rows(5000)
-            .with_period(Some(Duration::from_secs(1)))
-            .with_period_bias(0.1);
-
-        pin_mut!(event_stream);
-        while let Some(events) = event_stream.next().await {
-            for event in events {
-                match event {
-                    NormalizedEvent::Trade(trade) => {
-                        let trade: ClickhouseTrade = trade.into();
-                        trade_inserter.write(&trade)?;
-                        trade_inserter.commit().await?;
-                    }
-                    NormalizedEvent::Quote(quote) => {
-                        let quote: ClickhouseQuote = quote.into();
-                        quote_inserter.write(&quote)?;
-                        quote_inserter.commit().await?;
-                    }
-                }
-            }
-        }
-        trade_inserter.end().await?;
-        quote_inserter.end().await?;
         Ok(())
     }
 }

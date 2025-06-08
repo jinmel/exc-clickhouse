@@ -741,13 +741,12 @@ async fn clickhouse_writer_task(
     while let Some(msg) = rx.recv().await {
         buffer.push(msg);
         if buffer.len() >= batch_size {
-            clickhouse_svc
-                .handle_msg(std::mem::take(&mut buffer))
-                .await?;
+            let batch = std::mem::take(&mut buffer);
+            clickhouse_svc.handle_msg(&batch).await?;
         }
     }
     if !buffer.is_empty() {
-        clickhouse_svc.handle_msg(buffer).await?;
+        clickhouse_svc.handle_msg(&buffer).await?;
     }
     Ok(())
 }
