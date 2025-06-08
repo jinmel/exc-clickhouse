@@ -101,11 +101,9 @@ where
                         msg = ws.next() => {
                             match msg {
                                 Some(Ok(Message::Text(text))) => {
-                                    tracing::trace!(?text, "Received message");
                                     let parsed = parser
                                         .parse(&text)
                                         .map_err(|e| ExchangeStreamError::MessageError(e.to_string()))?;
-                                    tracing::trace!(?parsed, "Parsed message");
                                     if let Some(parsed) = parsed {
                                         tx.send(Ok(parsed))
                                             .map_err(|e| ExchangeStreamError::StreamError(e.to_string()))?;
