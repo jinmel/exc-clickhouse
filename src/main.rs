@@ -579,7 +579,7 @@ async fn binance_stream_task(
                     }
                     Err(e) => {
                         // TODO: handle error
-                        tracing::error!("Error parsing event: {:?}", e);
+                        tracing::error!("Error streaming binance event: {:?}", e);
                         None
                     }
                 }
@@ -614,7 +614,7 @@ async fn bybit_stream_task(
                         Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
                     }
                     Err(e) => {
-                        tracing::error!("Error parsing event: {:?}", e);
+                        tracing::error!("Error streaming bybit event: {:?}", e);
                         None
                     }
                 }
@@ -649,7 +649,7 @@ async fn okx_stream_task(
                         Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
                     }
                     Err(e) => {
-                        tracing::error!("Error parsing event: {:?}", e);
+                        tracing::error!("Error streaming okx event: {:?}", e);
                         None
                     }
                 }
@@ -684,7 +684,7 @@ async fn coinbase_stream_task(
                         Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
                     }
                     Err(e) => {
-                        tracing::error!("Error parsing event: {:?}", e);
+                        tracing::error!("Error streaming coinbase event: {:?}", e);
                         None
                     }
                 }
@@ -719,7 +719,7 @@ async fn kraken_stream_task(
                         Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
                     }
                     Err(e) => {
-                        tracing::error!("Error parsing event: {:?}", e);
+                        tracing::error!("Error streaming kraken event: {:?}", e);
                         None
                     }
                 }

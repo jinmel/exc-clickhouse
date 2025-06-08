@@ -43,7 +43,9 @@ pub struct StreamSymbols {
 // Returns subscription message
 pub trait Subscription {
     fn to_json(&self) -> Result<Vec<serde_json::Value>, serde_json::Error>;
-    fn messages(&self) -> Result<Vec<tokio_tungstenite::tungstenite::Message>, serde_json::Error> {
+    fn to_messages(
+        &self,
+    ) -> Result<Vec<tokio_tungstenite::tungstenite::Message>, serde_json::Error> {
         let subscription_messages = self.to_json()?;
         Ok(subscription_messages
             .iter()

@@ -57,7 +57,7 @@ where
                 let connected_at = Instant::now();
 
                 let messages = subscription
-                    .messages()
+                    .to_messages()
                     .map_err(|e| ExchangeStreamError::Subscription(e.to_string()))?;
                 let mut msg_stream = futures::stream::iter(messages.into_iter().map(Ok));
                 ws.send_all(&mut msg_stream)
