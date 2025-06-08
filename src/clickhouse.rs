@@ -1,4 +1,7 @@
 use std::time::Duration;
+use std::task::{Context, Poll};
+use std::pin::Pin;
+use std::future::Future;
 
 use crate::models::NormalizedQuote;
 use crate::models::NormalizedTrade;
@@ -15,6 +18,7 @@ use eyre::WrapErr;
 use futures::pin_mut;
 use futures::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
+use tower::Service;
 
 #[derive(Debug, Clone)]
 pub struct ClickHouseConfig {
@@ -238,5 +242,50 @@ impl ClickHouseService {
         inserter.commit().await?;
         inserter.end().await?;
         Ok(())
+    }
+}
+
+// Tower Service implementation for ClickHouseService
+//
+// This implementation allows ClickHouseService to be used as a Tower service,
+// enabling composition with other Tower middleware like rate limiting, timeouts, etc.
+//
+// Example usage:
+// ```rust
+// use tower::{Service, ServiceBuilder};
+// use tower::limit::RateLimitLayer;
+// use tower::timeout::TimeoutLayer;
+// use std::time::Duration;
+//
+// let config = ClickHouseConfig::from_env()?;
+// let clickhouse_service = ClickHouseService::new(config);
+//
+// // Compose with Tower middleware
+// let mut service = ServiceBuilder::new()
+//     .layer(TimeoutLayer::new(Duration::from_secs(30)))
+//     .layer(RateLimitLayer::new(100, Duration::from_secs(1)))
+//     .service(clickhouse_service);
+//
+// // Use the service
+// let message = ClickhouseMessage::Cex(NormalizedEvent::Trade(trade));
+// service.ready().await?;
+// service.call(message).await?;
+// ```
+impl Service<Vec<ClickhouseMessage>> for ClickHouseService {
+    type Response = ();
+    type Error = eyre::Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + 'static>>;
+
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        // ClickHouse service is always ready to accept requests
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, req: Vec<ClickhouseMessage>) -> Self::Future {
+        let service = self.clone();
+        Box::pin(async move {
+            // Convert single message to batch and use existing handle_msg function
+            service.handle_msg(&req).await
+        })
     }
 }

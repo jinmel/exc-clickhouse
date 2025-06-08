@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::time::Duration;
 use tokio::sync::mpsc;
+use tower::{Service, ServiceBuilder, ServiceExt};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 use crate::{
@@ -141,6 +142,10 @@ struct StreamArgs {
     /// Maximum restart delay in seconds (for exponential backoff)
     #[arg(long, default_value_t = 300)]
     max_restart_delay_seconds: u64,
+
+    /// Rate limit for ClickHouse requests per second
+    #[arg(long, default_value_t = 5)]
+    clickhouse_rate_limit: u64,
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
@@ -443,11 +448,10 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
 
         if !args.skip_clickhouse {
             tracing::info!("Spawning clickhouse writer task");
-            let batch_size = args.batch_size;
             set.spawn(async move {
                 (
                     TaskType::ClickHouseInsert,
-                    clickhouse_writer_task(msg_rx, batch_size).await,
+                    clickhouse_writer_task(msg_rx, args.clickhouse_rate_limit, args.batch_size).await,
                 )
             });
         }
@@ -733,20 +737,24 @@ async fn kucoin_stream_task(
 
 async fn clickhouse_writer_task(
     mut rx: mpsc::UnboundedReceiver<ClickhouseMessage>,
+    rate_limit: u64,
     batch_size: usize,
 ) -> eyre::Result<()> {
     let cfg = ClickHouseConfig::from_env()?;
     let clickhouse_svc = ClickHouseService::new(cfg);
+    let mut service = ServiceBuilder::new()
+        .rate_limit(rate_limit, Duration::from_secs(1))
+        .service(clickhouse_svc);
     let mut buffer = Vec::with_capacity(batch_size);
-    while let Some(msg) = rx.recv().await {
-        buffer.push(msg);
-        if buffer.len() >= batch_size {
-            let batch = std::mem::take(&mut buffer);
-            clickhouse_svc.handle_msg(&batch).await?;
-        }
+
+    while rx.recv_many(&mut buffer, batch_size).await > 0 {
+        service.ready().await?;
+        service.call(std::mem::take(&mut buffer)).await?;
     }
+
     if !buffer.is_empty() {
-        clickhouse_svc.handle_msg(&buffer).await?;
+        service.ready().await?;
+        service.call(buffer).await?;
     }
     Ok(())
 }
