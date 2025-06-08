@@ -63,15 +63,9 @@ impl KucoinClientBuilder {
         self
     }
 
-    pub fn with_rest_endpoint(mut self, ep: impl Into<String>) -> Self {
-        self.rest_endpoint = ep.into();
-        self
-    }
-
     pub async fn build(self) -> eyre::Result<KucoinClient> {
         #[derive(serde::Deserialize)]
         struct BulletResp {
-            code: String,
             data: BulletData,
         }
         #[derive(serde::Deserialize)]
@@ -85,8 +79,6 @@ impl KucoinClientBuilder {
             endpoint: String,
             #[serde(rename = "pingInterval")]
             ping_interval: u64,
-            #[serde(rename = "pingTimeout")]
-            ping_timeout: u64,
         }
 
         let client = reqwest::Client::new();

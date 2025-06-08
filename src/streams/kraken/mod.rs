@@ -8,7 +8,6 @@ use crate::{
         exchange_stream::ExchangeStream, subscription::KrakenSubscription,
     },
 };
-use tokio::time::Duration;
 
 /// Default WebSocket URL for Kraken v2
 pub const DEFAULT_KRAKEN_WS_URL: &str = "wss://ws.kraken.com/v2";
