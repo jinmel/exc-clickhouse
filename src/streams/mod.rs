@@ -61,8 +61,6 @@ pub trait Subscription {
 pub enum ExchangeStreamError {
     #[error("Stream error: {0}")]
     StreamError(String),
-    #[error("Stream not connected: {0}")]
-    StreamNotConnected(String),
     #[error("Message error: {0}")]
     MessageError(String),
     #[error("Connection error: {0}")]

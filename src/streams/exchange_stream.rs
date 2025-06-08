@@ -39,16 +39,6 @@ where
         }
     }
 
-    pub fn with_timeout(mut self, timeout: Duration) -> Self {
-        self.timeout = Some(timeout);
-        self
-    }
-
-    pub fn with_url(mut self, url: &str) -> Self {
-        self.url = url.to_owned();
-        self
-    }
-
     pub fn build(
         self,
     ) -> Pin<Box<dyn Stream<Item = Result<T, ExchangeStreamError>> + Send + 'static>> {
