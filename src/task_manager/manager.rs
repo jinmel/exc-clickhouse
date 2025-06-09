@@ -1,20 +1,20 @@
-use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
+use std::sync::atomic::AtomicU64;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tokio::task::JoinSet;
 use tokio::sync::watch;
+use tokio::task::JoinSet;
 use tracing::{Instrument, field};
 
-use crate::task_manager::types::{
-    TaskId, TaskState, TaskResult, TaskCompletion, PendingRestart, TaskManagerStats
-};
-use crate::task_manager::config::{TaskManagerConfig, ShutdownStatus};
-use crate::task_manager::types::ShutdownPhase;
-use crate::task_manager::handle::TaskHandle;
-use crate::task_manager::registry::TaskRegistry;
 use crate::task_manager::circuit_breaker::CircuitBreaker;
+use crate::task_manager::config::{ShutdownStatus, TaskManagerConfig};
+use crate::task_manager::handle::TaskHandle;
 use crate::task_manager::logging::{CorrelationId, TaskLoggingContext};
+use crate::task_manager::registry::TaskRegistry;
 use crate::task_manager::restart::RestartUtils;
+use crate::task_manager::types::ShutdownPhase;
+use crate::task_manager::types::{
+    PendingRestart, TaskCompletion, TaskId, TaskManagerStats, TaskResult, TaskState,
+};
 
 /// Main task manager with JoinSet-based task tracking
 #[derive(Debug)]
@@ -49,12 +49,12 @@ impl<T: Send + 'static> TaskManager<T> {
     /// Create a new TaskManager with custom configuration
     pub fn with_config(config: TaskManagerConfig) -> Self {
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
-        
+
         let circuit_breaker = CircuitBreaker::new(
             config.default_restart_policy.circuit_breaker_threshold,
             config.default_restart_policy.circuit_breaker_timeout,
         );
-        
+
         Self {
             join_set: JoinSet::new(),
             registry: TaskRegistry::new(),
@@ -77,7 +77,9 @@ impl<T: Send + 'static> TaskManager<T> {
         // Check if shutdown is in progress and new tasks should be rejected
         {
             let shutdown_status = self.shutdown_status.lock();
-            if shutdown_status.phase != ShutdownPhase::Running && self.config.shutdown_config.reject_new_tasks {
+            if shutdown_status.phase != ShutdownPhase::Running
+                && self.config.shutdown_config.reject_new_tasks
+            {
                 tracing::warn!(
                     name = %name,
                     shutdown_phase = %shutdown_status.phase,
@@ -87,7 +89,7 @@ impl<T: Send + 'static> TaskManager<T> {
                 return TaskId::new();
             }
         }
-        
+
         // Check capacity limits
         if self.is_at_capacity() {
             tracing::warn!(
@@ -99,20 +101,17 @@ impl<T: Send + 'static> TaskManager<T> {
             // Return a dummy task ID for now - in production this should return a Result
             return TaskId::new();
         }
-        
+
         let task_id = TaskId::new();
         let task_id_for_async = task_id.clone();
         let task_name_for_async = name.clone();
         let task_name_for_completion = name.clone();
-        
+
         // Create logging context and span for the task
         let correlation_id = CorrelationId::from_task_id(&task_id);
-        let _logging_context = TaskLoggingContext::new(
-            task_id.clone(),
-            name.clone(),
-            "task_execution".to_string()
-        );
-        
+        let _logging_context =
+            TaskLoggingContext::new(task_id.clone(), name.clone(), "task_execution".to_string());
+
         // Spawn the task with structured logging and instrumentation
         let _abort_handle = self.join_set.spawn(async move {
             let span = tracing::info_span!(
@@ -125,19 +124,19 @@ impl<T: Send + 'static> TaskManager<T> {
                 duration_ms = field::Empty,
                 error_type = field::Empty,
             );
-            
+
             let span_for_recording = span.clone();
-            
+
             async move {
                 tracing::info!("Starting task execution");
-                
+
                 let start_time = std::time::Instant::now();
                 let result = task_fn().await;
                 let duration = start_time.elapsed();
-                
+
                 // Record span fields based on result
                 span_for_recording.record("duration_ms", duration.as_millis());
-                
+
                 match &result {
                     Ok(_) => {
                         span_for_recording.record("result", "success");
@@ -148,7 +147,8 @@ impl<T: Send + 'static> TaskManager<T> {
                     }
                     Err(e) => {
                         span_for_recording.record("result", "error");
-                        span_for_recording.record("error_type", std::any::type_name_of_val(e.as_ref()));
+                        span_for_recording
+                            .record("error_type", std::any::type_name_of_val(e.as_ref()));
                         tracing::error!(
                             duration_ms = duration.as_millis(),
                             error = %e,
@@ -157,22 +157,24 @@ impl<T: Send + 'static> TaskManager<T> {
                         );
                     }
                 }
-                
+
                 TaskCompletion {
                     task_id: task_id_for_async,
                     task_name: task_name_for_completion,
                     result,
                     duration,
                 }
-            }.instrument(span).await
+            }
+            .instrument(span)
+            .await
         });
 
         // Create TaskHandle for tracking (JoinSet manages the actual execution)
         let handle = TaskHandle::new_managed(task_id.clone(), name.clone());
-        
+
         // Set task to running state since it's being spawned
         handle.set_state(TaskState::Running);
-        
+
         // Register the task
         if let Err(e) = self.registry.register(handle) {
             tracing::warn!(
@@ -226,8 +228,8 @@ impl<T: Send + 'static> TaskManager<T> {
 
     /// Get the number of active tasks (excludes completed/failed/cancelled tasks)
     pub fn active_task_count(&self) -> usize {
-        self.registry.tasks_by_state(TaskState::Running).len() +
-        self.registry.tasks_by_state(TaskState::Pending).len()
+        self.registry.tasks_by_state(TaskState::Running).len()
+            + self.registry.tasks_by_state(TaskState::Pending).len()
     }
 
     /// Check if the task manager is at capacity
@@ -241,13 +243,13 @@ impl<T: Send + 'static> TaskManager<T> {
             // For JoinSet-managed tasks, we abort all tasks and let the JoinSet handle cleanup
             // Individual task cancellation in JoinSet requires tracking abort handles separately
             handle.set_state(TaskState::Cancelled);
-            
+
             tracing::info!(
                 task_id = %task_id,
                 task_name = %handle.name,
                 "Task marked as cancelled (JoinSet will handle cleanup)"
             );
-            
+
             Ok(())
         } else {
             Err(format!("Task with ID {} not found", task_id))
@@ -258,7 +260,7 @@ impl<T: Send + 'static> TaskManager<T> {
     pub async fn cancel_all_tasks(&mut self) {
         let task_ids: Vec<TaskId> = self.registry.task_ids();
         let initial_count = task_ids.len();
-        
+
         for task_id in task_ids {
             if let Err(e) = self.cancel_task(&task_id).await {
                 tracing::warn!(
@@ -268,16 +270,16 @@ impl<T: Send + 'static> TaskManager<T> {
                 );
             }
         }
-        
+
         // Abort all remaining tasks in JoinSet
         self.join_set.abort_all();
-        
+
         // Update shutdown status if we're shutting down
         if self.is_shutting_down() {
             let mut status = self.shutdown_status.lock();
             status.tasks_cancelled += initial_count;
         }
-        
+
         tracing::info!(cancelled_tasks = initial_count, "All tasks cancelled");
     }
 
@@ -318,7 +320,7 @@ impl<T: Send + 'static> TaskManager<T> {
                     None
                 }
             }
-            
+
             // Check for shutdown signal
             _ = self.shutdown_rx.changed() => {
                 if *self.shutdown_rx.borrow() {
@@ -335,19 +337,19 @@ impl<T: Send + 'static> TaskManager<T> {
     /// Run the task manager event loop
     pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         tracing::info!("Task manager started");
-        
+
         loop {
             if let Some(completion) = self.wait_for_next_completion().await {
                 let task_id = completion.task_id;
                 let task_name = completion.task_name.clone();
-                
+
                 // Handle task completion
                 if let Some(handle) = self.registry.get(&task_id) {
                     match completion.result {
                         Ok(_) => {
                             handle.set_state(TaskState::Completed);
                             self.circuit_breaker.record_success();
-                            
+
                             tracing::info!(
                                 task_id = %task_id,
                                 task_name = %task_name,
@@ -358,7 +360,7 @@ impl<T: Send + 'static> TaskManager<T> {
                         Err(e) => {
                             handle.record_failure(&*e);
                             self.circuit_breaker.record_failure();
-                            
+
                             tracing::error!(
                                 task_id = %task_id,
                                 task_name = %task_name,
@@ -366,7 +368,7 @@ impl<T: Send + 'static> TaskManager<T> {
                                 error = %e,
                                 "Task failed"
                             );
-                            
+
                             // Check if task should be restarted using new comprehensive logic
                             if RestartUtils::should_restart_task(
                                 &*e,
@@ -379,12 +381,14 @@ impl<T: Send + 'static> TaskManager<T> {
                                     handle.restart_count(),
                                     &self.config.default_restart_policy,
                                 );
-                                
+
                                 let _restart_time = SystemTime::now()
                                     .duration_since(UNIX_EPOCH)
                                     .unwrap_or_default()
-                                    .as_millis() as u64 + restart_delay.as_millis() as u64;
-                                
+                                    .as_millis()
+                                    as u64
+                                    + restart_delay.as_millis() as u64;
+
                                 tracing::info!(
                                     task_id = %task_id,
                                     task_name = %task_name,
@@ -392,7 +396,7 @@ impl<T: Send + 'static> TaskManager<T> {
                                     delay_ms = restart_delay.as_millis(),
                                     "Scheduling task restart with exponential backoff"
                                 );
-                                
+
                                 // Note: For now, we'll just log the restart scheduling
                                 // In a full implementation, we'd store the task function for restart
                                 // This requires more complex task function storage which would be
@@ -409,7 +413,7 @@ impl<T: Send + 'static> TaskManager<T> {
                         }
                     }
                 }
-                
+
                 // Clean up completed task from registry
                 self.registry.remove(&task_id);
             } else {
@@ -417,7 +421,7 @@ impl<T: Send + 'static> TaskManager<T> {
                 break;
             }
         }
-        
+
         tracing::info!("Task manager stopped");
         Ok(())
     }
@@ -425,7 +429,7 @@ impl<T: Send + 'static> TaskManager<T> {
     /// Initiate graceful shutdown of the task manager with enhanced phase tracking
     pub async fn shutdown(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         tracing::info!("Initiating enhanced graceful shutdown");
-        
+
         // Initialize shutdown status
         let initial_task_count = self.active_task_count();
         {
@@ -439,17 +443,17 @@ impl<T: Send + 'static> TaskManager<T> {
             status.initial_task_count = initial_task_count;
             status.tasks_remaining = initial_task_count;
         }
-        
+
         tracing::info!(
             initial_task_count = initial_task_count,
             "Phase 1: Stop accepting new tasks"
         );
-        
+
         // Send shutdown signal
         if let Err(e) = self.shutdown_tx.send(true) {
             tracing::warn!(error = %e, "Failed to send shutdown signal");
         }
-        
+
         // Cancel pending restarts if configured
         if self.config.shutdown_config.cancel_pending_restarts {
             let cancelled_restarts = {
@@ -465,16 +469,17 @@ impl<T: Send + 'static> TaskManager<T> {
                 );
             }
         }
-        
+
         // Phase 2: Wait for running tasks to complete gracefully
-        self.transition_shutdown_phase(ShutdownPhase::WaitingForTasks).await;
-        
+        self.transition_shutdown_phase(ShutdownPhase::WaitingForTasks)
+            .await;
+
         let graceful_timeout = self.config.shutdown_config.graceful_timeout;
         tracing::info!(
             timeout_secs = graceful_timeout.as_secs(),
             "Phase 2: Waiting for tasks to complete gracefully"
         );
-        
+
         let graceful_result = tokio::select! {
             _ = self.wait_for_all_tasks_completion() => {
                 tracing::info!("All tasks completed gracefully");
@@ -490,21 +495,22 @@ impl<T: Send + 'static> TaskManager<T> {
                 false
             }
         };
-        
+
         // Phase 3: Force termination if needed
         if !graceful_result && self.active_task_count() > 0 {
-            self.transition_shutdown_phase(ShutdownPhase::ForceTerminating).await;
-            
+            self.transition_shutdown_phase(ShutdownPhase::ForceTerminating)
+                .await;
+
             let force_timeout = self.config.shutdown_config.force_timeout;
             tracing::warn!(
                 remaining_tasks = self.active_task_count(),
                 timeout_secs = force_timeout.as_secs(),
                 "Phase 3: Force terminating remaining tasks"
             );
-            
+
             // Cancel all remaining tasks
             self.cancel_all_tasks().await;
-            
+
             // Wait for force termination to complete or timeout
             tokio::select! {
                 _ = self.wait_for_all_tasks_completion() => {
@@ -518,17 +524,18 @@ impl<T: Send + 'static> TaskManager<T> {
                 }
             }
         }
-        
+
         // Phase 4: Shutdown complete
-        self.transition_shutdown_phase(ShutdownPhase::Complete).await;
-        
+        self.transition_shutdown_phase(ShutdownPhase::Complete)
+            .await;
+
         let final_status = {
             let mut status = self.shutdown_status.lock();
             status.completed_gracefully = graceful_result;
             status.tasks_remaining = self.active_task_count();
             status.clone()
         };
-        
+
         tracing::info!(
             shutdown_duration_ms = final_status.shutdown_elapsed().as_millis(),
             completed_gracefully = final_status.completed_gracefully,
@@ -536,23 +543,23 @@ impl<T: Send + 'static> TaskManager<T> {
             remaining_tasks = final_status.tasks_remaining,
             "Shutdown complete"
         );
-        
+
         Ok(())
     }
-    
+
     /// Transition to a new shutdown phase with status updates
     async fn transition_shutdown_phase(&mut self, new_phase: ShutdownPhase) {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_millis() as u64;
-            
+
         let mut status = self.shutdown_status.lock();
         let old_phase = status.phase.clone();
         status.phase = new_phase.clone();
         status.phase_started_at = now;
         status.tasks_remaining = self.active_task_count();
-        
+
         tracing::debug!(
             old_phase = %old_phase,
             new_phase = %new_phase,
@@ -579,17 +586,17 @@ impl<T: Send + 'static> TaskManager<T> {
     pub fn is_shutting_down(&self) -> bool {
         *self.shutdown_rx.borrow()
     }
-    
+
     /// Get current shutdown status with detailed information
     pub fn get_shutdown_status(&self) -> ShutdownStatus {
         self.shutdown_status.lock().clone()
     }
-    
+
     /// Get current shutdown phase
     pub fn get_shutdown_phase(&self) -> ShutdownPhase {
         self.shutdown_status.lock().phase.clone()
     }
-    
+
     /// Check if shutdown is complete
     pub fn is_shutdown_complete(&self) -> bool {
         self.shutdown_status.lock().phase == ShutdownPhase::Complete
@@ -623,8 +630,13 @@ impl<T: Send + 'static> TaskManager<T> {
     }
 
     /// Get circuit breaker status
-    pub fn get_circuit_breaker_status(&self) -> (crate::task_manager::types::CircuitBreakerState, u32) {
-        (self.circuit_breaker.state(), self.circuit_breaker.failure_count())
+    pub fn get_circuit_breaker_status(
+        &self,
+    ) -> (crate::task_manager::types::CircuitBreakerState, u32) {
+        (
+            self.circuit_breaker.state(),
+            self.circuit_breaker.failure_count(),
+        )
     }
 
     /// Get restart policy configuration
@@ -641,7 +653,7 @@ impl<T: Send + 'static> TaskManager<T> {
                 policy.circuit_breaker_timeout,
             );
         }
-        
+
         self.config.default_restart_policy = policy;
         tracing::info!("Restart policy updated");
     }
@@ -660,4 +672,4 @@ where
     fn default() -> Self {
         Self::new()
     }
-} 
+}

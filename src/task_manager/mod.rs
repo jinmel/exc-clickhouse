@@ -1,43 +1,49 @@
-// Task Manager Module - A comprehensive async task management system
-//
-// This module provides a robust task management system with the following features:
-// - JoinSet-based concurrent task execution
-// - Comprehensive error handling and restart policies
-// - Circuit breaker pattern for failure isolation
-// - Structured logging with correlation IDs
-// - Graceful shutdown with multiple phases
-// - Task state tracking and metrics collection
-// - Registry-based task lookup and management
+//! Task Manager Module
+//!
+//! A comprehensive task management system with advanced features including:
+//! - Task lifecycle management with spawn, monitor, and cancellation
+//! - Configurable restart policies with exponential backoff
+//! - Circuit breaker pattern for fault tolerance
+//! - Structured logging with correlation IDs
+//! - Performance metrics and telemetry
+//! - Graceful shutdown with multiple phases
+//! - Thread-safe task registry and state management
 
-pub mod types;
-pub mod logging;
-pub mod metrics;
-pub mod config;
-pub mod circuit_breaker;
-pub mod restart;
-pub mod handle;
-pub mod registry;
-pub mod manager;
+// Suppress warnings for this comprehensive module since it's designed to be reusable
+// and not all features may be used in every application
+#![allow(unused_imports)]
+#![allow(dead_code)]
+#![allow(unused_variables)]
+#![allow(unused_mut)]
 
-// Re-export commonly used types for convenience
+// Module declarations
+mod circuit_breaker;
+mod config;
+mod handle;
+mod logging;
+mod manager;
+mod metrics;
+mod registry;
+mod restart;
+mod types;
+
+// Re-export public API
+pub use circuit_breaker::CircuitBreaker;
+pub use config::{ShutdownConfig, ShutdownStatus, TaskManagerConfig};
+pub use handle::{TaskError, TaskHandle};
+pub use logging::{CorrelationId, TaskLoggingContext};
+pub use manager::TaskManager;
+pub use metrics::TaskMetrics;
+pub use registry::TaskRegistry;
+pub use restart::{RestartPolicy, RestartUtils};
 pub use types::{
-    TaskId, TaskState, TaskResult, TaskCompletion, PendingRestart,
-    FailureType, CircuitBreakerState, ShutdownPhase, TaskManagerStats,
-    TaskFn, AsyncTaskFn
+    AsyncTaskFn, CircuitBreakerState, FailureType, PendingRestart, ShutdownPhase, TaskCompletion,
+    TaskFn, TaskId, TaskManagerStats, TaskResult, TaskState,
 };
 
-pub use logging::{CorrelationId, TaskLoggingContext};
-pub use metrics::TaskMetrics;
-pub use config::{TaskManagerConfig, ShutdownConfig, ShutdownStatus};
-pub use circuit_breaker::CircuitBreaker;
-pub use restart::{RestartPolicy, RestartUtils};
-pub use handle::{TaskHandle, TaskError};
-pub use registry::TaskRegistry;
-pub use manager::TaskManager;
-
-// Convenience type aliases
+// Convenience type aliases for common use cases
 pub type DefaultTaskManager = TaskManager<()>;
 pub type StringTaskManager = TaskManager<String>;
 
 #[cfg(test)]
-mod tests; 
+mod tests;

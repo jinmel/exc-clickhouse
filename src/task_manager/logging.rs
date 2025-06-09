@@ -1,7 +1,7 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-use uuid::Uuid;
-use tracing::{Span, field};
 use crate::task_manager::types::TaskId;
+use std::time::{SystemTime, UNIX_EPOCH};
+use tracing::{Span, field};
+use uuid::Uuid;
 
 /// Correlation ID for tracking operations across task boundaries
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -11,7 +11,7 @@ impl CorrelationId {
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
-    
+
     pub fn from_task_id(task_id: &TaskId) -> Self {
         // Create a deterministic correlation ID based on the task ID
         // Use the task ID's UUID directly
@@ -48,7 +48,7 @@ impl TaskLoggingContext {
                 .as_millis() as u64,
         }
     }
-    
+
     pub fn elapsed_ms(&self) -> u64 {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -56,7 +56,7 @@ impl TaskLoggingContext {
             .as_millis() as u64;
         now.saturating_sub(self.start_time)
     }
-    
+
     pub fn create_span(&self) -> Span {
         tracing::info_span!(
             "task_operation",
@@ -69,4 +69,4 @@ impl TaskLoggingContext {
             result = field::Empty,
         )
     }
-} 
+}

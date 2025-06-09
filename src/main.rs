@@ -1,11 +1,8 @@
 use crate::symbols::{SymbolsConfig, SymbolsConfigEntry, fetch_binance_top_spot_pairs};
-use clap::{Args, Parser, Subcommand};
+use clap::Parser;
 use dotenv::dotenv;
 use eyre::WrapErr;
-use futures::pin_mut;
-use futures::stream::StreamExt;
-use std::collections::HashMap;
-use std::fs::File;
+use futures::{StreamExt, pin_mut};
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tower::{Service, ServiceBuilder, ServiceExt};
@@ -13,115 +10,23 @@ use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 use crate::{
     clickhouse::{ClickHouseConfig, ClickHouseService},
+    config::{AppConfig, Cli, Commands, DbCommands, StreamArgs},
     models::{ClickhouseMessage, NormalizedEvent},
     streams::{
-        ExchangeStreamError, WebsocketStream, binance::BinanceClient, bybit::BybitClient,
+        ExchangeClient, WebsocketStream, binance::BinanceClient, bybit::BybitClient,
         coinbase::CoinbaseClient, kraken::KrakenClient, kucoin::KucoinClient, okx::OkxClient,
     },
 };
 
 mod clickhouse;
+mod config;
 mod ethereum;
 mod models;
 mod streams;
 mod symbols;
+mod task_manager;
 mod timeboost;
 mod tower_utils;
-
-#[derive(Parser)]
-#[command(name = "exc-clickhouse")]
-#[command(about = "Exchange data collector to ClickHouse database")]
-#[command(version)]
-struct Cli {
-    #[command(subcommand)]
-    command: Commands,
-
-    /// Log level (trace, debug, info, warn, error)
-    #[arg(short, long, default_value = "info")]
-    log_level: String,
-}
-
-#[derive(Subcommand)]
-enum Commands {
-    /// One-time database tasks
-    Db(DbCmd),
-
-    /// Run streaming tasks
-    Stream(StreamArgs),
-}
-
-#[derive(Subcommand, Clone)]
-enum DbCommands {
-    /// Backfill timeboost bids
-    Timeboost,
-    /// Fetch Binance SPOT symbols from exchangeInfo
-    FetchBinanceSymbols(FetchBinanceSymbolsArgs),
-}
-
-#[derive(Args, Clone)]
-struct DbCmd {
-    #[command(subcommand)]
-    command: DbCommands,
-}
-
-#[derive(Args, Clone)]
-struct FetchBinanceSymbolsArgs {
-    /// Output YAML file path
-    #[arg(short, long)]
-    output: String,
-    /// Also insert trading pairs into ClickHouse
-    #[arg(long)]
-    update_clickhouse: bool,
-
-    #[arg(long)]
-    limit: usize,
-}
-
-#[derive(Args, Clone)]
-struct StreamArgs {
-    /// Path to symbols file
-    #[arg(short, long, default_value = "symbols.yaml")]
-    symbols_file: String,
-
-    /// Batch size for processing events
-    #[arg(short, long, default_value_t = 500)]
-    batch_size: usize,
-    /// Skip Ethereum block metadata
-    #[arg(long)]
-    skip_ethereum: bool,
-
-    /// Skip ClickHouse writer
-    #[arg(long)]
-    skip_clickhouse: bool,
-
-    /// Skip Timeboost bids
-    #[arg(long)]
-    skip_timeboost: bool,
-
-    /// RPC URL for Ethereum (overrides environment variable)
-    #[arg(long)]
-    rpc_url: Option<String>,
-
-    /// Enable automatic restart of failed tasks
-    #[arg(long)]
-    enable_restart: bool,
-
-    /// Maximum number of restart attempts per task (0 = unlimited)
-    #[arg(long, default_value_t = 0)]
-    max_restart_attempts: u32,
-
-    /// Initial restart delay in seconds
-    #[arg(long, default_value_t = 1)]
-    restart_delay_seconds: u64,
-
-    /// Maximum restart delay in seconds (for exponential backoff)
-    #[arg(long, default_value_t = 300)]
-    max_restart_delay_seconds: u64,
-
-    /// Rate limit for ClickHouse requests per second
-    #[arg(long, default_value_t = 5)]
-    clickhouse_rate_limit: u64,
-}
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
 enum TaskType {
@@ -150,61 +55,6 @@ impl std::fmt::Display for TaskType {
             TaskType::OkxStream => write!(f, "OKX"),
         }
     }
-}
-
-struct TaskSupervisor {
-    restart_attempts: HashMap<TaskType, u32>,
-    max_attempts: u32,
-    initial_delay: Duration,
-    max_delay: Duration,
-}
-
-impl TaskSupervisor {
-    fn new(max_attempts: u32, initial_delay_secs: u64, max_delay_secs: u64) -> Self {
-        Self {
-            restart_attempts: HashMap::new(),
-            max_attempts,
-            initial_delay: Duration::from_secs(initial_delay_secs),
-            max_delay: Duration::from_secs(max_delay_secs),
-        }
-    }
-
-    fn should_restart(&mut self, task_type: &TaskType) -> bool {
-        if self.max_attempts == 0 {
-            return true; // Unlimited restarts
-        }
-
-        let attempts = self.restart_attempts.entry(task_type.clone()).or_insert(0);
-        *attempts < self.max_attempts
-    }
-
-    async fn wait_before_restart(&mut self, task_type: &TaskType) {
-        let attempts = self.restart_attempts.entry(task_type.clone()).or_insert(0);
-        *attempts += 1;
-
-        // Exponential backoff: delay = min(initial_delay * 2^(attempts-1), max_delay)
-        let delay = std::cmp::min(
-            self.initial_delay * 2_u32.pow(attempts.saturating_sub(1)),
-            self.max_delay,
-        );
-
-        tracing::info!(
-            "Waiting {:?} before restarting {} task (attempt {})",
-            delay,
-            task_type,
-            attempts
-        );
-        tokio::time::sleep(delay).await;
-    }
-
-    fn reset_attempts(&mut self, task_type: &TaskType) {
-        self.restart_attempts.remove(task_type);
-    }
-}
-
-fn read_symbols(filename: &str) -> eyre::Result<SymbolsConfig> {
-    let file = File::open(filename).wrap_err("Failed to open symbols YAML file")?;
-    SymbolsConfig::from_yaml(file)
 }
 
 #[tokio::main]
@@ -263,8 +113,10 @@ async fn main() -> eyre::Result<()> {
 }
 
 async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
-    // Load symbols configuration once
-    let symbols_cfg = read_symbols(&args.symbols_file)?;
+    // Create app configuration from stream args
+    let app_config = AppConfig::from_stream_args(&args, "info")?;
+
+    let symbols_cfg = crate::config::read_symbols(&args.symbols_file)?;
 
     let binance_symbols: Vec<String> = symbols_cfg
         .entries
@@ -308,222 +160,164 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         .flat_map(|e| e.symbols.iter().cloned())
         .collect();
 
-    // Initialize task supervisor if restart is enabled
-    let mut supervisor = if args.enable_restart {
-        Some(TaskSupervisor::new(
-            args.max_restart_attempts,
-            args.restart_delay_seconds,
-            args.max_restart_delay_seconds,
-        ))
-    } else {
-        None
-    };
+    // Check if any data producer tasks will be enabled
+    let has_producers = app_config.has_exchange_symbols()
+        || app_config.ethereum_config.enabled
+        || app_config.timeboost_config.enabled;
 
-    let no_exchange = binance_symbols.is_empty()
-        && bybit_symbols.is_empty()
-        && okx_symbols.is_empty()
-        && coinbase_symbols.is_empty()
-        && kraken_symbols.is_empty()
-        && kucoin_symbols.is_empty();
-
-    if no_exchange && args.skip_ethereum && args.skip_clickhouse && args.skip_timeboost {
+    if !has_producers {
         tracing::warn!("No tasks were enabled. Use --help to see available options.");
         return Ok(());
     }
 
-    loop {
-        // Create new channel for each restart cycle
-        let (msg_tx, msg_rx) = mpsc::unbounded_channel::<ClickhouseMessage>();
-        let mut set = tokio::task::JoinSet::new();
+    // Create channel for task communication
+    let (msg_tx, msg_rx) = mpsc::unbounded_channel::<ClickhouseMessage>();
+    let mut set = tokio::task::JoinSet::new();
 
-        // Spawn tasks
-        if !binance_symbols.is_empty() {
-            let symbols = binance_symbols.clone();
-            let tx = msg_tx.clone();
+    // Spawn tasks
+    if !binance_symbols.is_empty() {
+        let symbols = binance_symbols.clone();
+        let tx = msg_tx.clone();
 
-            tracing::info!("Spawning binance stream for symbols: {:?}", symbols);
-            set.spawn(async move {
-                (
-                    TaskType::BinanceStream,
-                    binance_stream_task(tx, symbols).await,
-                )
-            });
-        }
+        tracing::info!("Spawning binance stream for symbols: {:?}", symbols);
+        set.spawn(async move {
+            (
+                TaskType::BinanceStream,
+                binance_stream_task(tx, symbols).await,
+            )
+        });
+    }
 
-        if !bybit_symbols.is_empty() {
-            let symbols = bybit_symbols.clone();
-            let tx = msg_tx.clone();
+    if !bybit_symbols.is_empty() {
+        let symbols = bybit_symbols.clone();
+        let tx = msg_tx.clone();
 
-            tracing::info!("Spawning bybit stream for symbols: {:?}", symbols);
-            set.spawn(async move { (TaskType::BybitStream, bybit_stream_task(tx, symbols).await) });
-        }
+        tracing::info!("Spawning bybit stream for symbols: {:?}", symbols);
+        set.spawn(async move { (TaskType::BybitStream, bybit_stream_task(tx, symbols).await) });
+    }
 
-        if !okx_symbols.is_empty() {
-            let symbols = okx_symbols.clone();
-            let tx = msg_tx.clone();
+    if !okx_symbols.is_empty() {
+        let symbols = okx_symbols.clone();
+        let tx = msg_tx.clone();
 
-            tracing::info!("Spawning okx stream for symbols: {:?}", symbols);
-            set.spawn(async move { (TaskType::OkxStream, okx_stream_task(tx, symbols).await) });
-        }
+        tracing::info!("Spawning okx stream for symbols: {:?}", symbols);
+        set.spawn(async move { (TaskType::OkxStream, okx_stream_task(tx, symbols).await) });
+    }
 
-        if !coinbase_symbols.is_empty() {
-            let symbols = coinbase_symbols.clone();
-            let tx = msg_tx.clone();
+    if !coinbase_symbols.is_empty() {
+        let symbols = coinbase_symbols.clone();
+        let tx = msg_tx.clone();
 
-            tracing::info!("Spawning coinbase stream for symbols: {:?}", symbols);
-            set.spawn(async move {
-                (
-                    TaskType::CoinbaseStream,
-                    coinbase_stream_task(tx, symbols).await,
-                )
-            });
-        }
+        tracing::info!("Spawning coinbase stream for symbols: {:?}", symbols);
+        set.spawn(async move {
+            (
+                TaskType::CoinbaseStream,
+                coinbase_stream_task(tx, symbols).await,
+            )
+        });
+    }
 
-        if !kraken_symbols.is_empty() {
-            let symbols = kraken_symbols.clone();
-            let tx = msg_tx.clone();
+    if !kraken_symbols.is_empty() {
+        let symbols = kraken_symbols.clone();
+        let tx = msg_tx.clone();
 
-            tracing::info!("Spawning kraken stream for symbols: {:?}", symbols);
-            set.spawn(async move {
-                (
-                    TaskType::KrakenStream,
-                    kraken_stream_task(tx, symbols).await,
-                )
-            });
-        }
+        tracing::info!("Spawning kraken stream for symbols: {:?}", symbols);
+        set.spawn(async move {
+            (
+                TaskType::KrakenStream,
+                kraken_stream_task(tx, symbols).await,
+            )
+        });
+    }
 
-        if !kucoin_symbols.is_empty() {
-            let symbols = kucoin_symbols.clone();
-            let tx = msg_tx.clone();
+    if !kucoin_symbols.is_empty() {
+        let symbols = kucoin_symbols.clone();
+        let tx = msg_tx.clone();
 
-            tracing::info!("Spawning kucoin stream for symbols: {:?}", symbols);
-            set.spawn(async move {
-                (
-                    TaskType::KucoinStream,
-                    kucoin_stream_task(tx, symbols).await,
-                )
-            });
-        }
+        tracing::info!("Spawning kucoin stream for symbols: {:?}", symbols);
+        set.spawn(async move {
+            (
+                TaskType::KucoinStream,
+                kucoin_stream_task(tx, symbols).await,
+            )
+        });
+    }
 
-        if !args.skip_ethereum {
-            let rpc_url = args
-                .rpc_url
-                .clone()
-                .or_else(|| std::env::var("RPC_URL").ok())
-                .ok_or(eyre::eyre!(
-                    "RPC_URL must be provided via --rpc-url flag or RPC_URL environment variable"
-                ))?;
+    if app_config.ethereum_config.enabled {
+        let rpc_url = app_config.get_rpc_url()?;
 
-            tracing::info!(
-                "Spawning ethereum block metadata task from RPC URL: {}",
-                rpc_url
-            );
-            let tx = msg_tx.clone();
-            set.spawn(async move {
-                (
-                    TaskType::EthereumBlockMetadata,
-                    ethereum::fetch_blocks_task(rpc_url, tx).await,
-                )
-            });
-        }
+        tracing::info!(
+            "Spawning ethereum block metadata task from RPC URL: {}",
+            rpc_url
+        );
+        let tx = msg_tx.clone();
+        set.spawn(async move {
+            (
+                TaskType::EthereumBlockMetadata,
+                ethereum::fetch_blocks_task(rpc_url, tx).await,
+            )
+        });
+    }
 
-        if !args.skip_clickhouse {
-            tracing::info!("Spawning clickhouse writer task");
-            set.spawn(async move {
-                (
-                    TaskType::ClickHouseInsert,
-                    clickhouse_writer_task(msg_rx, args.clickhouse_rate_limit, args.batch_size)
-                        .await,
-                )
-            });
-        }
+    // Automatically spawn ClickHouse writer if we have any data producers
+    if has_producers {
+        tracing::info!("Spawning clickhouse writer task (auto-enabled for producer tasks)");
+        set.spawn(async move {
+            (
+                TaskType::ClickHouseInsert,
+                clickhouse_writer_task(msg_rx, args.clickhouse_rate_limit, args.batch_size).await,
+            )
+        });
+    }
 
-        if !args.skip_timeboost {
-            tracing::info!("Spawning timeboost bids task");
-            let tx = msg_tx.clone();
-            set.spawn(async move {
-                (
-                    TaskType::FetchTimeboostBids,
-                    timeboost::bids::fetch_bids_task(tx).await,
-                )
-            });
-        }
+    if app_config.timeboost_config.enabled {
+        tracing::info!("Spawning timeboost bids task");
+        let tx = msg_tx.clone();
+        set.spawn(async move {
+            (
+                TaskType::FetchTimeboostBids,
+                timeboost::bids::fetch_bids_task(tx).await,
+            )
+        });
+    }
 
-        // Drop the sender to ensure proper cleanup
-        drop(msg_tx);
+    // Drop the sender to ensure proper cleanup
+    drop(msg_tx);
 
-        let mut should_restart = false;
-        let mut failed_tasks = Vec::new();
-
-        // Monitor tasks
-        tokio::select! {
-            _ = async {
-                while let Some(res) = set.join_next().await {
-                    match res {
-                        Ok((task_type, Ok(()))) => {
-                            tracing::info!("{} task completed successfully", task_type);
-                            if let Some(ref mut supervisor) = supervisor {
-                                supervisor.reset_attempts(&task_type);
-                            }
+    // Monitor tasks - simplified without restart logic
+    tokio::select! {
+        _ = async {
+            while let Some(res) = set.join_next().await {
+                match res {
+                    Ok((task_type, Ok(()))) => {
+                        tracing::info!("{} task completed successfully", task_type);
+                    }
+                    Ok((task_type, Err(err))) => {
+                        tracing::error!("{} task failed: {:?}", task_type, err);
+                        if args.enable_restart {
+                            tracing::info!("Task restart is enabled but not implemented in simplified version");
                         }
-                        Ok((task_type, Err(err))) => {
-                            tracing::error!("{} task failed: {:?}", task_type, err);
-
-                            if let Some(ref mut supervisor) = supervisor {
-                                if supervisor.should_restart(&task_type) {
-                                    failed_tasks.push(task_type.clone());
-                                    should_restart = true;
-                                    break;
-                                } else {
-                                    tracing::error!("{} task exceeded maximum restart attempts", task_type);
-                                    break;
-                                }
-                            } else {
-                                tracing::info!("Task restart is disabled, shutting down");
-                                break;
-                            }
-                        }
-                        Err(join_err) => {
-                            tracing::error!("Task panicked: {}", join_err);
-                            if supervisor.is_none() {
-                                break;
-                            }
-                            // For panics, we'll restart all tasks to be safe
-                            should_restart = true;
-                            break;
-                        }
+                        break;
+                    }
+                    Err(join_err) => {
+                        tracing::error!("Task panicked: {}", join_err);
+                        break;
                     }
                 }
-            } => {
-                if !should_restart {
-                    tracing::info!("All tasks completed or failed without restart enabled");
-                    break;
-                }
             }
-            _ = tokio::signal::ctrl_c() => {
-                tracing::info!("SIGINT received; shutting down worker tasks");
-                break;
-            }
+        } => {
+            tracing::info!("All tasks completed or failed");
         }
-
-        // Abort remaining tasks
-        set.abort_all();
-        while let Some(res) = set.join_next().await {
-            if let Err(e) = res {
-                tracing::debug!("Error during task shutdown: {}", e);
-            }
+        _ = tokio::signal::ctrl_c() => {
+            tracing::info!("SIGINT received; shutting down worker tasks");
         }
+    }
 
-        if !should_restart {
-            break;
-        }
-
-        // Wait before restarting failed tasks
-        if let Some(ref mut supervisor) = supervisor {
-            for task_type in &failed_tasks {
-                supervisor.wait_before_restart(task_type).await;
-            }
-            tracing::info!("Restarting failed tasks: {:?}", failed_tasks);
+    // Abort remaining tasks
+    set.abort_all();
+    while let Some(res) = set.join_next().await {
+        if let Err(e) = res {
+            tracing::debug!("Error during task shutdown: {}", e);
         }
     }
 
@@ -531,14 +325,32 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
     Ok(())
 }
 
-async fn binance_stream_task(
+/// Generic stream processing function that works with any WebsocketStream + ExchangeClient implementation
+/// This eliminates the code duplication in the exchange-specific stream task functions
+async fn process_exchange_stream<T>(
+    client: T,
     evt_tx: mpsc::UnboundedSender<ClickhouseMessage>,
-    symbols: Vec<String>,
-) -> eyre::Result<()> {
-    let binance = BinanceClient::builder().add_symbols(symbols).build()?;
-    let combined_stream = binance.stream_events().await?;
-    let stream = combined_stream.filter_map(
-        |event: Result<NormalizedEvent, ExchangeStreamError>| async move {
+) -> eyre::Result<()>
+where
+    T: WebsocketStream + ExchangeClient,
+    T::Error: std::error::Error + Send + Sync + 'static,
+{
+    let exchange_name = client.get_exchange_name();
+    let symbols = client.get_symbols();
+
+    tracing::info!(
+        "Starting {} stream for {} symbols: {:?}",
+        exchange_name,
+        symbols.len(),
+        symbols
+    );
+
+    let combined_stream = client
+        .stream_events()
+        .await
+        .map_err(|e| eyre::eyre!("Failed to create stream: {}", e))?;
+    let stream =
+        combined_stream.filter_map(|event: Result<NormalizedEvent, T::Error>| async move {
             match event {
                 Ok(NormalizedEvent::Trade(trade)) => {
                     Some(ClickhouseMessage::Cex(NormalizedEvent::Trade(trade)))
@@ -547,12 +359,11 @@ async fn binance_stream_task(
                     Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
                 }
                 Err(e) => {
-                    tracing::error!("Error streaming binance event: {:?}", e);
+                    tracing::error!("Error streaming {} event: {:?}", exchange_name, e);
                     None
                 }
             }
-        },
-    );
+        });
     pin_mut!(stream);
     while let Some(msg) = stream.next().await {
         if evt_tx.send(msg).is_err() {
@@ -560,161 +371,54 @@ async fn binance_stream_task(
         }
     }
     Ok(())
+}
+
+async fn binance_stream_task(
+    evt_tx: mpsc::UnboundedSender<ClickhouseMessage>,
+    symbols: Vec<String>,
+) -> eyre::Result<()> {
+    let client = BinanceClient::builder().add_symbols(symbols).build()?;
+    process_exchange_stream(client, evt_tx).await
 }
 
 async fn bybit_stream_task(
     evt_tx: mpsc::UnboundedSender<ClickhouseMessage>,
     symbols: Vec<String>,
 ) -> eyre::Result<()> {
-    let bybit = BybitClient::builder().add_symbols(symbols).build()?;
-    let combined_stream = bybit.stream_events().await?;
-    let stream = combined_stream.filter_map(
-        |event: Result<NormalizedEvent, ExchangeStreamError>| async move {
-            match event {
-                Ok(NormalizedEvent::Trade(trade)) => {
-                    Some(ClickhouseMessage::Cex(NormalizedEvent::Trade(trade)))
-                }
-                Ok(NormalizedEvent::Quote(quote)) => {
-                    Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
-                }
-                Err(e) => {
-                    tracing::error!("Error streaming bybit event: {:?}", e);
-                    None
-                }
-            }
-        },
-    );
-    pin_mut!(stream);
-    while let Some(msg) = stream.next().await {
-        if evt_tx.send(msg).is_err() {
-            tracing::error!("Failed to send message to channel");
-        }
-    }
-    Ok(())
+    let client = BybitClient::builder().add_symbols(symbols).build()?;
+    process_exchange_stream(client, evt_tx).await
 }
 
 async fn okx_stream_task(
     evt_tx: mpsc::UnboundedSender<ClickhouseMessage>,
     symbols: Vec<String>,
 ) -> eyre::Result<()> {
-    let okx = OkxClient::builder().add_symbols(symbols).build()?;
-    let combined_stream = okx.stream_events().await?;
-    let stream = combined_stream.filter_map(
-        |event: Result<NormalizedEvent, ExchangeStreamError>| async move {
-            match event {
-                Ok(NormalizedEvent::Trade(trade)) => {
-                    Some(ClickhouseMessage::Cex(NormalizedEvent::Trade(trade)))
-                }
-                Ok(NormalizedEvent::Quote(quote)) => {
-                    Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
-                }
-                Err(e) => {
-                    tracing::error!("Error streaming okx event: {:?}", e);
-                    None
-                }
-            }
-        },
-    );
-    pin_mut!(stream);
-    while let Some(msg) = stream.next().await {
-        if evt_tx.send(msg).is_err() {
-            tracing::error!("Failed to send message to channel");
-        }
-    }
-    Ok(())
+    let client = OkxClient::builder().add_symbols(symbols).build()?;
+    process_exchange_stream(client, evt_tx).await
 }
 
 async fn coinbase_stream_task(
     evt_tx: mpsc::UnboundedSender<ClickhouseMessage>,
     symbols: Vec<String>,
 ) -> eyre::Result<()> {
-    let coinbase = CoinbaseClient::builder().add_symbols(symbols).build()?;
-    let combined_stream = coinbase.stream_events().await?;
-    let stream = combined_stream.filter_map(
-        |event: Result<NormalizedEvent, ExchangeStreamError>| async move {
-            match event {
-                Ok(NormalizedEvent::Trade(trade)) => {
-                    Some(ClickhouseMessage::Cex(NormalizedEvent::Trade(trade)))
-                }
-                Ok(NormalizedEvent::Quote(quote)) => {
-                    Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
-                }
-                Err(e) => {
-                    tracing::error!("Error streaming coinbase event: {:?}", e);
-                    None
-                }
-            }
-        },
-    );
-    pin_mut!(stream);
-    while let Some(msg) = stream.next().await {
-        if evt_tx.send(msg).is_err() {
-            tracing::error!("Failed to send message to channel");
-        }
-    }
-    Ok(())
+    let client = CoinbaseClient::builder().add_symbols(symbols).build()?;
+    process_exchange_stream(client, evt_tx).await
 }
 
 async fn kraken_stream_task(
     evt_tx: mpsc::UnboundedSender<ClickhouseMessage>,
     symbols: Vec<String>,
 ) -> eyre::Result<()> {
-    let kraken = KrakenClient::builder().add_symbols(symbols).build()?;
-    let combined_stream = kraken.stream_events().await?;
-    let stream = combined_stream.filter_map(
-        |event: Result<NormalizedEvent, ExchangeStreamError>| async move {
-            match event {
-                Ok(NormalizedEvent::Trade(trade)) => {
-                    Some(ClickhouseMessage::Cex(NormalizedEvent::Trade(trade)))
-                }
-                Ok(NormalizedEvent::Quote(quote)) => {
-                    Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
-                }
-                Err(e) => {
-                    tracing::error!("Error streaming kraken event: {:?}", e);
-                    None
-                }
-            }
-        },
-    );
-    pin_mut!(stream);
-    while let Some(msg) = stream.next().await {
-        if evt_tx.send(msg).is_err() {
-            tracing::error!("Failed to send message to channel");
-        }
-    }
-    Ok(())
+    let client = KrakenClient::builder().add_symbols(symbols).build()?;
+    process_exchange_stream(client, evt_tx).await
 }
 
 async fn kucoin_stream_task(
     evt_tx: mpsc::UnboundedSender<ClickhouseMessage>,
     symbols: Vec<String>,
 ) -> eyre::Result<()> {
-    let kucoin = KucoinClient::builder().add_symbols(symbols).build().await?;
-    let combined_stream = kucoin.stream_events().await?;
-    let stream = combined_stream.filter_map(
-        |event: Result<NormalizedEvent, ExchangeStreamError>| async move {
-            match event {
-                Ok(NormalizedEvent::Trade(trade)) => {
-                    Some(ClickhouseMessage::Cex(NormalizedEvent::Trade(trade)))
-                }
-                Ok(NormalizedEvent::Quote(quote)) => {
-                    Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
-                }
-                Err(e) => {
-                    tracing::error!("Error parsing event: {:?}", e);
-                    None
-                }
-            }
-        },
-    );
-    pin_mut!(stream);
-    while let Some(msg) = stream.next().await {
-        if evt_tx.send(msg).is_err() {
-            tracing::error!("Failed to send message to channel");
-        }
-    }
-    Ok(())
+    let client = KucoinClient::builder().add_symbols(symbols).build().await?;
+    process_exchange_stream(client, evt_tx).await
 }
 
 async fn clickhouse_writer_task(

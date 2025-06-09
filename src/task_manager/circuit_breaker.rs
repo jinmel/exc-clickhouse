@@ -1,7 +1,7 @@
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
-use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use crate::task_manager::types::CircuitBreakerState;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// Circuit breaker for handling persistent failures
 #[derive(Debug)]
@@ -23,7 +23,7 @@ impl CircuitBreaker {
             timeout,
         }
     }
-    
+
     pub fn record_failure(&self) {
         let count = self.failure_count.fetch_add(1, Ordering::SeqCst) + 1;
         let now = SystemTime::now()
@@ -31,19 +31,19 @@ impl CircuitBreaker {
             .unwrap_or_default()
             .as_millis() as u64;
         self.last_failure_time.store(now, Ordering::SeqCst);
-        
+
         if count >= self.threshold {
             let mut state = self.state.lock();
             *state = CircuitBreakerState::Open;
         }
     }
-    
+
     pub fn record_success(&self) {
         self.failure_count.store(0, Ordering::SeqCst);
         let mut state = self.state.lock();
         *state = CircuitBreakerState::Closed;
     }
-    
+
     pub fn can_execute(&self) -> bool {
         let state = self.state.lock();
         match *state {
@@ -54,7 +54,7 @@ impl CircuitBreaker {
                     .unwrap_or_default()
                     .as_millis() as u64;
                 let last_failure = self.last_failure_time.load(Ordering::SeqCst);
-                
+
                 if now.saturating_sub(last_failure) >= self.timeout.as_millis() as u64 {
                     drop(state);
                     let mut state = self.state.lock();
@@ -67,18 +67,18 @@ impl CircuitBreaker {
             CircuitBreakerState::HalfOpen => true,
         }
     }
-    
+
     pub fn state(&self) -> CircuitBreakerState {
         *self.state.lock()
     }
-    
+
     pub fn failure_count(&self) -> u32 {
         self.failure_count.load(Ordering::SeqCst)
     }
-    
+
     pub fn reset(&self) {
         self.failure_count.store(0, Ordering::SeqCst);
         let mut state = self.state.lock();
         *state = CircuitBreakerState::Closed;
     }
-} 
+}

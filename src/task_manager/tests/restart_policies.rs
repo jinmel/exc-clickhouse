@@ -4,16 +4,16 @@ use std::time::Duration;
 #[tokio::test]
 async fn test_restart_policy_calculation() {
     let policy = RestartPolicy::default();
-    
+
     // Test exponential backoff calculation
     let delay1 = RestartUtils::calculate_backoff_delay(0, &policy);
     let delay2 = RestartUtils::calculate_backoff_delay(1, &policy);
     let delay3 = RestartUtils::calculate_backoff_delay(2, &policy);
-    
+
     // Should increase exponentially
     assert!(delay2 > delay1);
     assert!(delay3 > delay2);
-    
+
     // Should not exceed max delay
     let large_delay = RestartUtils::calculate_backoff_delay(100, &policy);
     assert!(large_delay <= policy.max_delay);
@@ -26,44 +26,71 @@ async fn test_restart_utils_failure_classification() {
 
     #[derive(Debug)]
     struct TestError(String);
-    
+
     impl fmt::Display for TestError {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             write!(f, "{}", self.0)
         }
     }
-    
+
     impl Error for TestError {}
 
     // Test network errors
     let network_error = TestError("connection timeout".to_string());
-    assert_eq!(RestartUtils::classify_failure(&network_error), FailureType::Network);
+    assert_eq!(
+        RestartUtils::classify_failure(&network_error),
+        FailureType::Network
+    );
 
     // Test resource errors
     let resource_error = TestError("out of memory".to_string());
-    assert_eq!(RestartUtils::classify_failure(&resource_error), FailureType::Resource);
+    assert_eq!(
+        RestartUtils::classify_failure(&resource_error),
+        FailureType::Resource
+    );
 
     // Test configuration errors
     let config_error = TestError("invalid configuration".to_string());
-    assert_eq!(RestartUtils::classify_failure(&config_error), FailureType::Configuration);
+    assert_eq!(
+        RestartUtils::classify_failure(&config_error),
+        FailureType::Configuration
+    );
 
     // Test permanent errors
     let permanent_error = TestError("fatal error occurred".to_string());
-    assert_eq!(RestartUtils::classify_failure(&permanent_error), FailureType::Permanent);
+    assert_eq!(
+        RestartUtils::classify_failure(&permanent_error),
+        FailureType::Permanent
+    );
 
     // Test unknown errors (default to transient)
     let unknown_error = TestError("something went wrong".to_string());
-    assert_eq!(RestartUtils::classify_failure(&unknown_error), FailureType::Transient);
+    assert_eq!(
+        RestartUtils::classify_failure(&unknown_error),
+        FailureType::Transient
+    );
 }
 
 #[tokio::test]
 async fn test_restart_utils_should_retry_failure_type() {
-    assert!(RestartUtils::should_retry_failure_type(&FailureType::Transient));
-    assert!(RestartUtils::should_retry_failure_type(&FailureType::Network));
-    assert!(RestartUtils::should_retry_failure_type(&FailureType::Resource));
-    assert!(RestartUtils::should_retry_failure_type(&FailureType::Unknown));
-    assert!(!RestartUtils::should_retry_failure_type(&FailureType::Permanent));
-    assert!(!RestartUtils::should_retry_failure_type(&FailureType::Configuration));
+    assert!(RestartUtils::should_retry_failure_type(
+        &FailureType::Transient
+    ));
+    assert!(RestartUtils::should_retry_failure_type(
+        &FailureType::Network
+    ));
+    assert!(RestartUtils::should_retry_failure_type(
+        &FailureType::Resource
+    ));
+    assert!(RestartUtils::should_retry_failure_type(
+        &FailureType::Unknown
+    ));
+    assert!(!RestartUtils::should_retry_failure_type(
+        &FailureType::Permanent
+    ));
+    assert!(!RestartUtils::should_retry_failure_type(
+        &FailureType::Configuration
+    ));
 }
 
 #[tokio::test]
@@ -121,8 +148,13 @@ async fn test_restart_utils_exponential_backoff_with_jitter() {
 
     // All delays should be within the jitter range
     for delay in delays {
-        assert!(delay >= min_expected && delay <= max_expected,
-            "Delay {:?} should be between {:?} and {:?}", delay, min_expected, max_expected);
+        assert!(
+            delay >= min_expected && delay <= max_expected,
+            "Delay {:?} should be between {:?} and {:?}",
+            delay,
+            min_expected,
+            max_expected
+        );
     }
 }
 
@@ -133,13 +165,13 @@ async fn test_restart_utils_comprehensive_restart_decision() {
 
     #[derive(Debug)]
     struct TestError(String);
-    
+
     impl fmt::Display for TestError {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             write!(f, "{}", self.0)
         }
     }
-    
+
     impl Error for TestError {}
 
     let policy = RestartPolicy {
@@ -157,7 +189,10 @@ async fn test_restart_utils_comprehensive_restart_decision() {
 
     // Test transient error should be retried
     let transient_error = TestError("connection timeout".to_string());
-    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as u64;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
     let past_time = now - 200; // 200ms ago, enough for restart
 
     assert!(RestartUtils::should_restart_task(
@@ -224,4 +259,4 @@ async fn test_task_manager_restart_policy_management() {
     assert_eq!(updated_policy.max_restarts, 5);
     assert_eq!(updated_policy.base_delay, Duration::from_secs(2));
     assert_eq!(updated_policy.backoff_multiplier, 1.5);
-} 
+}

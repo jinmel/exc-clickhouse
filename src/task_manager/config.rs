@@ -1,6 +1,6 @@
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use crate::task_manager::types::ShutdownPhase;
 use crate::task_manager::restart::RestartPolicy;
+use crate::task_manager::types::ShutdownPhase;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// Configuration for shutdown behavior
 #[derive(Debug, Clone)]
@@ -51,7 +51,7 @@ impl ShutdownStatus {
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_millis() as u64;
-        
+
         Self {
             phase: ShutdownPhase::Running,
             shutdown_started_at: now,
@@ -62,7 +62,7 @@ impl ShutdownStatus {
             completed_gracefully: false,
         }
     }
-    
+
     pub fn shutdown_elapsed(&self) -> Duration {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -70,7 +70,7 @@ impl ShutdownStatus {
             .as_millis() as u64;
         Duration::from_millis(now.saturating_sub(self.shutdown_started_at))
     }
-    
+
     pub fn phase_elapsed(&self) -> Duration {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -78,7 +78,7 @@ impl ShutdownStatus {
             .as_millis() as u64;
         Duration::from_millis(now.saturating_sub(self.phase_started_at))
     }
-    
+
     pub fn progress(&self) -> f64 {
         if self.initial_task_count == 0 {
             return 1.0;
@@ -116,4 +116,4 @@ impl Default for TaskManagerConfig {
             shutdown_config: ShutdownConfig::default(),
         }
     }
-} 
+}

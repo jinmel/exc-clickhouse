@@ -4,7 +4,7 @@ use crate::streams::bybit::parser::BybitParser;
 use crate::{
     models::NormalizedEvent,
     streams::{
-        ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
+        ExchangeClient, ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
         exchange_stream::ExchangeStreamBuilder, subscription::BybitSubscription,
     },
 };
@@ -19,6 +19,7 @@ pub mod parser;
 pub struct BybitClient {
     base_url: String,
     subscription: BybitSubscription,
+    symbols: Vec<String>,
 }
 
 impl BybitClient {
@@ -40,6 +41,16 @@ impl WebsocketStream for BybitClient {
             ExchangeStreamBuilder::new(&self.base_url, None, parser, self.subscription.clone())
                 .build();
         Ok(stream)
+    }
+}
+
+impl ExchangeClient for BybitClient {
+    fn get_exchange_name(&self) -> &'static str {
+        "bybit"
+    }
+
+    fn get_symbols(&self) -> &[String] {
+        &self.symbols
     }
 }
 
@@ -87,6 +98,7 @@ impl BybitClientBuilder {
         Ok(BybitClient {
             subscription,
             base_url: self.base_url,
+            symbols: self.symbols,
         })
     }
 }

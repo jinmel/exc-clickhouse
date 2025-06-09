@@ -22,6 +22,16 @@ pub trait WebsocketStream {
     async fn stream_events(&self) -> Result<Self::EventStream, Self::Error>;
 }
 
+/// Trait for exchange clients to provide metadata about themselves
+/// This allows for cleaner interfaces without passing exchange names as strings
+pub trait ExchangeClient {
+    /// Returns the name of the exchange (e.g., "binance", "coinbase")
+    fn get_exchange_name(&self) -> &'static str;
+
+    /// Returns the list of symbols this client is configured to stream
+    fn get_symbols(&self) -> &[String];
+}
+
 pub trait Parser<T: Send + 'static> {
     type Error: std::error::Error + Send + Sync + 'static;
 
