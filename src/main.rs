@@ -16,6 +16,7 @@ use crate::{
         ExchangeClient, WebsocketStream, binance::BinanceClient, bybit::BybitClient,
         coinbase::CoinbaseClient, kraken::KrakenClient, kucoin::KucoinClient, okx::OkxClient,
     },
+    task_manager::{TaskManager, IntoTaskResult},
 };
 
 mod clickhouse;
@@ -28,8 +29,9 @@ mod task_manager;
 mod timeboost;
 mod tower_utils;
 
-#[derive(Debug, Clone, Eq, Hash, PartialEq)]
-enum TaskType {
+/// Enum for task names to ensure type safety and consistency
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum TaskName {
     BinanceStream,
     BybitStream,
     OkxStream,
@@ -37,22 +39,22 @@ enum TaskType {
     KrakenStream,
     KucoinStream,
     EthereumBlockMetadata,
-    ClickHouseInsert,
-    FetchTimeboostBids,
+    ClickHouseWriter,
+    TimeboostBids,
 }
 
-impl std::fmt::Display for TaskType {
+impl std::fmt::Display for TaskName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TaskType::BinanceStream => write!(f, "Binance"),
-            TaskType::BybitStream => write!(f, "Bybit"),
-            TaskType::CoinbaseStream => write!(f, "Coinbase"),
-            TaskType::KrakenStream => write!(f, "Kraken"),
-            TaskType::KucoinStream => write!(f, "KuCoin"),
-            TaskType::EthereumBlockMetadata => write!(f, "Ethereum"),
-            TaskType::ClickHouseInsert => write!(f, "ClickHouse"),
-            TaskType::FetchTimeboostBids => write!(f, "Timeboost"),
-            TaskType::OkxStream => write!(f, "OKX"),
+            TaskName::BinanceStream => write!(f, "Binance Stream"),
+            TaskName::BybitStream => write!(f, "Bybit Stream"),
+            TaskName::OkxStream => write!(f, "OKX Stream"),
+            TaskName::CoinbaseStream => write!(f, "Coinbase Stream"),
+            TaskName::KrakenStream => write!(f, "Kraken Stream"),
+            TaskName::KucoinStream => write!(f, "KuCoin Stream"),
+            TaskName::EthereumBlockMetadata => write!(f, "Ethereum Block Metadata"),
+            TaskName::ClickHouseWriter => write!(f, "ClickHouse Writer"),
+            TaskName::TimeboostBids => write!(f, "Timeboost Bids"),
         }
     }
 }
@@ -172,7 +174,13 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
 
     // Create channel for task communication
     let (msg_tx, msg_rx) = mpsc::unbounded_channel::<ClickhouseMessage>();
-    let mut set = tokio::task::JoinSet::new();
+
+    // Create TaskManager with restart configuration from AppConfig
+    let task_config = app_config.get_task_manager_config();
+
+    let mut task_manager = TaskManager::<()>::with_config(task_config);
+
+
 
     // Spawn tasks
     if !binance_symbols.is_empty() {
@@ -180,11 +188,8 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         let tx = msg_tx.clone();
 
         tracing::info!("Spawning binance stream for symbols: {:?}", symbols);
-        set.spawn(async move {
-            (
-                TaskType::BinanceStream,
-                binance_stream_task(tx, symbols).await,
-            )
+        task_manager.spawn_task(TaskName::BinanceStream, move || async move {
+            binance_stream_task(tx, symbols).await.into_task_result()
         });
     }
 
@@ -193,7 +198,9 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         let tx = msg_tx.clone();
 
         tracing::info!("Spawning bybit stream for symbols: {:?}", symbols);
-        set.spawn(async move { (TaskType::BybitStream, bybit_stream_task(tx, symbols).await) });
+        task_manager.spawn_task(TaskName::BybitStream, move || async move {
+            bybit_stream_task(tx, symbols).await.into_task_result()
+        });
     }
 
     if !okx_symbols.is_empty() {
@@ -201,7 +208,9 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         let tx = msg_tx.clone();
 
         tracing::info!("Spawning okx stream for symbols: {:?}", symbols);
-        set.spawn(async move { (TaskType::OkxStream, okx_stream_task(tx, symbols).await) });
+        task_manager.spawn_task(TaskName::OkxStream, move || async move {
+            okx_stream_task(tx, symbols).await.into_task_result()
+        });
     }
 
     if !coinbase_symbols.is_empty() {
@@ -209,11 +218,8 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         let tx = msg_tx.clone();
 
         tracing::info!("Spawning coinbase stream for symbols: {:?}", symbols);
-        set.spawn(async move {
-            (
-                TaskType::CoinbaseStream,
-                coinbase_stream_task(tx, symbols).await,
-            )
+        task_manager.spawn_task(TaskName::CoinbaseStream, move || async move {
+            coinbase_stream_task(tx, symbols).await.into_task_result()
         });
     }
 
@@ -222,11 +228,8 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         let tx = msg_tx.clone();
 
         tracing::info!("Spawning kraken stream for symbols: {:?}", symbols);
-        set.spawn(async move {
-            (
-                TaskType::KrakenStream,
-                kraken_stream_task(tx, symbols).await,
-            )
+        task_manager.spawn_task(TaskName::KrakenStream, move || async move {
+            kraken_stream_task(tx, symbols).await.into_task_result()
         });
     }
 
@@ -235,11 +238,8 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         let tx = msg_tx.clone();
 
         tracing::info!("Spawning kucoin stream for symbols: {:?}", symbols);
-        set.spawn(async move {
-            (
-                TaskType::KucoinStream,
-                kucoin_stream_task(tx, symbols).await,
-            )
+        task_manager.spawn_task(TaskName::KucoinStream, move || async move {
+            kucoin_stream_task(tx, symbols).await.into_task_result()
         });
     }
 
@@ -251,73 +251,48 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
             rpc_url
         );
         let tx = msg_tx.clone();
-        set.spawn(async move {
-            (
-                TaskType::EthereumBlockMetadata,
-                ethereum::fetch_blocks_task(rpc_url, tx).await,
-            )
-        });
+        task_manager.spawn_task(
+            TaskName::EthereumBlockMetadata,
+            move || async move { ethereum::fetch_blocks_task(rpc_url, tx).await.into_task_result() }
+        );
     }
 
     // Automatically spawn ClickHouse writer if we have any data producers
     if has_producers {
         tracing::info!("Spawning clickhouse writer task (auto-enabled for producer tasks)");
-        set.spawn(async move {
-            (
-                TaskType::ClickHouseInsert,
-                clickhouse_writer_task(msg_rx, args.clickhouse_rate_limit, args.batch_size).await,
-            )
+        task_manager.spawn_task(TaskName::ClickHouseWriter, move || async move {
+            clickhouse_writer_task(msg_rx, args.clickhouse_rate_limit, args.batch_size).await.into_task_result()
         });
     }
 
     if app_config.timeboost_config.enabled {
         tracing::info!("Spawning timeboost bids task");
         let tx = msg_tx.clone();
-        set.spawn(async move {
-            (
-                TaskType::FetchTimeboostBids,
-                timeboost::bids::fetch_bids_task(tx).await,
-            )
+        task_manager.spawn_task(TaskName::TimeboostBids, move || async move {
+            timeboost::bids::fetch_bids_task(tx).await.into_task_result()
         });
     }
 
     // Drop the sender to ensure proper cleanup
     drop(msg_tx);
 
-    // Monitor tasks - simplified without restart logic
+    // Monitor tasks using TaskManager with restart capabilities
     tokio::select! {
-        _ = async {
-            while let Some(res) = set.join_next().await {
-                match res {
-                    Ok((task_type, Ok(()))) => {
-                        tracing::info!("{} task completed successfully", task_type);
-                    }
-                    Ok((task_type, Err(err))) => {
-                        tracing::error!("{} task failed: {:?}", task_type, err);
-                        if args.enable_restart {
-                            tracing::info!("Task restart is enabled but not implemented in simplified version");
-                        }
-                        break;
-                    }
-                    Err(join_err) => {
-                        tracing::error!("Task panicked: {}", join_err);
-                        break;
-                    }
+        result = task_manager.run() => {
+            match result {
+                Ok(()) => {
+                    tracing::info!("TaskManager completed successfully");
+                }
+                Err(e) => {
+                    tracing::error!("TaskManager failed: {:?}", e);
                 }
             }
-        } => {
-            tracing::info!("All tasks completed or failed");
         }
         _ = tokio::signal::ctrl_c() => {
-            tracing::info!("SIGINT received; shutting down worker tasks");
-        }
-    }
-
-    // Abort remaining tasks
-    set.abort_all();
-    while let Some(res) = set.join_next().await {
-        if let Err(e) = res {
-            tracing::debug!("Error during task shutdown: {}", e);
+            tracing::info!("SIGINT received; initiating graceful shutdown");
+            if let Err(e) = task_manager.shutdown().await {
+                tracing::error!("Error during TaskManager shutdown: {:?}", e);
+            }
         }
     }
 
