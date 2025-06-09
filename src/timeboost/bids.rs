@@ -284,7 +284,7 @@ impl S3Client {
     }
 
     // gets the latest bid file (use last_modified)
-    async fn get_latest_bid_file(&self) -> eyre::Result<S3ObjectInfo> {
+    pub async fn get_latest_bid_file(&self) -> eyre::Result<S3ObjectInfo> {
         let files = self.get_all_bid_files().await?;
 
         files
@@ -299,7 +299,7 @@ impl S3Client {
     }
 
     // gets all bid files in the bucket
-    async fn get_all_bid_files(&self) -> eyre::Result<Vec<S3ObjectInfo>> {
+    pub async fn get_all_bid_files(&self) -> eyre::Result<Vec<S3ObjectInfo>> {
         let mut objects = Vec::new();
         let mut continuation_token: Option<String> = None;
 
@@ -342,7 +342,7 @@ impl S3Client {
     }
 
     // read a file from S3. decompresses the Gz compressed binary
-    async fn read_file(&self, file: &S3ObjectInfo) -> eyre::Result<Vec<BidData>> {
+    pub async fn read_file(&self, file: &S3ObjectInfo) -> eyre::Result<Vec<BidData>> {
         let response = self
             .client
             .get_object()
@@ -374,56 +374,4 @@ impl S3Client {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tokio;
 
-    pub const BUCKET_NAME: &str = "timeboost-auctioneer-arb1";
-    pub const PREFIX: &str = "uw2/validated-timeboost-bids/";
-
-    #[tokio::test]
-    #[ignore]
-    async fn test_get_latest_bid_file() {
-        let client = S3Client::new(BUCKET_NAME, PREFIX).await.unwrap();
-        let _ = client
-            .get_latest_bid_file()
-            .await
-            .expect("Failed to get latest bid file");
-    }
-
-    #[tokio::test]
-    #[ignore]
-    async fn test_read_file() {
-        let client = S3Client::new(BUCKET_NAME, PREFIX)
-            .await
-            .expect("Failed to create S3 client");
-
-        // Get the latest file to test reading
-        let latest_file = client
-            .get_latest_bid_file()
-            .await
-            .expect("Failed to get latest bid file");
-
-        let bids = client
-            .read_file(&latest_file)
-            .await
-            .expect("Failed to read file");
-
-        // Basic validation
-        assert!(!bids.is_empty(), "Should have at least one bid");
-    }
-
-    #[tokio::test]
-    #[ignore]
-    async fn test_get_all_bid_files() {
-        let client = S3Client::new(BUCKET_NAME, PREFIX)
-            .await
-            .expect("Failed to create S3 client");
-
-        let _ = client
-            .get_all_bid_files()
-            .await
-            .expect("Failed to get all bid files");
-    }
-}
