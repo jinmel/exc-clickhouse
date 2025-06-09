@@ -192,7 +192,8 @@ impl AppBuilder {
 
     /// Set the application configuration
     pub fn with_config(mut self, config: AppConfig) -> Self {
-        self.config = Some(config);
+        self.config = Some(config.clone());
+        self.task_manager_config = Some(config.get_task_manager_config());
         self
     }
 
