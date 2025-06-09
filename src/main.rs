@@ -59,40 +59,6 @@ impl std::fmt::Display for TaskName {
     }
 }
 
-impl TaskName {
-    /// Get the task category for grouping and analysis
-    pub fn category(&self) -> TaskCategory {
-        match self {
-            TaskName::BinanceStream
-            | TaskName::BybitStream
-            | TaskName::OkxStream
-            | TaskName::CoinbaseStream
-            | TaskName::KrakenStream
-            | TaskName::KucoinStream => TaskCategory::DataProducer,
-            TaskName::EthereumBlockMetadata | TaskName::TimeboostBids => TaskCategory::BlockchainData,
-            TaskName::ClickHouseWriter => TaskCategory::DataConsumer,
-        }
-    }
-
-    /// Check if this is an exchange stream task
-    pub fn is_exchange_stream(&self) -> bool {
-        matches!(self.category(), TaskCategory::DataProducer)
-    }
-}
-
-/// Categories for different types of tasks
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum TaskCategory {
-    /// Tasks that produce trading data from exchanges
-    DataProducer,
-    /// Tasks that fetch blockchain-related data
-    BlockchainData,
-    /// Tasks that consume and store data
-    DataConsumer,
-}
-
-
-
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
     // Parse command line arguments
@@ -208,10 +174,10 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
 
     // Create channel for task communication
     let (msg_tx, msg_rx) = mpsc::unbounded_channel::<ClickhouseMessage>();
-    
+
     // Create TaskManager with restart configuration from AppConfig
     let task_config = app_config.get_task_manager_config();
-    
+
     let mut task_manager = TaskManager::<()>::with_config(task_config);
 
     // Helper function to convert eyre::Result to TaskResult
@@ -219,7 +185,8 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         result.map_err(|e| {
             // Convert eyre::Report to a standard error
             let error_msg = e.to_string();
-            Box::new(std::io::Error::new(std::io::ErrorKind::Other, error_msg)) as Box<dyn std::error::Error + Send + Sync>
+            Box::new(std::io::Error::new(std::io::ErrorKind::Other, error_msg))
+                as Box<dyn std::error::Error + Send + Sync>
         })
     }
 
@@ -229,10 +196,9 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         let tx = msg_tx.clone();
 
         tracing::info!("Spawning binance stream for symbols: {:?}", symbols);
-        task_manager.spawn_task(
-            TaskName::BinanceStream.to_string(),
-            move || async move { convert_task_result(binance_stream_task(tx, symbols).await) }
-        );
+        task_manager.spawn_task(TaskName::BinanceStream.to_string(), move || async move {
+            convert_task_result(binance_stream_task(tx, symbols).await)
+        });
     }
 
     if !bybit_symbols.is_empty() {
@@ -240,10 +206,9 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         let tx = msg_tx.clone();
 
         tracing::info!("Spawning bybit stream for symbols: {:?}", symbols);
-        task_manager.spawn_task(
-            TaskName::BybitStream.to_string(),
-            move || async move { convert_task_result(bybit_stream_task(tx, symbols).await) }
-        );
+        task_manager.spawn_task(TaskName::BybitStream.to_string(), move || async move {
+            convert_task_result(bybit_stream_task(tx, symbols).await)
+        });
     }
 
     if !okx_symbols.is_empty() {
@@ -251,10 +216,9 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         let tx = msg_tx.clone();
 
         tracing::info!("Spawning okx stream for symbols: {:?}", symbols);
-        task_manager.spawn_task(
-            TaskName::OkxStream.to_string(),
-            move || async move { convert_task_result(okx_stream_task(tx, symbols).await) }
-        );
+        task_manager.spawn_task(TaskName::OkxStream.to_string(), move || async move {
+            convert_task_result(okx_stream_task(tx, symbols).await)
+        });
     }
 
     if !coinbase_symbols.is_empty() {
@@ -262,10 +226,9 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         let tx = msg_tx.clone();
 
         tracing::info!("Spawning coinbase stream for symbols: {:?}", symbols);
-        task_manager.spawn_task(
-            TaskName::CoinbaseStream.to_string(),
-            move || async move { convert_task_result(coinbase_stream_task(tx, symbols).await) }
-        );
+        task_manager.spawn_task(TaskName::CoinbaseStream.to_string(), move || async move {
+            convert_task_result(coinbase_stream_task(tx, symbols).await)
+        });
     }
 
     if !kraken_symbols.is_empty() {
@@ -273,10 +236,9 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         let tx = msg_tx.clone();
 
         tracing::info!("Spawning kraken stream for symbols: {:?}", symbols);
-        task_manager.spawn_task(
-            TaskName::KrakenStream.to_string(),
-            move || async move { convert_task_result(kraken_stream_task(tx, symbols).await) }
-        );
+        task_manager.spawn_task(TaskName::KrakenStream.to_string(), move || async move {
+            convert_task_result(kraken_stream_task(tx, symbols).await)
+        });
     }
 
     if !kucoin_symbols.is_empty() {
@@ -284,10 +246,9 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         let tx = msg_tx.clone();
 
         tracing::info!("Spawning kucoin stream for symbols: {:?}", symbols);
-        task_manager.spawn_task(
-            TaskName::KucoinStream.to_string(),
-            move || async move { convert_task_result(kucoin_stream_task(tx, symbols).await) }
-        );
+        task_manager.spawn_task(TaskName::KucoinStream.to_string(), move || async move {
+            convert_task_result(kucoin_stream_task(tx, symbols).await)
+        });
     }
 
     if app_config.ethereum_config.enabled {
@@ -307,21 +268,19 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
     // Automatically spawn ClickHouse writer if we have any data producers
     if has_producers {
         tracing::info!("Spawning clickhouse writer task (auto-enabled for producer tasks)");
-        task_manager.spawn_task(
-            TaskName::ClickHouseWriter.to_string(),
-            move || async move { 
-                convert_task_result(clickhouse_writer_task(msg_rx, args.clickhouse_rate_limit, args.batch_size).await)
-            }
-        );
+        task_manager.spawn_task(TaskName::ClickHouseWriter.to_string(), move || async move {
+            convert_task_result(
+                clickhouse_writer_task(msg_rx, args.clickhouse_rate_limit, args.batch_size).await,
+            )
+        });
     }
 
     if app_config.timeboost_config.enabled {
         tracing::info!("Spawning timeboost bids task");
         let tx = msg_tx.clone();
-        task_manager.spawn_task(
-            TaskName::TimeboostBids.to_string(),
-            move || async move { convert_task_result(timeboost::bids::fetch_bids_task(tx).await) }
-        );
+        task_manager.spawn_task(TaskName::TimeboostBids.to_string(), move || async move {
+            convert_task_result(timeboost::bids::fetch_bids_task(tx).await)
+        });
     }
 
     // Drop the sender to ensure proper cleanup
