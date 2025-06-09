@@ -242,6 +242,29 @@ impl AppConfig {
             || !self.exchange_configs.kraken_symbols.is_empty()
             || !self.exchange_configs.kucoin_symbols.is_empty()
     }
+
+    /// Create TaskManagerConfig from the current AppConfig
+    pub fn get_task_manager_config(&self) -> crate::task_manager::TaskManagerConfig {
+        crate::task_manager::TaskManagerConfig {
+            max_concurrent_tasks: 100, // Could be made configurable later
+            default_restart_policy: crate::task_manager::RestartPolicy {
+                max_restarts: if self.restart_config.enabled {
+                    self.restart_config.max_attempts
+                } else {
+                    0
+                },
+                base_delay: self.restart_config.initial_delay,
+                backoff_multiplier: 2.0,
+                max_delay: self.restart_config.max_delay,
+                jitter_factor: 0.1,
+                enable_circuit_breaker: self.restart_config.enabled,
+                circuit_breaker_threshold: 5,
+                circuit_breaker_timeout: std::time::Duration::from_secs(60),
+            },
+            shutdown_timeout: std::time::Duration::from_secs(30),
+            shutdown_config: crate::task_manager::ShutdownConfig::default(),
+        }
+    }
 }
 
 impl ExchangeConfigs {
