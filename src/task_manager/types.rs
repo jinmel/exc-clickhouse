@@ -10,7 +10,7 @@ impl TaskId {
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
-    
+
     /// Get the inner UUID for correlation ID purposes
     pub fn as_uuid(&self) -> Uuid {
         self.0
@@ -103,7 +103,12 @@ impl std::fmt::Display for ShutdownPhase {
 /// Type aliases for task functions and results
 pub type TaskResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
 pub type TaskFn<T> = Box<dyn FnOnce() -> TaskResult<T> + Send + 'static>;
-pub type AsyncTaskFn<T> = Box<dyn FnOnce() -> std::pin::Pin<Box<dyn std::future::Future<Output = TaskResult<T>> + Send + 'static>> + Send + 'static>;
+pub type AsyncTaskFn<T> = Box<
+    dyn FnOnce() -> std::pin::Pin<
+            Box<dyn std::future::Future<Output = TaskResult<T>> + Send + 'static>,
+        > + Send
+        + 'static,
+>;
 
 /// Task completion information
 #[derive(Debug)]
@@ -118,7 +123,12 @@ pub struct TaskCompletion<T> {
 pub struct PendingRestart<T> {
     pub task_id: TaskId,
     pub task_name: String,
-    pub task_fn: Box<dyn FnOnce() -> std::pin::Pin<Box<dyn std::future::Future<Output = TaskResult<T>> + Send + 'static>> + Send + 'static>,
+    pub task_fn: Box<
+        dyn FnOnce() -> std::pin::Pin<
+                Box<dyn std::future::Future<Output = TaskResult<T>> + Send + 'static>,
+            > + Send
+            + 'static,
+    >,
     pub restart_time: u64, // Timestamp when restart should occur
     pub restart_count: u32,
 }
@@ -146,4 +156,4 @@ pub struct TaskManagerStats {
     pub circuit_breaker_failure_count: u32,
     pub pending_restarts: usize,
     pub shutdown_status: Option<super::config::ShutdownStatus>,
-} 
+}

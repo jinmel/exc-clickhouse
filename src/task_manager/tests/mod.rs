@@ -1,8 +1,8 @@
 mod basic_functionality;
-mod state_management;
-mod failure_handling;
-mod restart_policies;
 mod circuit_breaker;
-mod shutdown;
+mod failure_handling;
 mod integration;
-mod stress_tests; 
+mod restart_policies;
+mod shutdown;
+mod state_management;
+mod stress_tests;

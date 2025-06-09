@@ -6,7 +6,7 @@ use crate::streams::coinbase::parser::CoinbaseParser;
 use crate::{
     models::NormalizedEvent,
     streams::{
-        ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
+        ExchangeClient, ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
         exchange_stream::ExchangeStreamBuilder, subscription::CoinbaseSubscription,
     },
 };
@@ -19,6 +19,7 @@ pub mod parser;
 pub struct CoinbaseClient {
     base_url: String,
     subscription: CoinbaseSubscription,
+    symbols: Vec<String>,
 }
 
 impl CoinbaseClient {
@@ -40,6 +41,16 @@ impl WebsocketStream for CoinbaseClient {
             ExchangeStreamBuilder::new(&self.base_url, None, parser, self.subscription.clone())
                 .build();
         Ok(stream)
+    }
+}
+
+impl ExchangeClient for CoinbaseClient {
+    fn get_exchange_name(&self) -> &'static str {
+        "coinbase"
+    }
+
+    fn get_symbols(&self) -> &[String] {
+        &self.symbols
     }
 }
 
@@ -88,6 +99,7 @@ impl CoinbaseClientBuilder {
         Ok(CoinbaseClient {
             subscription,
             base_url: self.base_url,
+            symbols: self.symbols,
         })
     }
 }

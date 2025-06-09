@@ -6,7 +6,7 @@ use std::pin::Pin;
 use crate::{
     models::NormalizedEvent,
     streams::{
-        ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
+        ExchangeClient, ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
         exchange_stream::ExchangeStreamBuilder, subscription::KrakenSubscription,
     },
 };
@@ -20,6 +20,7 @@ pub mod parser;
 pub struct KrakenClient {
     base_url: String,
     subscription: KrakenSubscription,
+    symbols: Vec<String>,
 }
 
 impl KrakenClient {
@@ -42,6 +43,16 @@ impl WebsocketStream for KrakenClient {
             ExchangeStreamBuilder::new(&self.base_url, None, parser, self.subscription.clone())
                 .build();
         Ok(stream)
+    }
+}
+
+impl ExchangeClient for KrakenClient {
+    fn get_exchange_name(&self) -> &'static str {
+        "kraken"
+    }
+
+    fn get_symbols(&self) -> &[String] {
+        &self.symbols
     }
 }
 
@@ -95,6 +106,7 @@ impl KrakenClientBuilder {
         Ok(KrakenClient {
             subscription,
             base_url: self.base_url,
+            symbols: self.symbols,
         })
     }
 }

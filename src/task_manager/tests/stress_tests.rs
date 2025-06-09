@@ -6,7 +6,7 @@ use tokio::time::sleep;
 async fn test_high_concurrency_task_spawning() {
     let mut manager = TaskManager::<u32>::new();
     const TASK_COUNT: u32 = 50; // Reduced for CI/test environments
-    
+
     // Spawn many tasks concurrently
     let mut task_ids = Vec::new();
     for i in 0..TASK_COUNT {
@@ -18,7 +18,7 @@ async fn test_high_concurrency_task_spawning() {
         });
         task_ids.push(task_id);
     }
-    
+
     // Wait for all tasks to complete
     let mut completed_count = 0;
     while completed_count < TASK_COUNT {
@@ -26,15 +26,15 @@ async fn test_high_concurrency_task_spawning() {
             completed_count += 1;
         }
     }
-    
+
     // Verify all tasks completed successfully
     assert_eq!(completed_count, TASK_COUNT);
-    
+
     // Check final statistics
     let stats = manager.get_stats();
     assert_eq!(stats.total_tasks, TASK_COUNT as usize);
-    
+
     // Verify all tasks are in completed state
     let completed_tasks = manager.get_tasks_by_state(TaskState::Completed);
     assert_eq!(completed_tasks.len(), TASK_COUNT as usize);
-} 
+}

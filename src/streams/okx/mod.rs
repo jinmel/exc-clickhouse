@@ -6,7 +6,7 @@ use crate::streams::okx::parser::OkxParser;
 use crate::{
     models::NormalizedEvent,
     streams::{
-        ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
+        ExchangeClient, ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
         exchange_stream::ExchangeStreamBuilder, subscription::OkxSubscription,
     },
 };
@@ -19,6 +19,7 @@ pub mod parser;
 pub struct OkxClient {
     base_url: String,
     subscription: OkxSubscription,
+    symbols: Vec<String>,
 }
 
 impl OkxClient {
@@ -40,6 +41,16 @@ impl WebsocketStream for OkxClient {
             ExchangeStreamBuilder::new(&self.base_url, None, parser, self.subscription.clone())
                 .build();
         Ok(stream)
+    }
+}
+
+impl ExchangeClient for OkxClient {
+    fn get_exchange_name(&self) -> &'static str {
+        "okx"
+    }
+
+    fn get_symbols(&self) -> &[String] {
+        &self.symbols
     }
 }
 
@@ -87,6 +98,7 @@ impl OkxClientBuilder {
         Ok(OkxClient {
             subscription,
             base_url: self.base_url,
+            symbols: self.symbols,
         })
     }
 }

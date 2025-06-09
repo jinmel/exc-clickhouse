@@ -7,7 +7,7 @@ use crate::streams::kucoin::parser::KucoinParser;
 use crate::{
     models::NormalizedEvent,
     streams::{
-        ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
+        ExchangeClient, ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
         exchange_stream::ExchangeStreamBuilder, subscription::KucoinSubscription,
     },
 };
@@ -20,6 +20,7 @@ pub mod parser;
 pub struct KucoinClient {
     base_url: String,
     subscription: KucoinSubscription,
+    symbols: Vec<String>,
 }
 
 impl KucoinClient {
@@ -40,6 +41,16 @@ impl WebsocketStream for KucoinClient {
             ExchangeStreamBuilder::new(&self.base_url, None, parser, self.subscription.clone())
                 .build();
         Ok(stream)
+    }
+}
+
+impl ExchangeClient for KucoinClient {
+    fn get_exchange_name(&self) -> &'static str {
+        "kucoin"
+    }
+
+    fn get_symbols(&self) -> &[String] {
+        &self.symbols
     }
 }
 
@@ -125,6 +136,7 @@ impl KucoinClientBuilder {
         Ok(KucoinClient {
             base_url,
             subscription,
+            symbols: self.symbols,
         })
     }
 }

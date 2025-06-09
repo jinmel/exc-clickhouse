@@ -24,21 +24,21 @@ impl TaskMetrics {
             throughput_ops_per_sec: None,
         }
     }
-    
+
     pub fn record_execution(&mut self, duration_ms: u64) {
         self.execution_duration_ms = duration_ms;
         self.last_success_time = Some(
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap_or_default()
-                .as_millis() as u64
+                .as_millis() as u64,
         );
     }
-    
+
     pub fn record_error(&mut self) {
         self.error_count += 1;
     }
-    
+
     pub fn record_restart(&mut self) {
         self.restart_count += 1;
     }
@@ -48,4 +48,4 @@ impl Default for TaskMetrics {
     fn default() -> Self {
         Self::new()
     }
-} 
+}

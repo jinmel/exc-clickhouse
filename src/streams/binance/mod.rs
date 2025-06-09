@@ -4,7 +4,7 @@ use crate::streams::binance::parser::BinanceParser;
 use crate::{
     models::NormalizedEvent,
     streams::{
-        ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
+        ExchangeClient, ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
         exchange_stream::ExchangeStreamBuilder, subscription::BinanceSubscription,
     },
 };
@@ -25,6 +25,7 @@ pub mod parser;
 pub struct BinanceClient {
     base_url: String,
     subscription: BinanceSubscription,
+    symbols: Vec<String>,
 }
 
 impl BinanceClient {
@@ -52,6 +53,16 @@ impl WebsocketStream for BinanceClient {
         )
         .build();
         Ok(stream)
+    }
+}
+
+impl ExchangeClient for BinanceClient {
+    fn get_exchange_name(&self) -> &'static str {
+        "binance"
+    }
+
+    fn get_symbols(&self) -> &[String] {
+        &self.symbols
     }
 }
 
@@ -102,6 +113,7 @@ impl BinanceClientBuilder {
         Ok(BinanceClient {
             subscription,
             base_url: self.base_url,
+            symbols: self.symbols,
         })
     }
 }

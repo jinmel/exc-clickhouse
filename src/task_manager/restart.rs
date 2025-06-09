@@ -1,7 +1,7 @@
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use rand::Rng;
-use crate::task_manager::types::FailureType;
 use crate::task_manager::circuit_breaker::CircuitBreaker;
+use crate::task_manager::types::FailureType;
+use rand::Rng;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// Restart policy configuration for task failure recovery
 #[derive(Debug, Clone)]
@@ -47,51 +47,55 @@ impl RestartUtils {
     pub fn classify_failure(error: &dyn std::error::Error) -> FailureType {
         let error_msg = error.to_string().to_lowercase();
         let error_type = std::any::type_name_of_val(error);
-        
+
         // Network-related errors
-        if error_msg.contains("connection") 
-            || error_msg.contains("timeout") 
+        if error_msg.contains("connection")
+            || error_msg.contains("timeout")
             || error_msg.contains("network")
             || error_msg.contains("dns")
             || error_msg.contains("socket")
             || error_type.contains("hyper")
-            || error_type.contains("reqwest") {
+            || error_type.contains("reqwest")
+        {
             return FailureType::Network;
         }
-        
+
         // Resource-related errors
-        if error_msg.contains("memory") 
+        if error_msg.contains("memory")
             || error_msg.contains("disk")
             || error_msg.contains("space")
             || error_msg.contains("resource")
-            || error_msg.contains("limit") {
+            || error_msg.contains("limit")
+        {
             return FailureType::Resource;
         }
-        
+
         // Configuration errors
-        if error_msg.contains("config") 
+        if error_msg.contains("config")
             || error_msg.contains("permission")
             || error_msg.contains("auth")
             || error_msg.contains("credential")
             || error_msg.contains("key")
-            || error_msg.contains("invalid") {
+            || error_msg.contains("invalid")
+        {
             return FailureType::Configuration;
         }
-        
+
         // Permanent errors
-        if error_msg.contains("parse") 
+        if error_msg.contains("parse")
             || error_msg.contains("format")
             || error_msg.contains("syntax")
             || error_msg.contains("not found")
             || error_msg.contains("does not exist")
-            || error_msg.contains("fatal") {
+            || error_msg.contains("fatal")
+        {
             return FailureType::Permanent;
         }
-        
+
         // Default to transient for unknown errors
         FailureType::Transient
     }
-    
+
     /// Determine if a failure type should be retried
     pub fn should_retry_failure_type(failure_type: &FailureType) -> bool {
         match failure_type {
@@ -100,37 +104,34 @@ impl RestartUtils {
             FailureType::Unknown => true, // Default to retry for unknown failures
         }
     }
-    
+
     /// Calculate exponential backoff delay with jitter
-    pub fn calculate_backoff_delay(
-        restart_count: u32,
-        policy: &RestartPolicy,
-    ) -> Duration {
+    pub fn calculate_backoff_delay(restart_count: u32, policy: &RestartPolicy) -> Duration {
         if restart_count == 0 {
             return policy.base_delay;
         }
-        
+
         // Calculate exponential backoff: base_delay * multiplier^restart_count
         let base_ms = policy.base_delay.as_millis() as f64;
         let multiplier = policy.backoff_multiplier;
         let exponential_delay_ms = base_ms * multiplier.powi(restart_count as i32);
-        
+
         // Cap at max_delay
         let capped_delay_ms = exponential_delay_ms.min(policy.max_delay.as_millis() as f64);
-        
+
         // Add jitter to prevent thundering herd
         let jitter_range = capped_delay_ms * policy.jitter_factor;
         let mut rng = rand::rng();
         let jitter = rng.random_range(-jitter_range..=jitter_range);
         let final_delay_ms = (capped_delay_ms + jitter).max(0.0);
-        
+
         // Ensure final delay doesn't exceed max_delay
         let max_delay_ms = policy.max_delay.as_millis() as f64;
         let clamped_delay_ms = final_delay_ms.min(max_delay_ms);
-        
+
         Duration::from_millis(clamped_delay_ms as u64)
     }
-    
+
     /// Comprehensive restart decision logic
     pub fn should_restart_task(
         error: &dyn std::error::Error,
@@ -143,13 +144,13 @@ impl RestartUtils {
         if policy.max_restarts > 0 && restart_count >= policy.max_restarts {
             return false;
         }
-        
+
         // Classify failure type
         let failure_type = Self::classify_failure(error);
         if !Self::should_retry_failure_type(&failure_type) {
             return false;
         }
-        
+
         // Check circuit breaker if enabled
         if policy.enable_circuit_breaker {
             if let Some(cb) = circuit_breaker {
@@ -158,20 +159,20 @@ impl RestartUtils {
                 }
             }
         }
-        
+
         // Check minimum time between restarts
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_millis() as u64;
-        
+
         let required_delay = Self::calculate_backoff_delay(restart_count, policy);
         let time_since_last_restart = now.saturating_sub(last_restart_time);
-        
+
         if time_since_last_restart < required_delay.as_millis() as u64 {
             return false;
         }
-        
+
         true
     }
-} 
+}

@@ -1,7 +1,7 @@
-use std::time::Duration;
-use std::task::{Context, Poll};
-use std::pin::Pin;
 use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use std::time::Duration;
 
 use crate::models::NormalizedQuote;
 use crate::models::NormalizedTrade;
@@ -192,10 +192,14 @@ impl ClickHouseService {
 
     pub async fn handle_msg(&self, batch: &[ClickhouseMessage]) -> eyre::Result<()> {
         tracing::trace!("Writing {} messages to ClickHouse", batch.len());
-        let mut trade_inserter: Inserter<ClickhouseTrade> = self.get_inserter("cex.normalized_trades", 5000, 1, 0.1)?;
-        let mut quote_inserter: Inserter<ClickhouseQuote> = self.get_inserter("cex.normalized_quotes", 5000, 1, 0.1)?;
-        let mut block_inserter: Inserter<BlockMetadata> = self.get_inserter("ethereum.blocks", 100, 1, 0.1)?;
-        let mut bid_inserter: Inserter<BidData> = self.get_inserter("timeboost.bids", 100, 1, 0.1)?;
+        let mut trade_inserter: Inserter<ClickhouseTrade> =
+            self.get_inserter("cex.normalized_trades", 5000, 1, 0.1)?;
+        let mut quote_inserter: Inserter<ClickhouseQuote> =
+            self.get_inserter("cex.normalized_quotes", 5000, 1, 0.1)?;
+        let mut block_inserter: Inserter<BlockMetadata> =
+            self.get_inserter("ethereum.blocks", 100, 1, 0.1)?;
+        let mut bid_inserter: Inserter<BidData> =
+            self.get_inserter("timeboost.bids", 100, 1, 0.1)?;
 
         for msg in batch {
             match msg {
@@ -274,7 +278,8 @@ impl ClickHouseService {
 impl Service<Vec<ClickhouseMessage>> for ClickHouseService {
     type Response = ();
     type Error = eyre::Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + 'static>>;
+    type Future =
+        Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + 'static>>;
 
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         // ClickHouse service is always ready to accept requests
