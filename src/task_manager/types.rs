@@ -102,6 +102,23 @@ impl std::fmt::Display for ShutdownPhase {
 
 /// Type aliases for task functions and results
 pub type TaskResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
+
+/// Extension trait for converting eyre::Result to TaskResult
+pub trait IntoTaskResult<T> {
+    fn into_task_result(self) -> TaskResult<T>;
+}
+
+impl<T> IntoTaskResult<T> for eyre::Result<T> {
+    fn into_task_result(self) -> TaskResult<T> {
+        self.map_err(|e| {
+            // Convert eyre::Report to a standard error
+            let error_msg = e.to_string();
+            Box::new(std::io::Error::new(std::io::ErrorKind::Other, error_msg))
+                as Box<dyn std::error::Error + Send + Sync>
+        })
+    }
+}
+
 pub type TaskFn<T> = Box<dyn FnOnce() -> TaskResult<T> + Send + 'static>;
 pub type AsyncTaskFn<T> = Box<
     dyn FnOnce() -> std::pin::Pin<
