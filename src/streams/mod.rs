@@ -8,11 +8,11 @@ pub mod okx;
 pub mod subscription;
 // pub mod upbit; // TODO: Needs refactoring to use new builder pattern
 
-use crate::models::NormalizedEvent;
+use crate::models::{ClickhouseMessage, NormalizedEvent};
 use async_trait::async_trait;
-use futures::stream::Stream;
+use futures::{StreamExt, pin_mut, stream::Stream};
 use serde::{Deserialize, Serialize};
-use tokio::time::Duration;
+use tokio::{sync::mpsc, time::Duration};
 
 #[async_trait]
 pub trait WebsocketStream {
@@ -79,4 +79,51 @@ pub enum ExchangeStreamError {
     Connection(String),
     #[error("Subscription error: {0}")]
     Subscription(String),
+}
+
+// helper function to spawn streaming task
+pub async fn process_exchange_stream<T>(
+    client: T,
+    evt_tx: mpsc::UnboundedSender<ClickhouseMessage>,
+) -> eyre::Result<()>
+where
+    T: WebsocketStream + ExchangeClient,
+    T::Error: std::error::Error + Send + Sync + 'static,
+{
+    let exchange_name = client.get_exchange_name();
+    let symbols = client.get_symbols();
+
+    tracing::info!(
+        "Starting {} stream for {} symbols: {:?}",
+        exchange_name,
+        symbols.len(),
+        symbols
+    );
+
+    let combined_stream = client
+        .stream_events()
+        .await
+        .map_err(|e| eyre::eyre!("Failed to create stream: {}", e))?;
+    let stream =
+        combined_stream.filter_map(|event: Result<NormalizedEvent, T::Error>| async move {
+            match event {
+                Ok(NormalizedEvent::Trade(trade)) => {
+                    Some(ClickhouseMessage::Cex(NormalizedEvent::Trade(trade)))
+                }
+                Ok(NormalizedEvent::Quote(quote)) => {
+                    Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
+                }
+                Err(e) => {
+                    tracing::error!("Error streaming {} event: {:?}", exchange_name, e);
+                    None
+                }
+            }
+        });
+    pin_mut!(stream);
+    while let Some(msg) = stream.next().await {
+        if evt_tx.send(msg).is_err() {
+            tracing::error!("Failed to send message to channel");
+        }
+    }
+    Ok(())
 }

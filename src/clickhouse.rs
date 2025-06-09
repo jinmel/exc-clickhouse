@@ -18,7 +18,8 @@ use eyre::WrapErr;
 use futures::pin_mut;
 use futures::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
-use tower::Service;
+use tokio::sync::mpsc;
+use tower::{Service, ServiceBuilder, ServiceExt};
 
 #[derive(Debug, Clone)]
 pub struct ClickHouseConfig {
@@ -293,4 +294,29 @@ impl Service<Vec<ClickhouseMessage>> for ClickHouseService {
             service.handle_msg(&req).await
         })
     }
+}
+
+// Helper method for spawning writer task
+pub async fn clickhouse_writer_task(
+    mut rx: mpsc::UnboundedReceiver<ClickhouseMessage>,
+    rate_limit: u64,
+    batch_size: usize,
+) -> eyre::Result<()> {
+    let cfg = ClickHouseConfig::from_env()?;
+    let clickhouse_svc = ClickHouseService::new(cfg);
+    let mut service = ServiceBuilder::new()
+        .rate_limit(rate_limit, Duration::from_secs(1))
+        .service(clickhouse_svc);
+    let mut buffer = Vec::with_capacity(batch_size);
+
+    while rx.recv_many(&mut buffer, batch_size).await > 0 {
+        service.ready().await?;
+        service.call(std::mem::take(&mut buffer)).await?;
+    }
+
+    if !buffer.is_empty() {
+        service.ready().await?;
+        service.call(buffer).await?;
+    }
+    Ok(())
 }

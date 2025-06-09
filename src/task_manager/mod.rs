@@ -37,8 +37,8 @@ pub use metrics::TaskMetrics;
 pub use registry::TaskRegistry;
 pub use restart::{RestartPolicy, RestartUtils};
 pub use types::{
-    AsyncTaskFn, CircuitBreakerState, FailureType, IntoTaskResult, PendingRestart, ShutdownPhase, TaskCompletion,
-    TaskFn, TaskId, TaskManagerStats, TaskResult, TaskState,
+    AsyncTaskFn, CircuitBreakerState, FailureType, IntoTaskResult, PendingRestart, ShutdownPhase,
+    TaskCompletion, TaskFn, TaskId, TaskManagerStats, TaskResult, TaskState,
 };
 
 // Convenience type aliases for common use cases

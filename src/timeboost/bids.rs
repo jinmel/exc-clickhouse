@@ -373,5 +373,3 @@ impl S3Client {
         Ok(bids)
     }
 }
-
-
