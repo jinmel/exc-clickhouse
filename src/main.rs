@@ -188,7 +188,7 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         let tx = msg_tx.clone();
 
         tracing::info!("Spawning binance stream for symbols: {:?}", symbols);
-        task_manager.spawn_task(TaskName::BinanceStream.to_string(), move || async move {
+        task_manager.spawn_task(TaskName::BinanceStream, move || async move {
             binance_stream_task(tx, symbols).await.into_task_result()
         });
     }
@@ -198,7 +198,7 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         let tx = msg_tx.clone();
 
         tracing::info!("Spawning bybit stream for symbols: {:?}", symbols);
-        task_manager.spawn_task(TaskName::BybitStream.to_string(), move || async move {
+        task_manager.spawn_task(TaskName::BybitStream, move || async move {
             bybit_stream_task(tx, symbols).await.into_task_result()
         });
     }
@@ -208,7 +208,7 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         let tx = msg_tx.clone();
 
         tracing::info!("Spawning okx stream for symbols: {:?}", symbols);
-        task_manager.spawn_task(TaskName::OkxStream.to_string(), move || async move {
+        task_manager.spawn_task(TaskName::OkxStream, move || async move {
             okx_stream_task(tx, symbols).await.into_task_result()
         });
     }
@@ -218,7 +218,7 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         let tx = msg_tx.clone();
 
         tracing::info!("Spawning coinbase stream for symbols: {:?}", symbols);
-        task_manager.spawn_task(TaskName::CoinbaseStream.to_string(), move || async move {
+        task_manager.spawn_task(TaskName::CoinbaseStream, move || async move {
             coinbase_stream_task(tx, symbols).await.into_task_result()
         });
     }
@@ -228,7 +228,7 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         let tx = msg_tx.clone();
 
         tracing::info!("Spawning kraken stream for symbols: {:?}", symbols);
-        task_manager.spawn_task(TaskName::KrakenStream.to_string(), move || async move {
+        task_manager.spawn_task(TaskName::KrakenStream, move || async move {
             kraken_stream_task(tx, symbols).await.into_task_result()
         });
     }
@@ -238,7 +238,7 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         let tx = msg_tx.clone();
 
         tracing::info!("Spawning kucoin stream for symbols: {:?}", symbols);
-        task_manager.spawn_task(TaskName::KucoinStream.to_string(), move || async move {
+        task_manager.spawn_task(TaskName::KucoinStream, move || async move {
             kucoin_stream_task(tx, symbols).await.into_task_result()
         });
     }
@@ -252,7 +252,7 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         );
         let tx = msg_tx.clone();
         task_manager.spawn_task(
-            TaskName::EthereumBlockMetadata.to_string(),
+            TaskName::EthereumBlockMetadata,
             move || async move { ethereum::fetch_blocks_task(rpc_url, tx).await.into_task_result() }
         );
     }
@@ -260,7 +260,7 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
     // Automatically spawn ClickHouse writer if we have any data producers
     if has_producers {
         tracing::info!("Spawning clickhouse writer task (auto-enabled for producer tasks)");
-        task_manager.spawn_task(TaskName::ClickHouseWriter.to_string(), move || async move {
+        task_manager.spawn_task(TaskName::ClickHouseWriter, move || async move {
             clickhouse_writer_task(msg_rx, args.clickhouse_rate_limit, args.batch_size).await.into_task_result()
         });
     }
@@ -268,7 +268,7 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
     if app_config.timeboost_config.enabled {
         tracing::info!("Spawning timeboost bids task");
         let tx = msg_tx.clone();
-        task_manager.spawn_task(TaskName::TimeboostBids.to_string(), move || async move {
+        task_manager.spawn_task(TaskName::TimeboostBids, move || async move {
             timeboost::bids::fetch_bids_task(tx).await.into_task_result()
         });
     }

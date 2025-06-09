@@ -69,10 +69,11 @@ impl<T: Send + 'static> TaskManager<T> {
     }
 
     /// Spawn a new async task with automatic registration
-    pub fn spawn_task<F, Fut>(&mut self, name: String, task_fn: F) -> TaskId
+    pub fn spawn_task<F, Fut, N>(&mut self, name: N, task_fn: F) -> TaskId
     where
         F: FnOnce() -> Fut + Send + 'static,
         Fut: std::future::Future<Output = TaskResult<T>> + Send + 'static,
+        N: std::fmt::Display,
     {
         // Check if shutdown is in progress and new tasks should be rejected
         {
@@ -104,6 +105,7 @@ impl<T: Send + 'static> TaskManager<T> {
 
         let task_id = TaskId::new();
         let task_id_for_async = task_id.clone();
+        let name = name.to_string(); // Convert to String once
         let task_name_for_async = name.clone();
         let task_name_for_completion = name.clone();
 
@@ -195,9 +197,10 @@ impl<T: Send + 'static> TaskManager<T> {
     }
 
     /// Spawn a blocking task that will be executed on a blocking thread pool
-    pub fn spawn_blocking_task<F>(&mut self, name: String, task_fn: F) -> TaskId
+    pub fn spawn_blocking_task<F, N>(&mut self, name: N, task_fn: F) -> TaskId
     where
         F: FnOnce() -> TaskResult<T> + Send + 'static,
+        N: std::fmt::Display,
     {
         self.spawn_task(name, move || async move {
             tokio::task::spawn_blocking(task_fn)
