@@ -19,10 +19,8 @@ use crate::{
 pub struct AppContext {
     pub config: AppConfig,
     pub task_manager: TaskManager<()>,
-    pub message_channel: (
-        mpsc::UnboundedSender<ClickhouseMessage>,
-        mpsc::UnboundedReceiver<ClickhouseMessage>,
-    ),
+    pub message_sender: mpsc::UnboundedSender<ClickhouseMessage>,
+    pub message_receiver: Option<mpsc::UnboundedReceiver<ClickhouseMessage>>,
     pub has_producers: bool,
 }
 
@@ -33,7 +31,7 @@ impl AppContext {
         self.spawn_tasks().await?;
 
         // Drop the sender to ensure proper cleanup
-        drop(self.message_channel.0);
+        drop(self.message_sender);
 
         // Monitor tasks using TaskManager with restart capabilities
         tokio::select! {
@@ -61,7 +59,7 @@ impl AppContext {
 
     /// Spawn all enabled tasks based on configuration
     async fn spawn_tasks(&mut self) -> Result<()> {
-        let msg_tx = self.message_channel.0.clone();
+        let msg_tx = self.message_sender.clone();
 
         // Spawn exchange streaming tasks
         if !self.config.exchange_configs.binance_symbols.is_empty() {
@@ -160,8 +158,9 @@ impl AppContext {
 
         // Automatically spawn ClickHouse writer if we have any data producers
         if self.has_producers {
-            let msg_rx =
-                std::mem::replace(&mut self.message_channel.1, mpsc::unbounded_channel().1);
+            let msg_rx = self.message_receiver
+                .take()
+                .expect("ClickHouse receiver should be available");
             let rate_limit = self.config.clickhouse_rate_limit;
             let batch_size = self.config.batch_size;
 
@@ -237,12 +236,13 @@ impl AppBuilder {
         let task_manager = TaskManager::<()>::with_config(task_config);
 
         // Create communication channel
-        let message_channel = mpsc::unbounded_channel::<ClickhouseMessage>();
+        let (message_sender, message_receiver) = mpsc::unbounded_channel::<ClickhouseMessage>();
 
         Ok(AppContext {
             config,
             task_manager,
-            message_channel,
+            message_sender,
+            message_receiver: Some(message_receiver),
             has_producers,
         })
     }
