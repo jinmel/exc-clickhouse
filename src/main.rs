@@ -16,7 +16,7 @@ use crate::{
         ExchangeClient, WebsocketStream, binance::BinanceClient, bybit::BybitClient,
         coinbase::CoinbaseClient, kraken::KrakenClient, kucoin::KucoinClient, okx::OkxClient,
     },
-    task_manager::{TaskManager, IntoTaskResult},
+    task_manager::{IntoTaskResult, TaskManager},
 };
 
 mod clickhouse;
@@ -180,8 +180,6 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
 
     let mut task_manager = TaskManager::<()>::with_config(task_config);
 
-
-
     // Spawn tasks
     if !binance_symbols.is_empty() {
         let symbols = binance_symbols.clone();
@@ -189,7 +187,8 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
 
         tracing::info!("Spawning binance stream for symbols: {:?}", symbols);
         task_manager.spawn_task(TaskName::BinanceStream, move || async move {
-            binance_stream_task(tx, symbols).await.into_task_result()
+            let client = BinanceClient::builder().add_symbols(symbols).build()?;
+            process_exchange_stream(client, tx).await.into_task_result()
         });
     }
 
@@ -199,7 +198,8 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
 
         tracing::info!("Spawning bybit stream for symbols: {:?}", symbols);
         task_manager.spawn_task(TaskName::BybitStream, move || async move {
-            bybit_stream_task(tx, symbols).await.into_task_result()
+            let client = BybitClient::builder().add_symbols(symbols).build()?;
+            process_exchange_stream(client, tx).await.into_task_result()
         });
     }
 
@@ -209,7 +209,8 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
 
         tracing::info!("Spawning okx stream for symbols: {:?}", symbols);
         task_manager.spawn_task(TaskName::OkxStream, move || async move {
-            okx_stream_task(tx, symbols).await.into_task_result()
+            let client = OkxClient::builder().add_symbols(symbols).build()?;
+            process_exchange_stream(client, tx).await.into_task_result()
         });
     }
 
@@ -219,7 +220,8 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
 
         tracing::info!("Spawning coinbase stream for symbols: {:?}", symbols);
         task_manager.spawn_task(TaskName::CoinbaseStream, move || async move {
-            coinbase_stream_task(tx, symbols).await.into_task_result()
+            let client = CoinbaseClient::builder().add_symbols(symbols).build()?;
+            process_exchange_stream(client, tx).await.into_task_result()
         });
     }
 
@@ -229,7 +231,8 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
 
         tracing::info!("Spawning kraken stream for symbols: {:?}", symbols);
         task_manager.spawn_task(TaskName::KrakenStream, move || async move {
-            kraken_stream_task(tx, symbols).await.into_task_result()
+            let client = KrakenClient::builder().add_symbols(symbols).build()?;
+            process_exchange_stream(client, tx).await.into_task_result()
         });
     }
 
@@ -239,7 +242,8 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
 
         tracing::info!("Spawning kucoin stream for symbols: {:?}", symbols);
         task_manager.spawn_task(TaskName::KucoinStream, move || async move {
-            kucoin_stream_task(tx, symbols).await.into_task_result()
+            let client = KucoinClient::builder().add_symbols(symbols).build().await?;
+            process_exchange_stream(client, tx).await.into_task_result()
         });
     }
 
@@ -251,17 +255,20 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
             rpc_url
         );
         let tx = msg_tx.clone();
-        task_manager.spawn_task(
-            TaskName::EthereumBlockMetadata,
-            move || async move { ethereum::fetch_blocks_task(rpc_url, tx).await.into_task_result() }
-        );
+        task_manager.spawn_task(TaskName::EthereumBlockMetadata, move || async move {
+            ethereum::fetch_blocks_task(rpc_url, tx)
+                .await
+                .into_task_result()
+        });
     }
 
     // Automatically spawn ClickHouse writer if we have any data producers
     if has_producers {
         tracing::info!("Spawning clickhouse writer task (auto-enabled for producer tasks)");
         task_manager.spawn_task(TaskName::ClickHouseWriter, move || async move {
-            clickhouse_writer_task(msg_rx, args.clickhouse_rate_limit, args.batch_size).await.into_task_result()
+            clickhouse_writer_task(msg_rx, args.clickhouse_rate_limit, args.batch_size)
+                .await
+                .into_task_result()
         });
     }
 
@@ -269,7 +276,9 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         tracing::info!("Spawning timeboost bids task");
         let tx = msg_tx.clone();
         task_manager.spawn_task(TaskName::TimeboostBids, move || async move {
-            timeboost::bids::fetch_bids_task(tx).await.into_task_result()
+            timeboost::bids::fetch_bids_task(tx)
+                .await
+                .into_task_result()
         });
     }
 
@@ -346,54 +355,6 @@ where
         }
     }
     Ok(())
-}
-
-async fn binance_stream_task(
-    evt_tx: mpsc::UnboundedSender<ClickhouseMessage>,
-    symbols: Vec<String>,
-) -> eyre::Result<()> {
-    let client = BinanceClient::builder().add_symbols(symbols).build()?;
-    process_exchange_stream(client, evt_tx).await
-}
-
-async fn bybit_stream_task(
-    evt_tx: mpsc::UnboundedSender<ClickhouseMessage>,
-    symbols: Vec<String>,
-) -> eyre::Result<()> {
-    let client = BybitClient::builder().add_symbols(symbols).build()?;
-    process_exchange_stream(client, evt_tx).await
-}
-
-async fn okx_stream_task(
-    evt_tx: mpsc::UnboundedSender<ClickhouseMessage>,
-    symbols: Vec<String>,
-) -> eyre::Result<()> {
-    let client = OkxClient::builder().add_symbols(symbols).build()?;
-    process_exchange_stream(client, evt_tx).await
-}
-
-async fn coinbase_stream_task(
-    evt_tx: mpsc::UnboundedSender<ClickhouseMessage>,
-    symbols: Vec<String>,
-) -> eyre::Result<()> {
-    let client = CoinbaseClient::builder().add_symbols(symbols).build()?;
-    process_exchange_stream(client, evt_tx).await
-}
-
-async fn kraken_stream_task(
-    evt_tx: mpsc::UnboundedSender<ClickhouseMessage>,
-    symbols: Vec<String>,
-) -> eyre::Result<()> {
-    let client = KrakenClient::builder().add_symbols(symbols).build()?;
-    process_exchange_stream(client, evt_tx).await
-}
-
-async fn kucoin_stream_task(
-    evt_tx: mpsc::UnboundedSender<ClickhouseMessage>,
-    symbols: Vec<String>,
-) -> eyre::Result<()> {
-    let client = KucoinClient::builder().add_symbols(symbols).build().await?;
-    process_exchange_stream(client, evt_tx).await
 }
 
 async fn clickhouse_writer_task(
