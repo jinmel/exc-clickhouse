@@ -1,101 +1,10 @@
-use clap::{Args, Parser, Subcommand};
 use eyre::WrapErr;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::time::Duration;
 
-use crate::symbols::SymbolsConfig;
-
-#[derive(Parser)]
-#[command(name = "exc-clickhouse")]
-#[command(about = "Exchange data collector to ClickHouse database")]
-#[command(version)]
-pub struct Cli {
-    #[command(subcommand)]
-    pub command: Commands,
-
-    /// Log level (trace, debug, info, warn, error)
-    #[arg(short, long, default_value = "info")]
-    pub log_level: String,
-}
-
-#[derive(Subcommand)]
-pub enum Commands {
-    /// One-time database tasks
-    Db(DbCmd),
-
-    /// Run streaming tasks
-    Stream(StreamArgs),
-}
-
-#[derive(Subcommand, Clone)]
-pub enum DbCommands {
-    /// Backfill timeboost bids
-    Timeboost,
-    /// Fetch Binance SPOT symbols from exchangeInfo
-    FetchBinanceSymbols(FetchBinanceSymbolsArgs),
-}
-
-#[derive(Args, Clone)]
-pub struct DbCmd {
-    #[command(subcommand)]
-    pub command: DbCommands,
-}
-
-#[derive(Args, Clone)]
-pub struct FetchBinanceSymbolsArgs {
-    /// Output YAML file path
-    #[arg(short, long)]
-    pub output: String,
-    /// Also insert trading pairs into ClickHouse
-    #[arg(long)]
-    pub update_clickhouse: bool,
-
-    #[arg(long)]
-    pub limit: usize,
-}
-
-#[derive(Args, Clone)]
-pub struct StreamArgs {
-    /// Path to symbols file
-    #[arg(short, long, default_value = "symbols.yaml")]
-    pub symbols_file: String,
-
-    /// Batch size for processing events
-    #[arg(short, long, default_value_t = 500)]
-    pub batch_size: usize,
-    /// Skip Ethereum block metadata
-    #[arg(long)]
-    pub skip_ethereum: bool,
-
-    /// Skip Timeboost bids
-    #[arg(long)]
-    pub skip_timeboost: bool,
-
-    /// RPC URL for Ethereum (overrides environment variable)
-    #[arg(long)]
-    pub rpc_url: Option<String>,
-
-    /// Enable automatic restart of failed tasks
-    #[arg(long)]
-    pub enable_restart: bool,
-
-    /// Maximum number of restart attempts per task (0 = unlimited)
-    #[arg(long, default_value_t = 0)]
-    pub max_restart_attempts: u32,
-
-    /// Initial restart delay in seconds
-    #[arg(long, default_value_t = 1)]
-    pub restart_delay_seconds: u64,
-
-    /// Maximum restart delay in seconds (for exponential backoff)
-    #[arg(long, default_value_t = 300)]
-    pub max_restart_delay_seconds: u64,
-
-    /// Rate limit for ClickHouse requests per second
-    #[arg(long, default_value_t = 5)]
-    pub clickhouse_rate_limit: u64,
-}
+use crate::cli::StreamArgs;
+use crate::trading_pairs::TradingPairsConfig;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
@@ -195,12 +104,12 @@ impl Default for ExchangeConfigs {
 impl AppConfig {
     /// Create AppConfig from CLI arguments and symbols file
     pub fn from_stream_args(args: &StreamArgs, cli_log_level: &str) -> eyre::Result<Self> {
-        let symbols_cfg = read_symbols(&args.symbols_file)?;
-        let exchange_configs = ExchangeConfigs::from_symbols_config(&symbols_cfg);
+        let trading_pairs = read_trading_pairs(&args.trading_pairs_file)?;
+        let exchange_configs = ExchangeConfigs::from_trading_pairs_config(&trading_pairs);
 
         Ok(Self {
             log_level: cli_log_level.to_string(),
-            symbols_file: args.symbols_file.clone(),
+            symbols_file: args.trading_pairs_file.clone(),
             batch_size: args.batch_size,
             clickhouse_rate_limit: args.clickhouse_rate_limit,
             restart_config: RestartConfig {
@@ -269,47 +178,56 @@ impl AppConfig {
 
 impl ExchangeConfigs {
     /// Create ExchangeConfigs from SymbolsConfig
-    pub fn from_symbols_config(symbols_cfg: &SymbolsConfig) -> Self {
-        let binance_symbols: Vec<String> = symbols_cfg
-            .entries
+    pub fn from_trading_pairs_config(cfg: &TradingPairsConfig) -> Self {
+        // Every exchange has a different convention for its symbols
+        let binance_symbols: Vec<String> = cfg
+            .trading_pairs
             .iter()
             .filter(|e| e.exchange.eq_ignore_ascii_case("binance"))
-            .flat_map(|e| e.symbols.iter().cloned().map(|s| s.to_lowercase()))
+            .filter(|e| e.trading_type.eq_ignore_ascii_case("spot"))
+            // Binance accepts lowercase symbols only
+            .map(|e| format!("{}{}", e.base_asset.to_lowercase(), e.quote_asset.to_lowercase()))
             .collect();
 
-        let bybit_symbols: Vec<String> = symbols_cfg
-            .entries
+        let bybit_symbols: Vec<String> = cfg
+            .trading_pairs
             .iter()
             .filter(|e| e.exchange.eq_ignore_ascii_case("bybit"))
-            .flat_map(|e| e.symbols.iter().cloned())
+            .filter(|e| e.trading_type.eq_ignore_ascii_case("spot"))
+            .map(|e| format!("{}-{}", e.base_asset, e.quote_asset))
             .collect();
 
-        let okx_symbols: Vec<String> = symbols_cfg
-            .entries
+        let okx_symbols: Vec<String> = cfg
+            .trading_pairs
             .iter()
             .filter(|e| e.exchange.eq_ignore_ascii_case("okx"))
-            .flat_map(|e| e.symbols.iter().cloned())
+            .filter(|e| e.trading_type.eq_ignore_ascii_case("spot"))
+            .map(|e| format!("{}-{}", e.base_asset, e.quote_asset))
             .collect();
 
-        let coinbase_symbols: Vec<String> = symbols_cfg
-            .entries
+        let coinbase_symbols: Vec<String> = cfg
+            .trading_pairs
             .iter()
             .filter(|e| e.exchange.eq_ignore_ascii_case("coinbase"))
-            .flat_map(|e| e.symbols.iter().cloned())
+            .filter(|e| e.trading_type.eq_ignore_ascii_case("spot"))
+            .map(|e| format!("{}-{}", e.base_asset, e.quote_asset))
             .collect();
 
-        let kraken_symbols: Vec<String> = symbols_cfg
-            .entries
+        let kraken_symbols: Vec<String> = cfg
+            .trading_pairs
             .iter()
             .filter(|e| e.exchange.eq_ignore_ascii_case("kraken"))
-            .flat_map(|e| e.symbols.iter().cloned())
+            .filter(|e| e.trading_type.eq_ignore_ascii_case("spot"))
+            .map(|e| format!("{}/{}", e.base_asset, e.quote_asset))
             .collect();
 
-        let kucoin_symbols: Vec<String> = symbols_cfg
-            .entries
+        let kucoin_symbols: Vec<String> = cfg
+            .trading_pairs
             .iter()
             .filter(|e| e.exchange.eq_ignore_ascii_case("kucoin"))
-            .flat_map(|e| e.symbols.iter().cloned())
+            .filter(|e| e.trading_type.eq_ignore_ascii_case("spot"))
+            .map(|e| format!("{}-{}", e.base_asset, e.quote_asset))
+            .take(5)
             .collect();
 
         Self {
@@ -324,9 +242,9 @@ impl ExchangeConfigs {
 }
 
 /// Read symbols configuration from YAML file
-pub fn read_symbols(filename: &str) -> eyre::Result<SymbolsConfig> {
+pub fn read_trading_pairs(filename: &str) -> eyre::Result<TradingPairsConfig> {
     let file = File::open(filename).wrap_err("Failed to open symbols YAML file")?;
-    SymbolsConfig::from_yaml(file)
+    TradingPairsConfig::from_yaml(file)
 }
 
 #[cfg(test)]
@@ -344,7 +262,7 @@ mod tests {
     #[test]
     fn test_restart_config_from_args() {
         let args = StreamArgs {
-            symbols_file: "test.yaml".to_string(),
+            trading_pairs_file: "test.yaml".to_string(),
             batch_size: 1000,
             skip_ethereum: false,
             skip_timeboost: false,
@@ -365,7 +283,7 @@ mod tests {
 
     #[test]
     fn test_read_symbols_file_not_found() {
-        let result = read_symbols("nonexistent.yaml");
+        let result = read_trading_pairs("nonexistent.yaml");
         assert!(result.is_err());
     }
 
@@ -395,7 +313,7 @@ impl From<&StreamArgs> for AppConfig {
     fn from(args: &StreamArgs) -> Self {
         Self {
             log_level: "info".to_string(), // Will be set from CLI
-            symbols_file: args.symbols_file.clone(),
+            symbols_file: args.trading_pairs_file.clone(),
             batch_size: args.batch_size,
             clickhouse_rate_limit: args.clickhouse_rate_limit,
             restart_config: RestartConfig {
