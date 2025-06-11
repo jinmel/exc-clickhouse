@@ -27,9 +27,26 @@ pub struct TradingPair {
     pub quote_asset: String,
 }
 
+impl TradingPair {
+    /// Normalize a trading pair by converting exchange name to lowercase
+    fn normalize(mut self) -> Self {
+        self.exchange = self.exchange.to_lowercase();
+        if self.exchange == "okx" {
+            self.exchange = "okex".to_string();
+        }
+        self
+    }
+}
+
 pub async fn backfill_trading_pairs(trading_pairs_file: &str) -> eyre::Result<()> {
     let trading_pairs = TradingPairsConfig::from_yaml(File::open(trading_pairs_file)?)?;
+    let trading_pairs_normalized: Vec<TradingPair> = trading_pairs
+        .trading_pairs
+        .into_iter()
+        .map(TradingPair::normalize)
+        .collect();
+    
     let clickhouse = ClickHouseService::new(ClickHouseConfig::from_env()?);
-    clickhouse.write_trading_pairs(trading_pairs.trading_pairs).await?;
+    clickhouse.write_trading_pairs(trading_pairs_normalized).await?;
     Ok(())
 }

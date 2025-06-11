@@ -9,7 +9,7 @@ pub enum ExchangeName {
     Binance,
     #[serde(rename = "bybit")]
     Bybit,
-    #[serde(rename = "okx")]
+    #[serde(rename = "okex")]
     Okx,
     #[serde(rename = "coinbase")]
     Coinbase,
@@ -26,7 +26,7 @@ impl std::fmt::Display for ExchangeName {
         match self {
             ExchangeName::Binance => write!(f, "binance"),
             ExchangeName::Bybit => write!(f, "bybit"),
-            ExchangeName::Okx => write!(f, "okx"),
+            ExchangeName::Okx => write!(f, "okex"),
             ExchangeName::Coinbase => write!(f, "coinbase"),
             ExchangeName::Kraken => write!(f, "kraken"),
             ExchangeName::Kucoin => write!(f, "kucoin"),
