@@ -53,32 +53,29 @@ impl Parser<Vec<NormalizedEvent>> for KrakenParser {
                         .collect::<Result<Vec<NormalizedEvent>, Self::Error>>()?;
                     Ok(Some(normalized_quotes))
                 }
-                Response::Status(_) => {
-                    tracing::debug!("Received status message");
-                    Ok(None)
-                }
-                Response::Heartbeat(_) => {
-                    tracing::debug!("Received heartbeat message");
-                    Ok(None)
-                }
-                Response::Unknown => {
-                    tracing::warn!("Received unknown message type");
-                    Ok(None)
-                }
             },
-            KrakenMessage::Pong(_) => {
-                tracing::debug!("Received pong message");
-                Ok(None)
-            }
             KrakenMessage::Subscription(sub_result) => {
                 if !sub_result.success {
                     if let Some(error) = sub_result.error {
+                        tracing::error!("Subscription failed: {error}");
                         return Err(ExchangeStreamError::Subscription(format!(
                             "Subscription failed: {error}"
                         )));
                     }
                 }
-                tracing::debug!("Subscription result: {:?}", sub_result);
+                tracing::trace!("Subscription result: {:?}", sub_result);
+                Ok(None)
+            }
+            KrakenMessage::Status(status_msg) => {
+                tracing::trace!("Received status message: {:?}", status_msg);
+                Ok(None)
+            }
+            KrakenMessage::Heartbeat(heartbeat_msg) => {
+                tracing::trace!("Received heartbeat message: {:?}", heartbeat_msg);
+                Ok(None)
+            }
+            KrakenMessage::Pong(pong_msg) => {
+                tracing::trace!("Received pong message: {:?}", pong_msg);
                 Ok(None)
             }
         }
