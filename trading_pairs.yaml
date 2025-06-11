@@ -900,7 +900,7 @@
   quote_asset: USDT
 - exchange: Kraken
   trading_type: SPOT
-  pair: COMPXBT
+  pair: COMPBTC
   base_asset: COMP
   quote_asset: BTC
 - exchange: Kraken
@@ -925,12 +925,12 @@
   quote_asset: USDT
 - exchange: Kraken
   trading_type: SPOT
-  pair: ETHXBT
+  pair: ETHBTC
   base_asset: ETH
   quote_asset: BTC
 - exchange: Kraken
   trading_type: SPOT
-  pair: GRTXBT
+  pair: GRTBTC
   base_asset: GRT
   quote_asset: BTC
 - exchange: Kraken
@@ -950,7 +950,7 @@
   quote_asset: USDT
 - exchange: Kraken
   trading_type: SPOT
-  pair: LINKXBT
+  pair: LINKBTC
   base_asset: LINK
   quote_asset: BTC
 - exchange: Kraken
@@ -960,27 +960,27 @@
   quote_asset: ETH
 - exchange: Kraken
   trading_type: SPOT
-  pair: UNIXBT
+  pair: UNIBTC
   base_asset: UNI
   quote_asset: BTC
 - exchange: Kraken
   trading_type: SPOT
-  pair: WBTCXBT
+  pair: WBTCBTC
   base_asset: WBTC
   quote_asset: BTC
 - exchange: Kraken
   trading_type: SPOT
-  pair: XBTDAI
+  pair: BTCDAI
   base_asset: BTC
   quote_asset: DAI
 - exchange: Kraken
   trading_type: SPOT
-  pair: XBTUSDC
+  pair: BTCUSDC
   base_asset: BTC
   quote_asset: USDC
 - exchange: Kraken
   trading_type: SPOT
-  pair: XBTUSDT
+  pair: BTCUSDT
   base_asset: BTC
   quote_asset: USDT
 - exchange: Kucoin

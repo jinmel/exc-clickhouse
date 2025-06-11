@@ -142,6 +142,7 @@ class KrakenAdapter(ExchangeAdapter):
                 
                 # Use altname if available, otherwise use pair_name
                 display_name = altname if altname else pair_name
+                display_name = display_name.replace('XBT', 'BTC')
                 
                 # Create TradingPair object
                 trading_pair = TradingPair(
