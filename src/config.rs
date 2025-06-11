@@ -45,6 +45,7 @@ pub struct ExchangeConfigs {
     pub coinbase_symbols: Vec<String>,
     pub kraken_symbols: Vec<String>,
     pub kucoin_symbols: Vec<String>,
+    pub mexc_symbols: Vec<String>,
 }
 
 impl Default for AppConfig {
@@ -97,6 +98,7 @@ impl Default for ExchangeConfigs {
             coinbase_symbols: Vec::new(),
             kraken_symbols: Vec::new(),
             kucoin_symbols: Vec::new(),
+            mexc_symbols: Vec::new(),
         }
     }
 }
@@ -150,6 +152,7 @@ impl AppConfig {
             || !self.exchange_configs.coinbase_symbols.is_empty()
             || !self.exchange_configs.kraken_symbols.is_empty()
             || !self.exchange_configs.kucoin_symbols.is_empty()
+            || !self.exchange_configs.mexc_symbols.is_empty()
     }
 
     /// Create TaskManagerConfig from the current AppConfig
@@ -186,7 +189,13 @@ impl ExchangeConfigs {
             .filter(|e| e.exchange.eq_ignore_ascii_case("binance"))
             .filter(|e| e.trading_type.eq_ignore_ascii_case("spot"))
             // Binance accepts lowercase symbols only
-            .map(|e| format!("{}{}", e.base_asset.to_lowercase(), e.quote_asset.to_lowercase()))
+            .map(|e| {
+                format!(
+                    "{}{}",
+                    e.base_asset.to_lowercase(),
+                    e.quote_asset.to_lowercase()
+                )
+            })
             .collect();
 
         let bybit_symbols: Vec<String> = cfg
@@ -229,6 +238,14 @@ impl ExchangeConfigs {
             .map(|e| format!("{}-{}", e.base_asset, e.quote_asset))
             .collect();
 
+        let mexc_symbols: Vec<String> = cfg
+            .trading_pairs
+            .iter()
+            .filter(|e| e.exchange.eq_ignore_ascii_case("mexc"))
+            .filter(|e| e.trading_type.eq_ignore_ascii_case("spot"))
+            .map(|e| format!("{}{}", e.base_asset, e.quote_asset))
+            .collect();
+
         Self {
             binance_symbols,
             bybit_symbols,
@@ -236,6 +253,7 @@ impl ExchangeConfigs {
             coinbase_symbols,
             kraken_symbols,
             kucoin_symbols,
+            mexc_symbols,
         }
     }
 }
