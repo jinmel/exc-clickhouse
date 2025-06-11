@@ -1,7 +1,5 @@
-use crate::symbols::{SymbolsConfig, SymbolsConfigEntry, fetch_binance_top_spot_pairs};
 use clap::Parser;
 use dotenv::dotenv;
-use eyre::WrapErr;
 use futures::{StreamExt, pin_mut};
 use std::time::Duration;
 use tokio::sync::mpsc;
@@ -24,7 +22,7 @@ mod config;
 mod ethereum;
 mod models;
 mod streams;
-mod symbols;
+mod trading_pairs;
 mod task_manager;
 mod timeboost;
 mod tower_utils;
@@ -84,29 +82,10 @@ async fn main() -> eyre::Result<()> {
                 tracing::info!("Timeboost bids backfill complete");
                 return Ok(());
             }
-            DbCommands::FetchBinanceSymbols(args) => {
-                tracing::info!("Fetching top Binance SPOT symbols");
-                let pairs = fetch_binance_top_spot_pairs(args.limit).await?;
-                let symbols: Vec<String> = pairs.iter().map(|p| p.pair.clone()).collect();
-                let cfg = SymbolsConfig {
-                    entries: vec![SymbolsConfigEntry {
-                        exchange: "Binance".to_string(),
-                        market: "SPOT".to_string(),
-                        symbols,
-                    }],
-                };
-                let file = std::fs::File::create(&args.output)
-                    .wrap_err("Failed to create output YAML file")?;
-                cfg.to_yaml(file)?;
-                tracing::info!("Symbols written to {}", args.output);
-
-                if args.update_clickhouse {
-                    tracing::info!("Updating ClickHouse trading_pairs table");
-                    let ch_cfg = ClickHouseConfig::from_env()?;
-                    let ch = ClickHouseService::new(ch_cfg);
-                    ch.write_trading_pairs(pairs).await?;
-                }
-
+            DbCommands::TradingPairs(args) => {
+                tracing::info!("Backfilling trading pairs");
+                trading_pairs::backfill_trading_pairs(&args.trading_pairs_file).await?;
+                tracing::info!("Trading pairs backfill complete");
                 return Ok(());
             }
         },
@@ -118,49 +97,12 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
     // Create app configuration from stream args
     let app_config = AppConfig::from_stream_args(&args, "info")?;
 
-    let symbols_cfg = crate::config::read_symbols(&args.symbols_file)?;
-
-    let binance_symbols: Vec<String> = symbols_cfg
-        .entries
-        .iter()
-        .filter(|e| e.exchange.eq_ignore_ascii_case("binance"))
-        .flat_map(|e| e.symbols.iter().cloned().map(|s| s.to_lowercase()))
-        .collect();
-
-    let bybit_symbols: Vec<String> = symbols_cfg
-        .entries
-        .iter()
-        .filter(|e| e.exchange.eq_ignore_ascii_case("bybit"))
-        .flat_map(|e| e.symbols.iter().cloned())
-        .collect();
-
-    let okx_symbols: Vec<String> = symbols_cfg
-        .entries
-        .iter()
-        .filter(|e| e.exchange.eq_ignore_ascii_case("okx"))
-        .flat_map(|e| e.symbols.iter().cloned())
-        .collect();
-
-    let coinbase_symbols: Vec<String> = symbols_cfg
-        .entries
-        .iter()
-        .filter(|e| e.exchange.eq_ignore_ascii_case("coinbase"))
-        .flat_map(|e| e.symbols.iter().cloned())
-        .collect();
-
-    let kraken_symbols: Vec<String> = symbols_cfg
-        .entries
-        .iter()
-        .filter(|e| e.exchange.eq_ignore_ascii_case("kraken"))
-        .flat_map(|e| e.symbols.iter().cloned())
-        .collect();
-
-    let kucoin_symbols: Vec<String> = symbols_cfg
-        .entries
-        .iter()
-        .filter(|e| e.exchange.eq_ignore_ascii_case("kucoin"))
-        .flat_map(|e| e.symbols.iter().cloned())
-        .collect();
+    let binance_symbols: Vec<String> = app_config.exchange_configs.binance_symbols.clone();
+    let bybit_symbols: Vec<String> = app_config.exchange_configs.bybit_symbols.clone();
+    let okx_symbols: Vec<String> = app_config.exchange_configs.okx_symbols.clone();
+    let coinbase_symbols: Vec<String> = app_config.exchange_configs.coinbase_symbols.clone();
+    let kraken_symbols: Vec<String> = app_config.exchange_configs.kraken_symbols.clone();
+    let kucoin_symbols: Vec<String> = app_config.exchange_configs.kucoin_symbols.clone();
 
     // Check if any data producer tasks will be enabled
     let has_producers = app_config.has_exchange_symbols()
@@ -168,7 +110,7 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         || app_config.timeboost_config.enabled;
 
     if !has_producers {
-        tracing::warn!("No tasks were enabled. Use --help to see available options.");
+        tracing::warn!("No tasks were enabled and all exchange symbols are empty. Use --help to see available options.");
         return Ok(());
     }
 
@@ -177,7 +119,6 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
 
     // Create TaskManager with restart configuration from AppConfig
     let task_config = app_config.get_task_manager_config();
-
     let mut task_manager = TaskManager::<()>::with_config(task_config);
 
     // Spawn tasks

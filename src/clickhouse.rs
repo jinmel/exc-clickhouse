@@ -10,6 +10,7 @@ use crate::{
     ethereum::BlockMetadata,
     models::{ClickhouseMessage, EthereumMetadataMessage, ExpresslaneMessage, NormalizedEvent},
 };
+use crate::trading_pairs::TradingPair;
 use clickhouse::Compression;
 use clickhouse::Row;
 use clickhouse::inserter::Inserter;
@@ -232,7 +233,7 @@ impl ClickHouseService {
 
     pub async fn write_trading_pairs(
         &self,
-        pairs: Vec<crate::symbols::TradingPair>,
+        pairs: Vec<TradingPair>,
     ) -> eyre::Result<()> {
         if pairs.is_empty() {
             return Ok(());
