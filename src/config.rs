@@ -194,7 +194,7 @@ impl ExchangeConfigs {
             .iter()
             .filter(|e| e.exchange.eq_ignore_ascii_case("bybit"))
             .filter(|e| e.trading_type.eq_ignore_ascii_case("spot"))
-            .map(|e| format!("{}-{}", e.base_asset, e.quote_asset))
+            .map(|e| format!("{}{}", e.base_asset, e.quote_asset))
             .collect();
 
         let okx_symbols: Vec<String> = cfg
