@@ -34,3 +34,4 @@ tasks/
 .windsurfrules
 .env.example
 .taskmaster
+__pycache__
