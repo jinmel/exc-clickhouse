@@ -454,3 +454,70 @@ impl Subscription for KrakenSubscription {
         Some(Duration::from_secs(10)) // Send ping every 50 seconds
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct MexcSubscription {
+    symbols: Vec<StreamSymbols>,
+}
+
+impl Default for MexcSubscription {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl MexcSubscription {
+    pub fn new() -> Self {
+        Self { symbols: vec![] }
+    }
+
+    pub fn add_markets(&mut self, markets: Vec<StreamSymbols>) {
+        self.symbols.extend(markets);
+    }
+}
+
+impl Subscription for MexcSubscription {
+    fn to_json(&self) -> Result<Vec<serde_json::Value>, serde_json::Error> {
+        let mut messages = Vec::new();
+        let mut id = 1;
+
+        for symbol in &self.symbols {
+            // Create trade subscription message
+            let trade_params = vec![format!("spot@public.deals.v3.api@{}", symbol.symbol)];
+            messages.push(serde_json::json!({
+                "method": "SUBSCRIPTION",
+                "params": trade_params,
+                "id": id
+            }));
+            id += 1;
+
+            // Create book ticker subscription message
+            let ticker_params = vec![format!("spot@public.bookTicker.v3.api@{}", symbol.symbol)];
+            messages.push(serde_json::json!({
+                "method": "SUBSCRIPTION", 
+                "params": ticker_params,
+                "id": id
+            }));
+            id += 1;
+        }
+
+        Ok(messages)
+    }
+
+    fn heartbeat(&self) -> Option<tokio_tungstenite::tungstenite::Message> {
+        // MEXC uses ping-pong heartbeat
+        let ping = serde_json::json!({
+            "method": "PING",
+            "params": [],
+            "id": 0
+        });
+        
+        Some(tokio_tungstenite::tungstenite::Message::Text(
+            ping.to_string().into(),
+        ))
+    }
+
+    fn heartbeat_interval(&self) -> Option<Duration> {
+        Some(Duration::from_secs(30)) // MEXC has 30-second timeout
+    }
+}

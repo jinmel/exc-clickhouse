@@ -1,6 +1,6 @@
 use exc_clickhouse::streams::{
     WebsocketStream, binance::BinanceClient, bybit::BybitClient, coinbase::CoinbaseClient,
-    kraken::KrakenClient, kucoin::KucoinClient, okx::OkxClient,
+    kraken::KrakenClient, kucoin::KucoinClient, mexc::MexcClient, okx::OkxClient,
 };
 use futures::StreamExt;
 use tokio::time::{Duration, timeout};
@@ -204,6 +204,43 @@ async fn test_kucoin_stream_event() {
         ])
         .build()
         .await
+        .unwrap();
+    let mut stream = client.stream_events().await.unwrap();
+
+    let result = timeout(Duration::from_secs(10), async {
+        for _ in 0..30 {
+            let item = stream.next().await;
+            assert!(item.is_some(), "no event received");
+            assert!(item.unwrap().is_ok(), "event returned error");
+        }
+    })
+    .await;
+
+    assert!(
+        result.is_ok(),
+        "timed out waiting for 30 events within 10 seconds"
+    );
+}
+
+#[tokio::test]
+#[ignore]
+async fn test_mexc_stream_event() {
+    init_tracing();
+    let symbols = vec![
+        "BTCUSDT",
+        "ETHUSDT",
+        "XRPUSDT",
+        "ADAUSDT",
+        "DOGEUSDT",
+        "SOLUSDT",
+        "LTCUSDT",
+        "LINKUSDT",
+        "MATICUSDT",
+        "DOTUSDT",
+    ];
+    let client = MexcClient::builder()
+        .add_symbols(symbols)
+        .build()
         .unwrap();
     let mut stream = client.stream_events().await.unwrap();
 

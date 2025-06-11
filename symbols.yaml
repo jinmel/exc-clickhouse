@@ -146,3 +146,26 @@
     - SUSHI/USD
     - CRV/USD
     - GRT/USD
+- exchange: "MEXC"
+  market: "SPOT"
+  symbols:
+    - BTCUSDT
+    - ETHUSDT
+    - SOLUSDT
+    - LINKUSDT
+    - UNIUSDT
+    - AAVEUSDT
+    - SUSHIUSDT
+    - CRVUSDT
+    - GRTUSDT
+    - CAKEUSDT
+    - GMXUSDT
+    - MAGICUSDT
+    - ARBUSDT
+    - PENDLEUSDT
+    - ANIMEUSDT
+    - ENAUSDT
+    - ADAUSDT
+    - DOGEUSDT
+    - XRPUSDT
+    - LTCUSDT
