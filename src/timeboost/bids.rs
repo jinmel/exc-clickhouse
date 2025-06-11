@@ -268,7 +268,7 @@ impl S3Client {
         // This is equivalent to AWS CLI's --no-sign-request flag
 
         let config = aws_config::defaults(BehaviorVersion::latest())
-            .region("us-west-2") // Try us-west-2 region for blockchain-related buckets
+            .region("us-east-2") // Try us-east-2 region for blockchain-related buckets
             .no_credentials() // This is the key - no credentials for unsigned requests
             .load()
             .await;
