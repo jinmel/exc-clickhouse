@@ -454,3 +454,62 @@ impl Subscription for KrakenSubscription {
         Some(Duration::from_secs(10)) // Send ping every 50 seconds
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct MexcSubscription {
+    symbols: Vec<StreamSymbols>,
+}
+
+impl MexcSubscription {
+    pub fn new() -> Self {
+        Self { symbols: vec![] }
+    }
+
+    pub fn add_markets(&mut self, markets: Vec<StreamSymbols>) {
+        self.symbols.extend(markets);
+    }
+}
+
+impl Subscription for MexcSubscription {
+    fn to_json(&self) -> Result<Vec<serde_json::Value>, serde_json::Error> {
+        #[derive(Serialize)]
+        struct SubscriptionMessage<'a> {
+            method: &'static str,
+            params: Vec<&'a str>,
+        }
+
+        let params = self
+            .symbols
+            .iter()
+            .map(|m| {
+                let channel = match m.stream_type {
+                    StreamType::Trade => "spot@public.aggre.deals.v3.api.pb@100ms",
+                    StreamType::Quote => "spot@public.aggre.bookTicker.v3.api.pb@100ms",
+                };
+                format!("{channel}@{symbol}", symbol = m.symbol)
+            })
+            .collect::<Vec<String>>();
+
+        let msg = SubscriptionMessage {
+            method: "SUBSCRIPTION",
+            params: params.iter().map(|s| s.as_str()).collect(),
+        };
+        Ok(vec![serde_json::to_value(msg)?])
+    }
+
+    fn heartbeat(&self) -> Option<tokio_tungstenite::tungstenite::Message> {
+        #[derive(Serialize)]
+        struct Ping<'a> {
+            method: &'a str,
+        }
+
+        let ping = Ping { method: "PING" };
+        Some(tokio_tungstenite::tungstenite::Message::Text(
+            serde_json::to_string(&ping).unwrap().into(),
+        ))
+    }
+
+    fn heartbeat_interval(&self) -> Option<Duration> {
+        Some(Duration::from_secs(30))
+    }
+}

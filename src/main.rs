@@ -7,27 +7,28 @@ use tower::{Service, ServiceBuilder, ServiceExt};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 use crate::{
-    clickhouse::{ClickHouseConfig, ClickHouseService},
     cli::{Cli, Commands, DbCommands, StreamArgs},
+    clickhouse::{ClickHouseConfig, ClickHouseService},
     config::AppConfig,
     models::{ClickhouseMessage, NormalizedEvent},
     streams::{
         ExchangeClient, WebsocketStream, binance::BinanceClient, bybit::BybitClient,
-        coinbase::CoinbaseClient, kraken::KrakenClient, kucoin::KucoinClient, okx::OkxClient,
+        coinbase::CoinbaseClient, kraken::KrakenClient, kucoin::KucoinClient, mexc::MexcClient,
+        okx::OkxClient,
     },
     task_manager::{IntoTaskResult, TaskManager},
 };
 
-mod clickhouse;
 mod cli;
+mod clickhouse;
 mod config;
 mod ethereum;
 mod models;
 mod streams;
-mod trading_pairs;
 mod task_manager;
 mod timeboost;
 mod tower_utils;
+mod trading_pairs;
 
 /// Enum for task names to ensure type safety and consistency
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -38,6 +39,7 @@ enum TaskName {
     CoinbaseStream,
     KrakenStream,
     KucoinStream,
+    MexcStream,
     EthereumBlockMetadata,
     ClickHouseWriter,
     TimeboostBids,
@@ -52,6 +54,7 @@ impl std::fmt::Display for TaskName {
             TaskName::CoinbaseStream => write!(f, "Coinbase Stream"),
             TaskName::KrakenStream => write!(f, "Kraken Stream"),
             TaskName::KucoinStream => write!(f, "KuCoin Stream"),
+            TaskName::MexcStream => write!(f, "MEXC Stream"),
             TaskName::EthereumBlockMetadata => write!(f, "Ethereum Block Metadata"),
             TaskName::ClickHouseWriter => write!(f, "ClickHouse Writer"),
             TaskName::TimeboostBids => write!(f, "Timeboost Bids"),
@@ -105,6 +108,7 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
     let coinbase_symbols: Vec<String> = app_config.exchange_configs.coinbase_symbols.clone();
     let kraken_symbols: Vec<String> = app_config.exchange_configs.kraken_symbols.clone();
     let kucoin_symbols: Vec<String> = app_config.exchange_configs.kucoin_symbols.clone();
+    let mexc_symbols: Vec<String> = app_config.exchange_configs.mexc_symbols.clone();
 
     // Check if any data producer tasks will be enabled
     let has_producers = app_config.has_exchange_symbols()
@@ -112,7 +116,9 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         || app_config.timeboost_config.enabled;
 
     if !has_producers {
-        tracing::warn!("No tasks were enabled and all exchange symbols are empty. Use --help to see available options.");
+        tracing::warn!(
+            "No tasks were enabled and all exchange symbols are empty. Use --help to see available options."
+        );
         return Ok(());
     }
 
@@ -174,6 +180,15 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         let tx = msg_tx.clone();
         task_manager.spawn_task(TaskName::KucoinStream, move || async move {
             let client = KucoinClient::builder().add_symbols(symbols).build().await?;
+            process_exchange_stream(client, tx).await.into_task_result()
+        });
+    }
+
+    if !mexc_symbols.is_empty() {
+        let symbols = mexc_symbols.clone();
+        let tx = msg_tx.clone();
+        task_manager.spawn_task(TaskName::MexcStream, move || async move {
+            let client = MexcClient::builder().add_symbols(symbols).build()?;
             process_exchange_stream(client, tx).await.into_task_result()
         });
     }
