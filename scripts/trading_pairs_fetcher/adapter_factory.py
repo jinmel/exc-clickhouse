@@ -20,6 +20,7 @@ try:
     from .coinbase_adapter import CoinbaseAdapter
     from .kucoin_adapter import KuCoinAdapter
     from .kraken_adapter import KrakenAdapter
+    from .mexc_adapter import MexcAdapter
 except ImportError:
     from models import ExchangeResponse, TradingPair
     from base_adapter import ExchangeAdapter
@@ -29,6 +30,7 @@ except ImportError:
     from coinbase_adapter import CoinbaseAdapter
     from kucoin_adapter import KuCoinAdapter
     from kraken_adapter import KrakenAdapter
+    from mexc_adapter import MexcAdapter
 
 
 class AdapterFactory:
@@ -46,6 +48,7 @@ class AdapterFactory:
         'coinbase': CoinbaseAdapter,
         'kucoin': KuCoinAdapter,
         'kraken': KrakenAdapter,
+        'mexc': MexcAdapter,
     }
     
     def __init__(self):

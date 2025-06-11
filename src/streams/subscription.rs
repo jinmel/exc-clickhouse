@@ -454,3 +454,64 @@ impl Subscription for KrakenSubscription {
         Some(Duration::from_secs(10)) // Send ping every 50 seconds
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct MexcSubscription {
+    symbols: Vec<StreamSymbols>,
+}
+
+impl Default for MexcSubscription {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl MexcSubscription {
+    pub fn new() -> Self {
+        Self { symbols: vec![] }
+    }
+
+    pub fn add_markets(&mut self, symbols: Vec<StreamSymbols>) {
+        self.symbols.extend(symbols);
+    }
+}
+
+impl Subscription for MexcSubscription {
+    fn to_json(&self) -> Result<Vec<serde_json::Value>, serde_json::Error> {
+        #[derive(Serialize)]
+        struct SubscriptionMessage {
+            method: String,
+            params: Vec<String>,
+            id: i64,
+        }
+
+        let params = self
+            .symbols
+            .iter()
+            .map(|market| {
+                let channel = match market.stream_type {
+                    StreamType::Trade => "deal",
+                    StreamType::Quote => "bookTicker",
+                };
+                format!("spot@public.{}.v3.api@{}", channel, market.symbol)
+            })
+            .collect::<Vec<String>>();
+
+        let id = rand::random::<u64>() as i64;
+        let subscription_message = SubscriptionMessage {
+            method: "SUBSCRIBE".to_string(),
+            params,
+            id,
+        };
+        
+        Ok(vec![serde_json::to_value(subscription_message)?])
+    }
+
+    fn heartbeat(&self) -> Option<tokio_tungstenite::tungstenite::Message> {
+        None // MEXC doesn't require explicit heartbeat, connection timeout handles it
+    }
+
+    fn heartbeat_interval(&self) -> Option<Duration> {
+        None
+    }
+}
