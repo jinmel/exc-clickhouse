@@ -8,7 +8,8 @@ use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 use crate::{
     clickhouse::{ClickHouseConfig, ClickHouseService},
-    config::{AppConfig, Cli, Commands, DbCommands, StreamArgs},
+    cli::{Cli, Commands, DbCommands, StreamArgs},
+    config::AppConfig,
     models::{ClickhouseMessage, NormalizedEvent},
     streams::{
         ExchangeClient, WebsocketStream, binance::BinanceClient, bybit::BybitClient,
@@ -18,6 +19,7 @@ use crate::{
 };
 
 mod clickhouse;
+mod cli;
 mod config;
 mod ethereum;
 mod models;

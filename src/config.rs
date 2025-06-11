@@ -1,95 +1,10 @@
-use clap::{Args, Parser, Subcommand};
 use eyre::WrapErr;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::time::Duration;
 
+use crate::cli::StreamArgs;
 use crate::trading_pairs::TradingPairsConfig;
-
-#[derive(Parser)]
-#[command(name = "exc-clickhouse")]
-#[command(about = "Exchange data collector to ClickHouse database")]
-#[command(version)]
-pub struct Cli {
-    #[command(subcommand)]
-    pub command: Commands,
-
-    /// Log level (trace, debug, info, warn, error)
-    #[arg(short, long, default_value = "info")]
-    pub log_level: String,
-}
-
-#[derive(Subcommand)]
-pub enum Commands {
-    /// One-time database tasks
-    Db(DbCmd),
-
-    /// Run streaming tasks
-    Stream(StreamArgs),
-}
-
-#[derive(Subcommand, Clone)]
-pub enum DbCommands {
-    /// Backfill timeboost bids
-    Timeboost,
-    /// Backfill trading pairs
-    TradingPairs(TradingPairsArgs),
-}
-
-#[derive(Args, Clone)]
-pub struct TradingPairsArgs {
-    /// Path to trading pairs file
-    #[arg(short, long, default_value = "trading_pairs.yaml")]
-    pub trading_pairs_file: String,
-}
-
-#[derive(Args, Clone)]
-pub struct DbCmd {
-    #[command(subcommand)]
-    pub command: DbCommands,
-}
-
-#[derive(Args, Clone)]
-pub struct StreamArgs {
-    /// Path to trading pairs file
-    #[arg(short, long, default_value = "trading_pairs.yaml")]
-    pub trading_pairs_file: String,
-
-    /// Batch size for processing events
-    #[arg(short, long, default_value_t = 500)]
-    pub batch_size: usize,
-    /// Skip Ethereum block metadata
-    #[arg(long)]
-    pub skip_ethereum: bool,
-
-    /// Skip Timeboost bids
-    #[arg(long)]
-    pub skip_timeboost: bool,
-
-    /// RPC URL for Ethereum (overrides environment variable)
-    #[arg(long)]
-    pub rpc_url: Option<String>,
-
-    /// Enable automatic restart of failed tasks
-    #[arg(long)]
-    pub enable_restart: bool,
-
-    /// Maximum number of restart attempts per task (0 = unlimited)
-    #[arg(long, default_value_t = 0)]
-    pub max_restart_attempts: u32,
-
-    /// Initial restart delay in seconds
-    #[arg(long, default_value_t = 1)]
-    pub restart_delay_seconds: u64,
-
-    /// Maximum restart delay in seconds (for exponential backoff)
-    #[arg(long, default_value_t = 300)]
-    pub max_restart_delay_seconds: u64,
-
-    /// Rate limit for ClickHouse requests per second
-    #[arg(long, default_value_t = 5)]
-    pub clickhouse_rate_limit: u64,
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
@@ -189,8 +104,8 @@ impl Default for ExchangeConfigs {
 impl AppConfig {
     /// Create AppConfig from CLI arguments and symbols file
     pub fn from_stream_args(args: &StreamArgs, cli_log_level: &str) -> eyre::Result<Self> {
-        let symbols_cfg = read_trading_pairs(&args.trading_pairs_file)?;
-        let exchange_configs = ExchangeConfigs::from_trading_pairs_config(&symbols_cfg);
+        let trading_pairs = read_trading_pairs(&args.trading_pairs_file)?;
+        let exchange_configs = ExchangeConfigs::from_trading_pairs_config(&trading_pairs);
 
         Ok(Self {
             log_level: cli_log_level.to_string(),
@@ -312,6 +227,7 @@ impl ExchangeConfigs {
             .filter(|e| e.exchange.eq_ignore_ascii_case("kucoin"))
             .filter(|e| e.trading_type.eq_ignore_ascii_case("spot"))
             .map(|e| format!("{}-{}", e.base_asset, e.quote_asset))
+            .take(5)
             .collect();
 
         Self {

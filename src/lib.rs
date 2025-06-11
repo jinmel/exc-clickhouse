@@ -1,4 +1,5 @@
 pub mod clickhouse;
+pub mod cli;
 pub mod config;
 pub mod ethereum;
 pub mod models;
