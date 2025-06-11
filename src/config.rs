@@ -227,7 +227,6 @@ impl ExchangeConfigs {
             .filter(|e| e.exchange.eq_ignore_ascii_case("kucoin"))
             .filter(|e| e.trading_type.eq_ignore_ascii_case("spot"))
             .map(|e| format!("{}-{}", e.base_asset, e.quote_asset))
-            .take(5)
             .collect();
 
         Self {

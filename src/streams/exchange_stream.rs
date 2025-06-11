@@ -59,10 +59,12 @@ where
                 let messages = subscription
                     .to_messages()
                     .map_err(|e| ExchangeStreamError::Subscription(e.to_string()))?;
-                let mut msg_stream = futures::stream::iter(messages.into_iter().map(Ok));
-                ws.send_all(&mut msg_stream)
-                    .await
-                    .map_err(|e| ExchangeStreamError::Stream(e.to_string()))?;
+                for sub_msg in messages {
+                    // some exchanges rate limit the subscription message.
+                    tracing::trace!(?url, ?sub_msg, "Sending subscription message");
+                    ws.send(sub_msg).await.map_err(|e| ExchangeStreamError::Stream(e.to_string()))?;
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                }
 
                 // Create interval for periodic messages (e.g., every 30 seconds)
                 let mut interval = tokio::time::interval(
