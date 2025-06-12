@@ -1,12 +1,23 @@
 use exc_clickhouse::timeboost::bids::S3Client;
+use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 pub const BUCKET_NAME: &str = "timeboost-auctioneer-arb1";
-pub const PREFIX: &str = "uw2/validated-timeboost-bids/";
+pub const PREFIX: &str = "ue2/validated-timeboost-bids/";
+
+fn init_tracing() {
+    let _ = FmtSubscriber::builder()
+        .with_env_filter(EnvFilter::new("exc_clickhouse=trace"))
+        .with_test_writer()
+        .try_init();
+}
 
 #[tokio::test]
 #[ignore]
 async fn test_get_latest_bid_file() {
-    let client = S3Client::new(BUCKET_NAME, PREFIX).await.unwrap();
+    init_tracing();
+    let client = S3Client::new(BUCKET_NAME, PREFIX, "us-west-2")
+        .await
+        .expect("Failed to create S3 client");
     let _ = client
         .get_latest_bid_file()
         .await
@@ -16,7 +27,8 @@ async fn test_get_latest_bid_file() {
 #[tokio::test]
 #[ignore]
 async fn test_read_file() {
-    let client = S3Client::new(BUCKET_NAME, PREFIX)
+    init_tracing();
+    let client = S3Client::new(BUCKET_NAME, PREFIX, "us-west-2")
         .await
         .expect("Failed to create S3 client");
 
@@ -38,7 +50,8 @@ async fn test_read_file() {
 #[tokio::test]
 #[ignore]
 async fn test_get_all_bid_files() {
-    let client = S3Client::new(BUCKET_NAME, PREFIX)
+    init_tracing();
+    let client = S3Client::new(BUCKET_NAME, PREFIX, "us-west-2")
         .await
         .expect("Failed to create S3 client");
 
