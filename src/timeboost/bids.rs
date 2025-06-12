@@ -7,9 +7,7 @@ use clickhouse::Row;
 use csv;
 use flate2::read::GzDecoder;
 use futures::future::BoxFuture;
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::io::Read;
 use std::task::{Context, Poll};
 use tokio::sync::mpsc;
@@ -116,7 +114,8 @@ pub async fn backfill_timeboost_bids() -> eyre::Result<()> {
         .map(|bid| {
             let delta = bid.round - FIRST_ROUND;
             let elapsed = Duration::from_secs(delta * ROUND_DURATION);
-            let chrono_elapsed = chrono::Duration::from_std(elapsed).expect("elapsed is out of range");
+            let chrono_elapsed =
+                chrono::Duration::from_std(elapsed).expect("elapsed is out of range");
             let final_timestamp = (first_round_at + chrono_elapsed).with_timezone(&Utc);
             bid.with_timestamp(final_timestamp)
         })
@@ -157,12 +156,11 @@ pub async fn fetch_bids_task(msg_tx: mpsc::UnboundedSender<ClickhouseMessage>) -
 
         let last_bid = bids.last().unwrap().clone();
         let last_bid_db = clickhouse.get_latest_bid().await.ok();
-        if let Some(last_bid_db) = last_bid_db {
-            if last_bid_db.round == last_bid.round {
+        if let Some(last_bid_db) = last_bid_db
+            && last_bid_db.round == last_bid.round {
                 tracing::debug!(?last_bid_db.round, ?last_bid.round, "No new round found");
                 continue;
             }
-        }
 
         let bids = bids
             .into_iter()

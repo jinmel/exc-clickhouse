@@ -1,10 +1,10 @@
-pub mod clickhouse;
 pub mod cli;
+pub mod clickhouse;
 pub mod config;
 pub mod ethereum;
 pub mod models;
 pub mod streams;
-pub mod trading_pairs;
 pub mod task_manager;
 pub mod timeboost;
 pub mod tower_utils;
+pub mod trading_pairs;

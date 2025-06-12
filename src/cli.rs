@@ -83,4 +83,4 @@ pub struct StreamArgs {
     /// Rate limit for ClickHouse requests per second
     #[arg(long, default_value_t = 5)]
     pub clickhouse_rate_limit: u64,
-} 
+}

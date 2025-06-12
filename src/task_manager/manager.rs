@@ -255,7 +255,7 @@ impl<T: Send + 'static> TaskManager<T> {
 
             Ok(())
         } else {
-            Err(format!("Task with ID {} not found", task_id))
+            Err(format!("Task with ID {task_id} not found"))
         }
     }
 
@@ -341,8 +341,7 @@ impl<T: Send + 'static> TaskManager<T> {
     pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         tracing::info!("Task manager started");
 
-        loop {
-            if let Some(completion) = self.wait_for_next_completion().await {
+        while let Some(completion) = self.wait_for_next_completion().await {
                 let task_id = completion.task_id;
                 let task_name = completion.task_name.clone();
 
@@ -412,7 +411,6 @@ impl<T: Send + 'static> TaskManager<T> {
                                     restart_count = handle.restart_count(),
                                     "Task restart denied by restart policy"
                                 );
-                            }
                         }
                     }
                 }
@@ -558,8 +556,8 @@ impl<T: Send + 'static> TaskManager<T> {
             .as_millis() as u64;
 
         let mut status = self.shutdown_status.lock();
-        let old_phase = status.phase.clone();
-        status.phase = new_phase.clone();
+        let old_phase = status.phase;
+        status.phase = new_phase;
         status.phase_started_at = now;
         status.tasks_remaining = self.active_task_count();
 
@@ -597,7 +595,7 @@ impl<T: Send + 'static> TaskManager<T> {
 
     /// Get current shutdown phase
     pub fn get_shutdown_phase(&self) -> ShutdownPhase {
-        self.shutdown_status.lock().phase.clone()
+        self.shutdown_status.lock().phase
     }
 
     /// Check if shutdown is complete

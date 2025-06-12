@@ -7,6 +7,12 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct CorrelationId(Uuid);
 
+impl Default for CorrelationId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CorrelationId {
     pub fn new() -> Self {
         Self(Uuid::new_v4())

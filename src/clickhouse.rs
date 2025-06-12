@@ -6,11 +6,11 @@ use std::time::Duration;
 use crate::models::NormalizedQuote;
 use crate::models::NormalizedTrade;
 use crate::timeboost::bids::BidData;
+use crate::trading_pairs::TradingPair;
 use crate::{
     ethereum::BlockMetadata,
     models::{ClickhouseMessage, EthereumMetadataMessage, ExpresslaneMessage, NormalizedEvent},
 };
-use crate::trading_pairs::TradingPair;
 use clickhouse::Compression;
 use clickhouse::Row;
 use clickhouse::inserter::Inserter;
@@ -144,17 +144,6 @@ impl ClickHouseService {
             .wrap_err("failed to get latest bid")
     }
 
-    pub async fn get_bids_by_round(&self, round: u64) -> eyre::Result<Vec<BidData>> {
-        let query = self
-            .client
-            .query("SELECT * FROM timeboost.bids WHERE round = ?")
-            .bind(round);
-        query
-            .fetch_all::<BidData>()
-            .await
-            .wrap_err("failed to get bids by round")
-    }
-
     pub async fn write_express_lane_bids(&self, bids: Vec<BidData>) -> eyre::Result<Quantities> {
         if bids.is_empty() {
             return Ok(Quantities::ZERO);
@@ -231,10 +220,7 @@ impl ClickHouseService {
         Ok(())
     }
 
-    pub async fn write_trading_pairs(
-        &self,
-        pairs: Vec<TradingPair>,
-    ) -> eyre::Result<()> {
+    pub async fn write_trading_pairs(&self, pairs: Vec<TradingPair>) -> eyre::Result<()> {
         if pairs.is_empty() {
             return Ok(());
         }

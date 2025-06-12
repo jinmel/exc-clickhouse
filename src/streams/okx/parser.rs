@@ -58,22 +58,20 @@ impl Parser<Vec<NormalizedEvent>> for OkxParser {
                     Ok(Some(normalized_quotes))
                 }
             },
-            OkxMessage::Event(event) => {
-                match event {
-                    OkxEventMessage::Login { code, msg, conn_id } => {
-                        tracing::debug!(?code, ?msg, ?conn_id, "received login");
-                        Ok(None)
-                    }
-                    OkxEventMessage::Subscribe { arg, conn_id } => {
-                        tracing::debug!(?arg, ?conn_id, "received subscribe");
-                        Ok(None)
-                    }
-                    OkxEventMessage::Error { code, msg, conn_id } => {
-                        tracing::debug!(?code, ?msg, ?conn_id, "received error");
-                        Ok(None)
-                    }
+            OkxMessage::Event(event) => match event {
+                OkxEventMessage::Login { code, msg, conn_id } => {
+                    tracing::debug!(?code, ?msg, ?conn_id, "received login");
+                    Ok(None)
                 }
-            }
+                OkxEventMessage::Subscribe { arg, conn_id } => {
+                    tracing::debug!(?arg, ?conn_id, "received subscribe");
+                    Ok(None)
+                }
+                OkxEventMessage::Error { code, msg, conn_id } => {
+                    tracing::debug!(?code, ?msg, ?conn_id, "received error");
+                    Ok(None)
+                }
+            },
         }
     }
 }

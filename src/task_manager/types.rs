@@ -6,6 +6,12 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct TaskId(Uuid);
 
+impl Default for TaskId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TaskId {
     pub fn new() -> Self {
         Self(Uuid::new_v4())
@@ -113,7 +119,7 @@ impl<T> IntoTaskResult<T> for eyre::Result<T> {
         self.map_err(|e| {
             // Convert eyre::Report to a standard error
             let error_msg = e.to_string();
-            Box::new(std::io::Error::new(std::io::ErrorKind::Other, error_msg))
+            Box::new(std::io::Error::other(error_msg))
                 as Box<dyn std::error::Error + Send + Sync>
         })
     }
@@ -140,12 +146,7 @@ pub struct TaskCompletion<T> {
 pub struct PendingRestart<T> {
     pub task_id: TaskId,
     pub task_name: String,
-    pub task_fn: Box<
-        dyn FnOnce() -> std::pin::Pin<
-                Box<dyn std::future::Future<Output = TaskResult<T>> + Send + 'static>,
-            > + Send
-            + 'static,
-    >,
+    pub task_fn: AsyncTaskFn<T>,
     pub restart_time: u64, // Timestamp when restart should occur
     pub restart_count: u32,
 }

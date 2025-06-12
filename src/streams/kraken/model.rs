@@ -228,7 +228,10 @@ mod tests {
                 assert_eq!(trade_data.trade_id, 4665847);
                 assert_eq!(trade_data.timestamp, "2023-09-25T07:49:36.925603Z");
             }
-            _ => panic!("Expected KrakenMessage::Response(Response::Trade), got {:?}", parsed),
+            _ => panic!(
+                "Expected KrakenMessage::Response(Response::Trade), got {:?}",
+                parsed
+            ),
         }
     }
 
@@ -372,7 +375,12 @@ mod tests {
         match parsed {
             KrakenMessage::Subscription(subscription_msg) => {
                 assert_eq!(subscription_msg.method, "subscribe");
-                assert_eq!(subscription_msg.error, Some(String::from("Currency pair not in ISO 4217-A3 format CRV-USD")));
+                assert_eq!(
+                    subscription_msg.error,
+                    Some(String::from(
+                        "Currency pair not in ISO 4217-A3 format CRV-USD"
+                    ))
+                );
                 assert_eq!(subscription_msg.time_in, "2025-06-11T07:36:58.524650Z");
                 assert_eq!(subscription_msg.time_out, "2025-06-11T07:36:58.524663Z");
                 assert!(subscription_msg.result.is_none());

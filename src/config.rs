@@ -38,6 +38,7 @@ pub struct TimeboostConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct ExchangeConfigs {
     pub binance_symbols: Vec<String>,
     pub bybit_symbols: Vec<String>,
@@ -88,18 +89,6 @@ impl Default for TimeboostConfig {
     }
 }
 
-impl Default for ExchangeConfigs {
-    fn default() -> Self {
-        Self {
-            binance_symbols: Vec::new(),
-            bybit_symbols: Vec::new(),
-            okx_symbols: Vec::new(),
-            coinbase_symbols: Vec::new(),
-            kraken_symbols: Vec::new(),
-            kucoin_symbols: Vec::new(),
-        }
-    }
-}
 
 impl AppConfig {
     /// Create AppConfig from CLI arguments and symbols file
@@ -186,7 +175,13 @@ impl ExchangeConfigs {
             .filter(|e| e.exchange.eq_ignore_ascii_case("binance"))
             .filter(|e| e.trading_type.eq_ignore_ascii_case("spot"))
             // Binance accepts lowercase symbols only
-            .map(|e| format!("{}{}", e.base_asset.to_lowercase(), e.quote_asset.to_lowercase()))
+            .map(|e| {
+                format!(
+                    "{}{}",
+                    e.base_asset.to_lowercase(),
+                    e.quote_asset.to_lowercase()
+                )
+            })
             .collect();
 
         let bybit_symbols: Vec<String> = cfg

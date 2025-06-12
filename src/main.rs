@@ -7,8 +7,8 @@ use tower::{Service, ServiceBuilder, ServiceExt};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 use crate::{
-    clickhouse::{ClickHouseConfig, ClickHouseService},
     cli::{Cli, Commands, DbCommands, StreamArgs},
+    clickhouse::{ClickHouseConfig, ClickHouseService},
     config::AppConfig,
     models::{ClickhouseMessage, NormalizedEvent},
     streams::{
@@ -18,16 +18,16 @@ use crate::{
     task_manager::{IntoTaskResult, TaskManager},
 };
 
-mod clickhouse;
 mod cli;
+mod clickhouse;
 mod config;
 mod ethereum;
 mod models;
 mod streams;
-mod trading_pairs;
 mod task_manager;
 mod timeboost;
 mod tower_utils;
+mod trading_pairs;
 
 /// Enum for task names to ensure type safety and consistency
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -112,7 +112,9 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         || app_config.timeboost_config.enabled;
 
     if !has_producers {
-        tracing::warn!("No tasks were enabled and all exchange symbols are empty. Use --help to see available options.");
+        tracing::warn!(
+            "No tasks were enabled and all exchange symbols are empty. Use --help to see available options."
+        );
         return Ok(());
     }
 

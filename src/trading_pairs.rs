@@ -1,9 +1,8 @@
+use crate::clickhouse::{ClickHouseConfig, ClickHouseService};
 use clickhouse::Row;
 use eyre::WrapErr;
 use serde::{Deserialize, Serialize};
-use crate::clickhouse::{ClickHouseConfig, ClickHouseService};
 use std::fs::File;
-
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TradingPairsConfig {
@@ -45,8 +44,10 @@ pub async fn backfill_trading_pairs(trading_pairs_file: &str) -> eyre::Result<()
         .into_iter()
         .map(TradingPair::normalize)
         .collect();
-    
+
     let clickhouse = ClickHouseService::new(ClickHouseConfig::from_env()?);
-    clickhouse.write_trading_pairs(trading_pairs_normalized).await?;
+    clickhouse
+        .write_trading_pairs(trading_pairs_normalized)
+        .await?;
     Ok(())
 }
