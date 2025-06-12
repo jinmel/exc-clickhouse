@@ -203,7 +203,7 @@ pub struct HistoricalBidsService {
 
 impl HistoricalBidsService {
     pub const BUCKET_NAME: &str = "timeboost-auctioneer-arb1";
-    pub const PREFIX: &str = "uw2/validated-timeboost-bids/";
+    pub const PREFIX: &str = "ue2/validated-timeboost-bids/";
 
     pub async fn new() -> eyre::Result<Self> {
         let client = S3Client::new(Self::BUCKET_NAME, Self::PREFIX).await?;
