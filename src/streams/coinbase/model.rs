@@ -61,23 +61,31 @@ impl TryFrom<MatchEvent> for NormalizedTrade {
 pub struct TickerEvent {
     #[serde(rename = "type")]
     pub typ: String,
-    pub sequence: u64,
+    pub sequence: Option<u64>,
     pub product_id: String,
     pub price: String,
     pub best_bid: String,
     pub best_ask: String,
     pub best_bid_size: String,
     pub best_ask_size: String,
-    pub time: String,
+    pub time: Option<String>,
+    pub open_24h: Option<String>,
+    pub volume_24h: Option<String>,
+    pub low_24h: Option<String>,
+    pub high_24h: Option<String>,
+    pub volume_30d: Option<String>,
 }
 
 impl TryFrom<TickerEvent> for NormalizedQuote {
     type Error = ExchangeStreamError;
 
     fn try_from(ticker: TickerEvent) -> Result<NormalizedQuote, Self::Error> {
-        let timestamp = DateTime::parse_from_rfc3339(&ticker.time)
-            .map_err(|e| ExchangeStreamError::Message(format!("Invalid time: {e}")))?
-            .timestamp_micros() as u64;
+        let timestamp = match ticker.time {
+            Some(time_str) => DateTime::parse_from_rfc3339(&time_str)
+                .map_err(|e| ExchangeStreamError::Message(format!("Invalid time: {e}")))?
+                .timestamp_micros() as u64,
+            None => chrono::Utc::now().timestamp_micros() as u64,
+        };
         let bid_price = ticker
             .best_bid
             .parse::<f64>()
@@ -189,7 +197,7 @@ mod tests {
         match parsed {
             CoinbaseMessage::Ticker(ticker) => {
                 assert_eq!(ticker.typ, "ticker");
-                assert_eq!(ticker.sequence, 123456789);
+                assert_eq!(ticker.sequence, Some(123456789));
                 assert_eq!(ticker.product_id, "BTC-USD");
                 assert_eq!(ticker.price, "50000.00");
                 assert_eq!(ticker.best_bid, "49999.99");
@@ -240,5 +248,68 @@ mod tests {
             }
             _ => panic!("Expected Error message, got {:?}", parsed),
         }
+    }
+
+    #[test]
+    fn test_ticker_event_parsing_24h_stats() {
+        let json = r#"{
+            "type": "ticker",
+            "product_id": "LRC-BTC",
+            "price": "7.8e-7",
+            "open_24h": "7.9e-7",
+            "volume_24h": "832",
+            "low_24h": "7.7e-7",
+            "high_24h": "7.9e-7",
+            "volume_30d": "3718342",
+            "best_bid": "0.00000077",
+            "best_bid_size": "2340",
+            "best_ask": "0.00000078",
+            "best_ask_size": "13774"
+        }"#;
+
+        let parsed: CoinbaseMessage = serde_json::from_str(json).expect("Failed to parse JSON");
+        match parsed {
+            CoinbaseMessage::Ticker(ticker) => {
+                assert_eq!(ticker.typ, "ticker");
+                assert_eq!(ticker.product_id, "LRC-BTC");
+                assert_eq!(ticker.price, "7.8e-7");
+                assert_eq!(ticker.best_bid, "0.00000077");
+                assert_eq!(ticker.best_ask, "0.00000078");
+                assert_eq!(ticker.best_bid_size, "2340");
+                assert_eq!(ticker.best_ask_size, "13774");
+                assert_eq!(ticker.open_24h, Some("7.9e-7".to_string()));
+                assert_eq!(ticker.volume_24h, Some("832".to_string()));
+                assert_eq!(ticker.low_24h, Some("7.7e-7".to_string()));
+                assert_eq!(ticker.high_24h, Some("7.9e-7".to_string()));
+                assert_eq!(ticker.volume_30d, Some("3718342".to_string()));
+                assert_eq!(ticker.sequence, None);
+                assert_eq!(ticker.time, None);
+            }
+            _ => panic!("Expected Ticker event, got {:?}", parsed),
+        }
+    }
+
+    #[test]
+    fn test_ticker_to_normalized_quote_conversion() {
+        let ticker_json = r#"{
+            "type": "ticker",
+            "product_id": "LRC-BTC",
+            "price": "7.8e-7",
+            "best_bid": "0.00000077",
+            "best_bid_size": "2340",
+            "best_ask": "0.00000078",
+            "best_ask_size": "13774"
+        }"#;
+
+        let ticker: TickerEvent = serde_json::from_str(ticker_json).expect("Failed to parse ticker");
+        let normalized_quote = NormalizedQuote::try_from(ticker).expect("Failed to convert to NormalizedQuote");
+
+        assert_eq!(normalized_quote.exchange, ExchangeName::Coinbase);
+        assert_eq!(normalized_quote.symbol.as_str(), "LRC-BTC");
+        assert_eq!(normalized_quote.bid_price, 0.00000077);
+        assert_eq!(normalized_quote.bid_amount, 2340.0);
+        assert_eq!(normalized_quote.ask_price, 0.00000078);
+        assert_eq!(normalized_quote.ask_amount, 13774.0);
+        assert!(normalized_quote.timestamp > 0); // Should have a timestamp (current time since time field was None)
     }
 }
