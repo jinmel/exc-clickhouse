@@ -70,7 +70,7 @@ pub struct BidData {
     pub express_lane_controller: String,
     pub auction_contract_address: String,
     pub round: u64,
-    pub amount: String,
+    pub amount: u64,
     pub signature: String,
 }
 
@@ -90,7 +90,7 @@ impl From<CsvBidData> for BidData {
             express_lane_controller: csv_bid.express_lane_controller,
             auction_contract_address: csv_bid.auction_contract_address,
             round: csv_bid.round,
-            amount: csv_bid.amount,
+            amount: csv_bid.amount.parse::<u64>().unwrap(),
             signature: csv_bid.signature,
         }
     }
