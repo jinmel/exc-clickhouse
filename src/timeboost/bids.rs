@@ -96,6 +96,7 @@ impl From<CsvBidData> for BidData {
     }
 }
 
+// https://arbiscan.io/tx/0x89b629162ca8f29b4a10dd99838086f4424a8c497e105c560aaaed872ec1f312#eventlog
 const FIRST_ROUND: u64 = 53516;
 const ROUND_DURATION: u64 = 60;
 
@@ -109,34 +110,17 @@ pub async fn backfill_timeboost_bids() -> eyre::Result<()> {
 
     svc.ready().await?;
     let bids = svc.call(HistoricalBidsRequest::All).await?;
-    let bids_by_round: HashMap<u64, Vec<BidData>> =
-        bids.into_iter().fold(HashMap::new(), |mut acc, bid| {
-            acc.entry(bid.round).or_default().push(bid);
-            acc
-        });
-
-    for (round, bids) in bids_by_round {
-        let bids_by_round = clickhouse.get_bids_by_round(round).await?;
-        if !bids_by_round.is_empty() {
-            tracing::warn!(?round, "Bids already exist for round");
-            continue;
-        }
-
-        if round < FIRST_ROUND {
-            tracing::warn!(?round, "Found bids from before the first round");
-            continue;
-        }
-
-        let delta = round - FIRST_ROUND;
-        let elapsed = Duration::from_secs(delta * ROUND_DURATION);
-        let chrono_elapsed = chrono::Duration::from_std(elapsed)?;
-        let final_timestamp = (first_round_at + chrono_elapsed).with_timezone(&Utc);
-        let bids = bids
-            .into_iter()
-            .map(|bid| bid.with_timestamp(final_timestamp))
-            .collect();
-        clickhouse.write_express_lane_bids(bids).await?;
-    }
+    let bids_with_timestamp = bids
+        .into_iter()
+        .map(|bid| {
+            let delta = bid.round - FIRST_ROUND;
+            let elapsed = Duration::from_secs(delta * ROUND_DURATION);
+            let chrono_elapsed = chrono::Duration::from_std(elapsed).expect("elapsed is out of range");
+            let final_timestamp = (first_round_at + chrono_elapsed).with_timezone(&Utc);
+            bid.with_timestamp(final_timestamp)
+        })
+        .collect::<Vec<_>>();
+    clickhouse.write_express_lane_bids(bids_with_timestamp).await?;
     Ok(())
 }
 
