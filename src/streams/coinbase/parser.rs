@@ -35,9 +35,12 @@ impl Parser<Vec<NormalizedEvent>> for CoinbaseParser {
                 let quote: NormalizedQuote = event.try_into()?;
                 Ok(Some(vec![NormalizedEvent::Quote(quote)]))
             }
-            CoinbaseMessage::Subscriptions(_) => Ok(None),
-            CoinbaseMessage::Error(_) => {
-                tracing::warn!("Received error message: {}", text);
+            CoinbaseMessage::Subscriptions(subscriptions) => {
+                tracing::trace!("Received subscriptions: {:?}", subscriptions);
+                Ok(None)
+            }
+            CoinbaseMessage::Error(error) => {
+                tracing::warn!("Received error message: {:?}", error);
                 Ok(None)
             }
         }

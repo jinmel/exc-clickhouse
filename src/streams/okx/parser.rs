@@ -2,7 +2,7 @@ use crate::{
     models::NormalizedEvent,
     streams::{
         ExchangeStreamError, Parser,
-        okx::model::{OkxDataMessage, OkxMessage},
+        okx::model::{OkxDataMessage, OkxEventMessage, OkxMessage},
     },
 };
 
@@ -59,9 +59,20 @@ impl Parser<Vec<NormalizedEvent>> for OkxParser {
                 }
             },
             OkxMessage::Event(event) => {
-                tracing::debug!("received event: {:?}", event);
-                // subscription ack or error
-                Ok(None)
+                match event {
+                    OkxEventMessage::Login { code, msg, conn_id } => {
+                        tracing::debug!(?code, ?msg, ?conn_id, "received login");
+                        Ok(None)
+                    }
+                    OkxEventMessage::Subscribe { arg, conn_id } => {
+                        tracing::debug!(?arg, ?conn_id, "received subscribe");
+                        Ok(None)
+                    }
+                    OkxEventMessage::Error { code, msg, conn_id } => {
+                        tracing::debug!(?code, ?msg, ?conn_id, "received error");
+                        Ok(None)
+                    }
+                }
             }
         }
     }

@@ -147,7 +147,7 @@ pub struct OrderbookMessage {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct SubscriptionResult {
+pub struct SubscriptionMessage {
     pub success: bool,
     pub ret_msg: String,
     pub conn_id: String,
@@ -160,7 +160,7 @@ pub struct SubscriptionResult {
 pub enum BybitMessage {
     Trade(TradeMessage),
     Orderbook(OrderbookMessage),
-    Subscription(SubscriptionResult),
+    Subscription(SubscriptionMessage),
 }
 
 #[cfg(test)]

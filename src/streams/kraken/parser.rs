@@ -76,6 +76,12 @@ impl Parser<Vec<NormalizedEvent>> for KrakenParser {
             }
             KrakenMessage::Pong(pong_msg) => {
                 tracing::trace!("Received pong message: {:?}", pong_msg);
+                if let Some(error) = pong_msg.error {
+                    tracing::error!("Pong error: {error}");
+                }
+                if let Some(result) = pong_msg.result {
+                    tracing::warn!("Pong warnings: {:?}", result.warnings);
+                }
                 Ok(None)
             }
         }
