@@ -204,9 +204,10 @@ pub struct HistoricalBidsService {
 impl HistoricalBidsService {
     pub const BUCKET_NAME: &str = "timeboost-auctioneer-arb1";
     pub const PREFIX: &str = "ue2/validated-timeboost-bids/";
+    pub const REGION: &str = "us-west-2";
 
     pub async fn new() -> eyre::Result<Self> {
-        let client = S3Client::new(Self::BUCKET_NAME, Self::PREFIX).await?;
+        let client = S3Client::new(Self::BUCKET_NAME, Self::PREFIX, Self::REGION).await?;
         Ok(Self { client })
     }
 
@@ -263,12 +264,12 @@ pub struct S3Client {
 }
 
 impl S3Client {
-    pub async fn new(bucket_name: &str, prefix: &str) -> eyre::Result<Self> {
+    pub async fn new(bucket_name: &str, prefix: &str, region: &str) -> eyre::Result<Self> {
         // For public S3 buckets, we need to configure the client to not sign requests
         // This is equivalent to AWS CLI's --no-sign-request flag
-
+        let region = aws_types::region::Region::new(region.to_string());
         let config = aws_config::defaults(BehaviorVersion::latest())
-            .region("us-east-2") // Try us-east-2 region for blockchain-related buckets
+            .region(region)
             .no_credentials() // This is the key - no credentials for unsigned requests
             .load()
             .await;
