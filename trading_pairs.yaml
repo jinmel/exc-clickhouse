@@ -125,6 +125,16 @@
   quote_asset: USDT
 - exchange: Binance
   trading_type: SPOT
+  pair: COTIBTC
+  base_asset: COTI
+  quote_asset: BTC
+- exchange: Binance
+  trading_type: SPOT
+  pair: COTIUSDT
+  base_asset: COTI
+  quote_asset: USDT
+- exchange: Binance
+  trading_type: SPOT
   pair: COWUSDC
   base_asset: COW
   quote_asset: USDC
@@ -390,6 +400,11 @@
   quote_asset: USDT
 - exchange: Binance
   trading_type: SPOT
+  pair: PERPUSDT
+  base_asset: PERP
+  quote_asset: USDT
+- exchange: Binance
+  trading_type: SPOT
   pair: PONDUSDT
   base_asset: POND
   quote_asset: USDT
@@ -635,6 +650,11 @@
   quote_asset: USDT
 - exchange: Bybit
   trading_type: SPOT
+  pair: ENAUSDC
+  base_asset: ENA
+  quote_asset: USDC
+- exchange: Bybit
+  trading_type: SPOT
   pair: ENAUSDT
   base_asset: ENA
   quote_asset: USDT
@@ -730,6 +750,11 @@
   quote_asset: USDT
 - exchange: Bybit
   trading_type: SPOT
+  pair: PERPUSDT
+  base_asset: PERP
+  quote_asset: USDT
+- exchange: Bybit
+  trading_type: SPOT
   pair: PYTHUSDT
   base_asset: PYTH
   quote_asset: USDT
@@ -815,9 +840,44 @@
   quote_asset: USDT
 - exchange: Coinbase
   trading_type: SPOT
+  pair: 1INCH-USD
+  base_asset: 1INCH
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: ACX-USD
+  base_asset: ACX
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: APE-USD
+  base_asset: APE
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
   pair: APE-USDT
   base_asset: APE
   quote_asset: USDT
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: ARB-USD
+  base_asset: ARB
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: ATH-USD
+  base_asset: ATH
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: AXL-USD
+  base_asset: AXL
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: BTC-USD
+  base_asset: BTC
+  quote_asset: USD
 - exchange: Coinbase
   trading_type: SPOT
   pair: BTC-USDT
@@ -825,14 +885,59 @@
   quote_asset: USDT
 - exchange: Coinbase
   trading_type: SPOT
+  pair: CAKE-USD
+  base_asset: CAKE
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
   pair: COMP-BTC
   base_asset: COMP
   quote_asset: BTC
 - exchange: Coinbase
   trading_type: SPOT
+  pair: COMP-USD
+  base_asset: COMP
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: COTI-USD
+  base_asset: COTI
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: COW-USD
+  base_asset: COW
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
   pair: CRV-BTC
   base_asset: CRV
   quote_asset: BTC
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: CRV-USD
+  base_asset: CRV
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: CTSI-USD
+  base_asset: CTSI
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: DAI-USD
+  base_asset: DAI
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: DIA-USD
+  base_asset: DIA
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: ENA-USD
+  base_asset: ENA
+  quote_asset: USD
 - exchange: Coinbase
   trading_type: SPOT
   pair: ETH-BTC
@@ -845,14 +950,44 @@
   quote_asset: DAI
 - exchange: Coinbase
   trading_type: SPOT
+  pair: ETH-USD
+  base_asset: ETH
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
   pair: ETH-USDT
   base_asset: ETH
   quote_asset: USDT
 - exchange: Coinbase
   trading_type: SPOT
+  pair: ETHFI-USD
+  base_asset: ETHFI
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: GNO-USD
+  base_asset: GNO
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
   pair: GRT-BTC
   base_asset: GRT
   quote_asset: BTC
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: GRT-USD
+  base_asset: GRT
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: KNC-USD
+  base_asset: KNC
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: LDO-USD
+  base_asset: LDO
+  quote_asset: USD
 - exchange: Coinbase
   trading_type: SPOT
   pair: LINK-BTC
@@ -865,9 +1000,19 @@
   quote_asset: ETH
 - exchange: Coinbase
   trading_type: SPOT
+  pair: LINK-USD
+  base_asset: LINK
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
   pair: LINK-USDT
   base_asset: LINK
   quote_asset: USDT
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: LPT-USD
+  base_asset: LPT
+  quote_asset: USD
 - exchange: Coinbase
   trading_type: SPOT
   pair: LRC-BTC
@@ -875,9 +1020,69 @@
   quote_asset: BTC
 - exchange: Coinbase
   trading_type: SPOT
+  pair: LRC-USD
+  base_asset: LRC
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
   pair: LRC-USDT
   base_asset: LRC
   quote_asset: USDT
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: MAGIC-USD
+  base_asset: MAGIC
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: PENDLE-USD
+  base_asset: PENDLE
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: PEPE-USD
+  base_asset: PEPE
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: PERP-USD
+  base_asset: PERP
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: POND-USD
+  base_asset: POND
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: PYTH-USD
+  base_asset: PYTH
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: SQD-USD
+  base_asset: SQD
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: STG-USD
+  base_asset: STG
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: SUSHI-USD
+  base_asset: SUSHI
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: TRB-USD
+  base_asset: TRB
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: UMA-USD
+  base_asset: UMA
+  quote_asset: USD
 - exchange: Coinbase
   trading_type: SPOT
   pair: UNI-BTC
@@ -885,9 +1090,39 @@
   quote_asset: BTC
 - exchange: Coinbase
   trading_type: SPOT
+  pair: UNI-USD
+  base_asset: UNI
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
   pair: YFI-BTC
   base_asset: YFI
   quote_asset: BTC
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: YFI-USD
+  base_asset: YFI
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: ZRO-USD
+  base_asset: ZRO
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: 1INCHUSD
+  base_asset: 1INCH
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: ACXUSD
+  base_asset: ACX
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: APEUSD
+  base_asset: APE
+  quote_asset: USD
 - exchange: Kraken
   trading_type: SPOT
   pair: APEUSDC
@@ -900,9 +1135,79 @@
   quote_asset: USDT
 - exchange: Kraken
   trading_type: SPOT
+  pair: ARBUSD
+  base_asset: ARB
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: ATHUSD
+  base_asset: ATH
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: BTCDAI
+  base_asset: BTC
+  quote_asset: DAI
+- exchange: Kraken
+  trading_type: SPOT
+  pair: BTCUSD
+  base_asset: BTC
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: BTCUSDC
+  base_asset: BTC
+  quote_asset: USDC
+- exchange: Kraken
+  trading_type: SPOT
+  pair: BTCUSDT
+  base_asset: BTC
+  quote_asset: USDT
+- exchange: Kraken
+  trading_type: SPOT
+  pair: CAKEUSD
+  base_asset: CAKE
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: CELOUSD
+  base_asset: CELO
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
   pair: COMPBTC
   base_asset: COMP
   quote_asset: BTC
+- exchange: Kraken
+  trading_type: SPOT
+  pair: COMPUSD
+  base_asset: COMP
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: COTIUSD
+  base_asset: COTI
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: COWUSD
+  base_asset: COW
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: CRVUSD
+  base_asset: CRV
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: CTSIUSD
+  base_asset: CTSI
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: DAIUSD
+  base_asset: DAI
+  quote_asset: USD
 - exchange: Kraken
   trading_type: SPOT
   pair: DAIUSDT
@@ -910,9 +1215,29 @@
   quote_asset: USDT
 - exchange: Kraken
   trading_type: SPOT
+  pair: ENAUSD
+  base_asset: ENA
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: ETHBTC
+  base_asset: ETH
+  quote_asset: BTC
+- exchange: Kraken
+  trading_type: SPOT
   pair: ETHDAI
   base_asset: ETH
   quote_asset: DAI
+- exchange: Kraken
+  trading_type: SPOT
+  pair: ETHFIUSD
+  base_asset: ETHFI
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: ETHUSD
+  base_asset: ETH
+  quote_asset: USD
 - exchange: Kraken
   trading_type: SPOT
   pair: ETHUSDC
@@ -925,9 +1250,19 @@
   quote_asset: USDT
 - exchange: Kraken
   trading_type: SPOT
-  pair: ETHBTC
-  base_asset: ETH
-  quote_asset: BTC
+  pair: FXSUSD
+  base_asset: FXS
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: GMXUSD
+  base_asset: GMX
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: GNOUSD
+  base_asset: GNO
+  quote_asset: USD
 - exchange: Kraken
   trading_type: SPOT
   pair: GRTBTC
@@ -935,9 +1270,34 @@
   quote_asset: BTC
 - exchange: Kraken
   trading_type: SPOT
+  pair: GRTUSD
+  base_asset: GRT
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: KNCUSD
+  base_asset: KNC
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: LDOUSD
+  base_asset: LDO
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: LINKBTC
+  base_asset: LINK
+  quote_asset: BTC
+- exchange: Kraken
+  trading_type: SPOT
   pair: LINKETH
   base_asset: LINK
   quote_asset: ETH
+- exchange: Kraken
+  trading_type: SPOT
+  pair: LINKUSD
+  base_asset: LINK
+  quote_asset: USD
 - exchange: Kraken
   trading_type: SPOT
   pair: LINKUSDC
@@ -950,8 +1310,58 @@
   quote_asset: USDT
 - exchange: Kraken
   trading_type: SPOT
-  pair: LINKBTC
-  base_asset: LINK
+  pair: LPTUSD
+  base_asset: LPT
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: LRCUSD
+  base_asset: LRC
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: PENDLEUSD
+  base_asset: PENDLE
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: PEPEUSD
+  base_asset: PEPE
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: PERPUSD
+  base_asset: PERP
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: PONDUSD
+  base_asset: POND
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: PYTHUSD
+  base_asset: PYTH
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: STGUSD
+  base_asset: STG
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: SUSHIUSD
+  base_asset: SUSHI
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: UMAUSD
+  base_asset: UMA
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: UNIBTC
+  base_asset: UNI
   quote_asset: BTC
 - exchange: Kraken
   trading_type: SPOT
@@ -960,9 +1370,14 @@
   quote_asset: ETH
 - exchange: Kraken
   trading_type: SPOT
-  pair: UNIBTC
+  pair: UNIUSD
   base_asset: UNI
-  quote_asset: BTC
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: USUALUSD
+  base_asset: USUAL
+  quote_asset: USD
 - exchange: Kraken
   trading_type: SPOT
   pair: WBTCBTC
@@ -970,19 +1385,29 @@
   quote_asset: BTC
 - exchange: Kraken
   trading_type: SPOT
-  pair: BTCDAI
-  base_asset: BTC
-  quote_asset: DAI
+  pair: WBTCUSD
+  base_asset: WBTC
+  quote_asset: USD
 - exchange: Kraken
   trading_type: SPOT
-  pair: BTCUSDC
-  base_asset: BTC
-  quote_asset: USDC
+  pair: WOOUSD
+  base_asset: WOO
+  quote_asset: USD
 - exchange: Kraken
   trading_type: SPOT
-  pair: BTCUSDT
-  base_asset: BTC
-  quote_asset: USDT
+  pair: WUSD
+  base_asset: W
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: YFIUSD
+  base_asset: YFI
+  quote_asset: USD
+- exchange: Kraken
+  trading_type: SPOT
+  pair: ZROUSD
+  base_asset: ZRO
+  quote_asset: USD
 - exchange: Kucoin
   trading_type: SPOT
   pair: 1INCH-USDT
@@ -1052,6 +1477,16 @@
   trading_type: SPOT
   pair: COMP-USDT
   base_asset: COMP
+  quote_asset: USDT
+- exchange: Kucoin
+  trading_type: SPOT
+  pair: COTI-BTC
+  base_asset: COTI
+  quote_asset: BTC
+- exchange: Kucoin
+  trading_type: SPOT
+  pair: COTI-USDT
+  base_asset: COTI
   quote_asset: USDT
 - exchange: Kucoin
   trading_type: SPOT
@@ -1235,6 +1670,16 @@
   quote_asset: USDT
 - exchange: Kucoin
   trading_type: SPOT
+  pair: PERP-BTC
+  base_asset: PERP
+  quote_asset: BTC
+- exchange: Kucoin
+  trading_type: SPOT
+  pair: PERP-USDT
+  base_asset: PERP
+  quote_asset: USDT
+- exchange: Kucoin
+  trading_type: SPOT
   pair: POND-BTC
   base_asset: POND
   quote_asset: BTC
@@ -1345,6 +1790,11 @@
   quote_asset: USDT
 - exchange: OKX
   trading_type: SPOT
+  pair: APE-USD
+  base_asset: APE
+  quote_asset: USD
+- exchange: OKX
+  trading_type: SPOT
   pair: APE-USDC
   base_asset: APE
   quote_asset: USDC
@@ -1353,6 +1803,11 @@
   pair: APE-USDT
   base_asset: APE
   quote_asset: USDT
+- exchange: OKX
+  trading_type: SPOT
+  pair: ARB-USD
+  base_asset: ARB
+  quote_asset: USD
 - exchange: OKX
   trading_type: SPOT
   pair: ARB-USDC
@@ -1365,6 +1820,11 @@
   quote_asset: USDT
 - exchange: OKX
   trading_type: SPOT
+  pair: ATH-USD
+  base_asset: ATH
+  quote_asset: USD
+- exchange: OKX
+  trading_type: SPOT
   pair: ATH-USDC
   base_asset: ATH
   quote_asset: USDC
@@ -1373,6 +1833,11 @@
   pair: ATH-USDT
   base_asset: ATH
   quote_asset: USDT
+- exchange: OKX
+  trading_type: SPOT
+  pair: BTC-USD
+  base_asset: BTC
+  quote_asset: USD
 - exchange: OKX
   trading_type: SPOT
   pair: BTC-USDC
@@ -1385,9 +1850,19 @@
   quote_asset: USDT
 - exchange: OKX
   trading_type: SPOT
+  pair: CELO-USD
+  base_asset: CELO
+  quote_asset: USD
+- exchange: OKX
+  trading_type: SPOT
   pair: CELO-USDT
   base_asset: CELO
   quote_asset: USDT
+- exchange: OKX
+  trading_type: SPOT
+  pair: COMP-USD
+  base_asset: COMP
+  quote_asset: USD
 - exchange: OKX
   trading_type: SPOT
   pair: COMP-USDC
@@ -1400,6 +1875,11 @@
   quote_asset: USDT
 - exchange: OKX
   trading_type: SPOT
+  pair: CRV-USD
+  base_asset: CRV
+  quote_asset: USD
+- exchange: OKX
+  trading_type: SPOT
   pair: CRV-USDC
   base_asset: CRV
   quote_asset: USDC
@@ -1408,6 +1888,11 @@
   pair: CRV-USDT
   base_asset: CRV
   quote_asset: USDT
+- exchange: OKX
+  trading_type: SPOT
+  pair: DAI-USD
+  base_asset: DAI
+  quote_asset: USD
 - exchange: OKX
   trading_type: SPOT
   pair: DAI-USDC
@@ -1420,6 +1905,11 @@
   quote_asset: USDT
 - exchange: OKX
   trading_type: SPOT
+  pair: DIA-USD
+  base_asset: DIA
+  quote_asset: USD
+- exchange: OKX
+  trading_type: SPOT
   pair: DIA-USDT
   base_asset: DIA
   quote_asset: USDT
@@ -1430,6 +1920,11 @@
   quote_asset: BTC
 - exchange: OKX
   trading_type: SPOT
+  pair: ETH-USD
+  base_asset: ETH
+  quote_asset: USD
+- exchange: OKX
+  trading_type: SPOT
   pair: ETH-USDC
   base_asset: ETH
   quote_asset: USDC
@@ -1438,6 +1933,11 @@
   pair: ETH-USDT
   base_asset: ETH
   quote_asset: USDT
+- exchange: OKX
+  trading_type: SPOT
+  pair: ETHFI-USD
+  base_asset: ETHFI
+  quote_asset: USD
 - exchange: OKX
   trading_type: SPOT
   pair: ETHFI-USDC
@@ -1460,6 +1960,11 @@
   quote_asset: USDT
 - exchange: OKX
   trading_type: SPOT
+  pair: GRT-USD
+  base_asset: GRT
+  quote_asset: USD
+- exchange: OKX
+  trading_type: SPOT
   pair: GRT-USDC
   base_asset: GRT
   quote_asset: USDC
@@ -1470,14 +1975,29 @@
   quote_asset: USDT
 - exchange: OKX
   trading_type: SPOT
+  pair: JOE-USD
+  base_asset: JOE
+  quote_asset: USD
+- exchange: OKX
+  trading_type: SPOT
   pair: JOE-USDT
   base_asset: JOE
   quote_asset: USDT
 - exchange: OKX
   trading_type: SPOT
+  pair: KNC-USD
+  base_asset: KNC
+  quote_asset: USD
+- exchange: OKX
+  trading_type: SPOT
   pair: KNC-USDT
   base_asset: KNC
   quote_asset: USDT
+- exchange: OKX
+  trading_type: SPOT
+  pair: LDO-USD
+  base_asset: LDO
+  quote_asset: USD
 - exchange: OKX
   trading_type: SPOT
   pair: LDO-USDC
@@ -1490,6 +2010,11 @@
   quote_asset: USDT
 - exchange: OKX
   trading_type: SPOT
+  pair: LINK-USD
+  base_asset: LINK
+  quote_asset: USD
+- exchange: OKX
+  trading_type: SPOT
   pair: LINK-USDC
   base_asset: LINK
   quote_asset: USDC
@@ -1500,9 +2025,19 @@
   quote_asset: USDT
 - exchange: OKX
   trading_type: SPOT
+  pair: LPT-USD
+  base_asset: LPT
+  quote_asset: USD
+- exchange: OKX
+  trading_type: SPOT
   pair: LPT-USDT
   base_asset: LPT
   quote_asset: USDT
+- exchange: OKX
+  trading_type: SPOT
+  pair: LRC-USD
+  base_asset: LRC
+  quote_asset: USD
 - exchange: OKX
   trading_type: SPOT
   pair: LRC-USDC
@@ -1515,14 +2050,29 @@
   quote_asset: USDT
 - exchange: OKX
   trading_type: SPOT
+  pair: MAGIC-USD
+  base_asset: MAGIC
+  quote_asset: USD
+- exchange: OKX
+  trading_type: SPOT
   pair: MAGIC-USDT
   base_asset: MAGIC
   quote_asset: USDT
 - exchange: OKX
   trading_type: SPOT
+  pair: PENDLE-USD
+  base_asset: PENDLE
+  quote_asset: USD
+- exchange: OKX
+  trading_type: SPOT
   pair: PENDLE-USDT
   base_asset: PENDLE
   quote_asset: USDT
+- exchange: OKX
+  trading_type: SPOT
+  pair: PEPE-USD
+  base_asset: PEPE
+  quote_asset: USD
 - exchange: OKX
   trading_type: SPOT
   pair: PEPE-USDC
@@ -1533,6 +2083,21 @@
   pair: PEPE-USDT
   base_asset: PEPE
   quote_asset: USDT
+- exchange: OKX
+  trading_type: SPOT
+  pair: PERP-USD
+  base_asset: PERP
+  quote_asset: USD
+- exchange: OKX
+  trading_type: SPOT
+  pair: PERP-USDT
+  base_asset: PERP
+  quote_asset: USDT
+- exchange: OKX
+  trading_type: SPOT
+  pair: PYTH-USD
+  base_asset: PYTH
+  quote_asset: USD
 - exchange: OKX
   trading_type: SPOT
   pair: PYTH-USDC
@@ -1555,9 +2120,19 @@
   quote_asset: USDT
 - exchange: OKX
   trading_type: SPOT
+  pair: SUSHI-USD
+  base_asset: SUSHI
+  quote_asset: USD
+- exchange: OKX
+  trading_type: SPOT
   pair: SUSHI-USDT
   base_asset: SUSHI
   quote_asset: USDT
+- exchange: OKX
+  trading_type: SPOT
+  pair: TRB-USD
+  base_asset: TRB
+  quote_asset: USD
 - exchange: OKX
   trading_type: SPOT
   pair: TRB-USDT
@@ -1565,9 +2140,19 @@
   quote_asset: USDT
 - exchange: OKX
   trading_type: SPOT
+  pair: UMA-USD
+  base_asset: UMA
+  quote_asset: USD
+- exchange: OKX
+  trading_type: SPOT
   pair: UMA-USDT
   base_asset: UMA
   quote_asset: USDT
+- exchange: OKX
+  trading_type: SPOT
+  pair: UNI-USD
+  base_asset: UNI
+  quote_asset: USD
 - exchange: OKX
   trading_type: SPOT
   pair: UNI-USDC
@@ -1580,9 +2165,19 @@
   quote_asset: USDT
 - exchange: OKX
   trading_type: SPOT
+  pair: UXLINK-USD
+  base_asset: UXLINK
+  quote_asset: USD
+- exchange: OKX
+  trading_type: SPOT
   pair: UXLINK-USDT
   base_asset: UXLINK
   quote_asset: USDT
+- exchange: OKX
+  trading_type: SPOT
+  pair: W-USD
+  base_asset: W
+  quote_asset: USD
 - exchange: OKX
   trading_type: SPOT
   pair: W-USDT
@@ -1593,6 +2188,11 @@
   pair: WBTC-BTC
   base_asset: WBTC
   quote_asset: BTC
+- exchange: OKX
+  trading_type: SPOT
+  pair: WBTC-USD
+  base_asset: WBTC
+  quote_asset: USD
 - exchange: OKX
   trading_type: SPOT
   pair: WBTC-USDC
@@ -1610,9 +2210,19 @@
   quote_asset: USDT
 - exchange: OKX
   trading_type: SPOT
+  pair: YFI-USD
+  base_asset: YFI
+  quote_asset: USD
+- exchange: OKX
+  trading_type: SPOT
   pair: YFI-USDT
   base_asset: YFI
   quote_asset: USDT
+- exchange: OKX
+  trading_type: SPOT
+  pair: ZRO-USD
+  base_asset: ZRO
+  quote_asset: USD
 - exchange: OKX
   trading_type: SPOT
   pair: ZRO-USDC
