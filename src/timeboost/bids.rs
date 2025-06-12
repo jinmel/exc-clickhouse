@@ -7,6 +7,7 @@ use clickhouse::Row;
 use csv;
 use flate2::read::GzDecoder;
 use futures::future::BoxFuture;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::Read;
@@ -110,7 +111,7 @@ pub async fn backfill_timeboost_bids() -> eyre::Result<()> {
 
     svc.ready().await?;
     let bids = svc.call(HistoricalBidsRequest::All).await?;
-    let bids_with_timestamp = bids
+    let bids_with_timestamp: Vec<BidData> = bids
         .into_iter()
         .map(|bid| {
             let delta = bid.round - FIRST_ROUND;
@@ -119,8 +120,12 @@ pub async fn backfill_timeboost_bids() -> eyre::Result<()> {
             let final_timestamp = (first_round_at + chrono_elapsed).with_timezone(&Utc);
             bid.with_timestamp(final_timestamp)
         })
-        .collect::<Vec<_>>();
-    clickhouse.write_express_lane_bids(bids_with_timestamp).await?;
+        .collect();
+
+    for bids in bids_with_timestamp.chunks(5000) {
+        tracing::info!("Writing {} bids to clickhouse", bids.len());
+        clickhouse.write_express_lane_bids(bids.to_vec()).await?;
+    }
     Ok(())
 }
 
