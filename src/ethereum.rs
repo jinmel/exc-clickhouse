@@ -41,7 +41,7 @@ impl BlockMetadataFetcher {
 
     pub async fn create_block_metadata_stream(
         &self,
-    ) -> impl Stream<Item = eyre::Result<BlockMetadata>> {
+    ) -> impl Stream<Item = eyre::Result<BlockMetadata>> + use<'_> {
         try_stream! {
           loop {
             let sub = self.provider.subscribe_blocks().await?;

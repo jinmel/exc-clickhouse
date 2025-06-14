@@ -156,11 +156,12 @@ pub async fn fetch_bids_task(msg_tx: mpsc::UnboundedSender<ClickhouseMessage>) -
 
         let last_bid = bids.last().unwrap().clone();
         let last_bid_db = clickhouse.get_latest_bid().await.ok();
-        if let Some(last_bid_db) = last_bid_db
-            && last_bid_db.round == last_bid.round {
+        if let Some(last_bid_db) = last_bid_db {
+            if last_bid_db.round == last_bid.round {
                 tracing::debug!(?last_bid_db.round, ?last_bid.round, "No new round found");
                 continue;
             }
+        }
 
         let bids = bids
             .into_iter()

@@ -1,7 +1,8 @@
 [package]
 name = "exc-clickhouse"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+rust-version = "1.70"
 authors = ["Eisen Labs"]
 description = "Exchange data collector to clickhouse db"
 [lib]
