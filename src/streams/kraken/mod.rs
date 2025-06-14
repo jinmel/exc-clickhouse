@@ -17,6 +17,8 @@ pub const DEFAULT_KRAKEN_WS_URL: &str = "wss://ws.kraken.com/v2";
 pub mod model;
 pub mod parser;
 
+#[derive(Clone)]
+
 pub struct KrakenClient {
     base_url: String,
     subscription: KrakenSubscription,

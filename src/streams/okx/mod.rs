@@ -16,6 +16,7 @@ pub const DEFAULT_OKX_WS_URL: &str = "wss://ws.okx.com:8443/ws/v5/public";
 pub mod model;
 pub mod parser;
 
+#[derive(Clone)]
 pub struct OkxClient {
     base_url: String,
     subscription: OkxSubscription,

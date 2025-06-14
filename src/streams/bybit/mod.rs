@@ -16,6 +16,7 @@ pub const DEFAULT_BYBIT_WS_URL: &str = "wss://stream.bybit.com/v5/public/spot";
 pub mod model;
 pub mod parser;
 
+#[derive(Clone)]
 pub struct BybitClient {
     base_url: String,
     subscription: BybitSubscription,

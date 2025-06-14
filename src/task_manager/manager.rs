@@ -1,9 +1,11 @@
 use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::pin::Pin;
 use tokio::sync::watch;
 use tokio::task::JoinSet;
 use tracing::{Instrument, field};
+use std::collections::HashMap;
 
 use crate::task_manager::circuit_breaker::CircuitBreaker;
 use crate::task_manager::config::{ShutdownStatus, TaskManagerConfig};
@@ -17,7 +19,6 @@ use crate::task_manager::types::{
 };
 
 /// Main task manager with JoinSet-based task tracking
-#[derive(Debug)]
 pub struct TaskManager<T> {
     /// JoinSet for managing concurrent tasks
     join_set: JoinSet<TaskCompletion<T>>,
@@ -30,7 +31,6 @@ pub struct TaskManager<T> {
     /// Shutdown signal receiver
     shutdown_rx: watch::Receiver<bool>,
     /// Task counter for generating sequential IDs
-    #[allow(dead_code)] // Reserved for future task ID generation
     task_counter: Arc<AtomicU64>,
     /// Circuit breaker for handling persistent failures
     circuit_breaker: CircuitBreaker,
@@ -38,6 +38,9 @@ pub struct TaskManager<T> {
     restart_queue: Arc<parking_lot::Mutex<Vec<PendingRestart<T>>>>,
     /// Shutdown status tracking
     shutdown_status: Arc<parking_lot::Mutex<ShutdownStatus>>,
+
+    /// Storage for task functions to enable task restarts
+    task_fns: HashMap<TaskId, Box<dyn Fn() -> Pin<Box<dyn std::future::Future<Output = TaskResult<T>> + Send + 'static>> + Send + 'static>>,
 }
 
 impl<T: Send + 'static> TaskManager<T> {
@@ -65,14 +68,14 @@ impl<T: Send + 'static> TaskManager<T> {
             circuit_breaker,
             restart_queue: Arc::new(parking_lot::Mutex::new(Vec::new())),
             shutdown_status: Arc::new(parking_lot::Mutex::new(ShutdownStatus::new())),
+            task_fns: HashMap::new(),
         }
     }
 
     /// Spawn a new async task with automatic registration
-    pub fn spawn_task<F, Fut, N>(&mut self, name: N, task_fn: F) -> TaskId
+    pub fn spawn_task<F, N>(&mut self, name: N, task_fn: F) -> TaskId
     where
-        F: FnOnce() -> Fut + Send + 'static,
-        Fut: std::future::Future<Output = TaskResult<T>> + Send + 'static,
+        F: Fn() -> Pin<Box<dyn std::future::Future<Output = TaskResult<T>> + Send + 'static>> + Send + Clone + 'static,
         N: std::fmt::Display,
     {
         // Check if shutdown is in progress and new tasks should be rejected
@@ -113,6 +116,9 @@ impl<T: Send + 'static> TaskManager<T> {
         let correlation_id = CorrelationId::from_task_id(&task_id);
         let _logging_context =
             TaskLoggingContext::new(task_id.clone(), name.clone(), "task_execution".to_string());
+
+        // Store the task function directly since it already returns the correct type
+        self.task_fns.insert(task_id.clone(), Box::new(task_fn.clone()));
 
         // Spawn the task with structured logging and instrumentation
         let _abort_handle = self.join_set.spawn(async move {
@@ -194,19 +200,6 @@ impl<T: Send + 'static> TaskManager<T> {
         );
 
         task_id
-    }
-
-    /// Spawn a blocking task that will be executed on a blocking thread pool
-    pub fn spawn_blocking_task<F, N>(&mut self, name: N, task_fn: F) -> TaskId
-    where
-        F: FnOnce() -> TaskResult<T> + Send + 'static,
-        N: std::fmt::Display,
-    {
-        self.spawn_task(name, move || async move {
-            tokio::task::spawn_blocking(task_fn)
-                .await
-                .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?
-        })
     }
 
     /// Get task handle by ID

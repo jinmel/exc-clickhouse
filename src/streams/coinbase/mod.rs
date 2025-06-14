@@ -16,6 +16,7 @@ pub const DEFAULT_COINBASE_WS_URL: &str = "wss://ws-feed.exchange.coinbase.com";
 pub mod model;
 pub mod parser;
 
+#[derive(Clone)]
 pub struct CoinbaseClient {
     base_url: String,
     subscription: CoinbaseSubscription,

@@ -24,27 +24,6 @@ async fn test_task_manager_basic_functionality() {
 }
 
 #[tokio::test]
-async fn test_task_manager_blocking_tasks() {
-    let mut manager: TaskManager<i32> = TaskManager::new();
-
-    // Spawn a blocking task
-    let task_id = manager.spawn_blocking_task("blocking_task".to_string(), || {
-        std::thread::sleep(Duration::from_millis(10));
-        Ok(42)
-    });
-
-    // Wait for task completion
-    if let Some(completion) = manager.wait_for_next_completion().await {
-        assert_eq!(completion.task_id, task_id);
-        assert_eq!(completion.task_name, "blocking_task");
-        assert!(completion.result.is_ok());
-        assert_eq!(completion.result.unwrap(), 42);
-    } else {
-        panic!("Expected task completion");
-    }
-}
-
-#[tokio::test]
 async fn test_task_manager_capacity_limits() {
     let config = TaskManagerConfig {
         max_concurrent_tasks: 2,
