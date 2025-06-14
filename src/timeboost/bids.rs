@@ -190,7 +190,7 @@ pub struct HistoricalBidsService {
 
 impl HistoricalBidsService {
     pub const BUCKET_NAME: &str = "timeboost-auctioneer-arb1";
-    pub const PREFIX: &str = "ue2/validated-timeboost-bids/";
+    pub const PREFIX: &str = "";
     pub const REGION: &str = "us-west-2";
 
     pub async fn new() -> eyre::Result<Self> {

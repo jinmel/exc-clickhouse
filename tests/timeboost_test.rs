@@ -2,7 +2,7 @@ use exc_clickhouse::timeboost::bids::S3Client;
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 pub const BUCKET_NAME: &str = "timeboost-auctioneer-arb1";
-pub const PREFIX: &str = "ue2/validated-timeboost-bids/";
+pub const PREFIX: &str = "";
 
 fn init_tracing() {
     let _ = FmtSubscriber::builder()
