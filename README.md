@@ -82,24 +82,46 @@ CLICKHOUSE_DATABASE=crypto
 RPC_URL=https://eth-mainnet.alchemyapi.io/v2/your-key
 ```
 
-### Symbol Configuration
+### Trading Pairs Configuration
 
-Configure trading pairs in `symbols.yaml`:
+Configure trading pairs in `trading_pairs.yaml`:
 
 ```yaml
-- exchange: "Binance"
-  market: "SPOT"
-  symbols:
-    - BTCUSDT
-    - ETHUSDT
-    - SOLUSDT
+- exchange: Binance
+  trading_type: SPOT
+  pair: BTCUSDT
+  base_asset: BTC
+  quote_asset: USDT
+- exchange: Binance
+  trading_type: SPOT
+  pair: ETHUSDT
+  base_asset: ETH
+  quote_asset: USDT
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: BTC-USD
+  base_asset: BTC
+  quote_asset: USD
+- exchange: Coinbase
+  trading_type: SPOT
+  pair: ETH-USD
+  base_asset: ETH
+  quote_asset: USD
+```
 
-- exchange: "Coinbase"
-  market: "SPOT"
-  symbols:
-    - BTC-USD
-    - ETH-USD
-    - SOL-USD
+#### Generate Trading Pairs File
+
+Use the Python fetcher script to automatically generate trading pairs from exchanges:
+
+```bash
+# Generate from all supported exchanges
+cd scripts/trading_pairs_fetcher
+python run_fetcher.py
+
+# Generate filtered by specific base assets
+python run_fetcher.py --base-assets-file ../symbols.txt
+
+# This creates trading_pairs_flat.yaml which can be used as trading_pairs.yaml
 ```
 
 ## Usage
@@ -110,8 +132,8 @@ Configure trading pairs in `symbols.yaml`:
 # Stream data from all configured exchanges
 ./target/release/exc-clickhouse stream
 
-# Custom symbols file
-./target/release/exc-clickhouse stream --symbols-file custom-symbols.yaml
+# Custom trading pairs file
+./target/release/exc-clickhouse stream --trading-pairs-file custom-trading-pairs.yaml
 
 # Skip certain data sources
 ./target/release/exc-clickhouse stream --skip-ethereum --skip-timeboost
@@ -123,8 +145,8 @@ Configure trading pairs in `symbols.yaml`:
 ### Database Operations
 
 ```bash
-# Fetch top Binance trading pairs
-./target/release/exc-clickhouse db fetch-binance-symbols --output binance-top.yaml --limit 100
+# Backfill trading pairs to database
+./target/release/exc-clickhouse db trading-pairs --trading-pairs-file trading_pairs.yaml
 
 # Backfill Timeboost auction data
 ./target/release/exc-clickhouse db timeboost
@@ -134,7 +156,7 @@ Configure trading pairs in `symbols.yaml`:
 
 #### Stream Command
 
-- `--symbols-file`: Path to symbols configuration (default: `symbols.yaml`)
+- `--trading-pairs-file`: Path to trading pairs configuration (default: `trading_pairs.yaml`)
 - `--batch-size`: Batch size for ClickHouse inserts (default: 500)
 - `--skip-ethereum`: Skip Ethereum block metadata collection
 - `--skip-clickhouse`: Skip ClickHouse writer (useful for testing)
