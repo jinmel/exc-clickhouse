@@ -377,6 +377,7 @@ impl<T: Send + 'static> TaskManager<T> {
                         handle.set_state(TaskState::Completed);
                         self.circuit_breaker.record_success();
 
+
                         tracing::info!(
                             task_id = %task_id,
                             task_name = %task_name,
@@ -395,15 +396,30 @@ impl<T: Send + 'static> TaskManager<T> {
                             error = %e,
                             "Task failed"
                         );
+                        
+
 
                         // Check if task should be restarted using new comprehensive logic
-                        if RestartUtils::should_restart_task(
+                        let failure_type = RestartUtils::classify_failure(&*e);
+                        let should_restart = RestartUtils::should_restart_task(
                             &*e,
                             handle.restart_count(),
                             handle.last_restart_time(),
                             &self.config.default_restart_policy,
                             Some(&self.circuit_breaker),
-                        ) {
+                        );
+                        
+
+                        tracing::debug!(
+                            task_id = %task_id,
+                            error_type = ?failure_type,
+                            restart_count = handle.restart_count(),
+                            should_restart = should_restart,
+                            error_msg = %e,
+                            "Restart decision analysis"
+                        );
+                        
+                        if should_restart {
                             let restart_delay = RestartUtils::calculate_backoff_delay(
                                 handle.restart_count(),
                                 &self.config.default_restart_policy,
@@ -430,6 +446,8 @@ impl<T: Send + 'static> TaskManager<T> {
                                 task_fn()
                             });
                             self.join_set.spawn(fut);
+                            
+                            // Don't remove task from registry since we're restarting it
                         } else {
                             tracing::warn!(
                                 task_id = %task_id,
@@ -437,12 +455,11 @@ impl<T: Send + 'static> TaskManager<T> {
                                 restart_count = handle.restart_count(),
                                 "Task restart denied by restart policy"
                             );
+                            // Clean up completed task from registry since not restarting
+                            self.registry.remove(&task_id);
                         }
                     }
                 }
-
-                // Clean up completed task from registry
-                self.registry.remove(&task_id);
             } else {
                 // No more tasks or shutdown signal received
                 break;
