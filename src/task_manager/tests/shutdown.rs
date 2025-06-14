@@ -7,10 +7,10 @@ async fn test_task_manager_shutdown() {
     let mut manager = TaskManager::new();
 
     // Spawn a long-running task
-    let _task_id = manager.spawn_task("long_task".to_string(), || async {
+    let _task_id = manager.spawn_task("long_task".to_string(), || Box::pin(async {
         sleep(Duration::from_secs(10)).await;
         Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
-    });
+    }));
 
     // Initiate shutdown
     let shutdown_result =
@@ -35,10 +35,10 @@ async fn test_enhanced_shutdown_phases() {
     assert!(!manager.is_shutdown_complete());
 
     // Spawn a long-running task
-    let _task_id = manager.spawn_task("long_task".to_string(), || async {
+    let _task_id = manager.spawn_task("long_task".to_string(), || Box::pin(async {
         sleep(Duration::from_millis(200)).await;
         Ok(())
-    });
+    }));
 
     // Start shutdown
     let shutdown_handle = tokio::spawn(async move { manager.shutdown().await });
@@ -59,14 +59,14 @@ async fn test_shutdown_status_tracking() {
     let mut manager = TaskManager::<()>::with_config(config);
 
     // Spawn multiple tasks
-    let _task1 = manager.spawn_task("task1".to_string(), || async {
+    let _task1 = manager.spawn_task("task1".to_string(), || Box::pin(async {
         sleep(Duration::from_millis(100)).await;
         Ok(())
-    });
-    let _task2 = manager.spawn_task("task2".to_string(), || async {
+    }));
+    let _task2 = manager.spawn_task("task2".to_string(), || Box::pin(async {
         sleep(Duration::from_millis(100)).await;
         Ok(())
-    });
+    }));
 
     // Initial status
     let initial_status = manager.get_shutdown_status();
@@ -96,10 +96,10 @@ async fn test_shutdown_during_high_load() {
     // Spawn many tasks with varying durations
     for i in 0..20 {
         let duration = Duration::from_millis(50 + (i % 10) * 10);
-        manager.spawn_task(format!("load_task_{}", i), move || async move {
+        manager.spawn_task(format!("load_task_{}", i), move || Box::pin(async move {
             sleep(duration).await;
             Ok(())
-        });
+        }));
     }
 
     // Start shutdown immediately while tasks are running

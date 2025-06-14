@@ -7,20 +7,20 @@ async fn test_end_to_end_task_lifecycle() {
     let mut manager = TaskManager::<String>::new();
 
     // Spawn multiple tasks with different outcomes
-    let success_task = manager.spawn_task("success_task".to_string(), || async {
+    let success_task = manager.spawn_task("success_task".to_string(), || Box::pin(async {
         sleep(Duration::from_millis(50)).await;
         Ok("success".to_string())
-    });
+    }));
 
-    let failure_task = manager.spawn_task("failure_task".to_string(), || async {
+    let failure_task = manager.spawn_task("failure_task".to_string(), || Box::pin(async {
         sleep(Duration::from_millis(30)).await;
         Err("simulated failure".into())
-    });
+    }));
 
-    let slow_task = manager.spawn_task("slow_task".to_string(), || async {
+    let slow_task = manager.spawn_task("slow_task".to_string(), || Box::pin(async {
         sleep(Duration::from_millis(100)).await;
         Ok("slow_success".to_string())
-    });
+    }));
 
     // Wait for all tasks to complete
     let mut completed_tasks = Vec::new();
@@ -60,10 +60,10 @@ async fn test_resource_limit_boundary_testing() {
     // Try to spawn more tasks than the limit
     let mut task_ids = Vec::new();
     for i in 0..10 {
-        let task_id = manager.spawn_task(format!("limited_task_{}", i), || async {
+        let task_id = manager.spawn_task(format!("limited_task_{}", i), || Box::pin(async {
             sleep(Duration::from_millis(100)).await;
             Ok(())
-        });
+        }));
         task_ids.push(task_id);
     }
 
