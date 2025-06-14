@@ -10,12 +10,12 @@ async fn test_high_concurrency_task_spawning() {
     // Spawn many tasks concurrently
     let mut task_ids = Vec::new();
     for i in 0..TASK_COUNT {
-        let task_id = manager.spawn_task(format!("concurrent_task_{}", i), move || async move {
+        let task_id = manager.spawn_task(format!("concurrent_task_{}", i), move || Box::pin(async move {
             // Small random delay to simulate work
             let delay = (i % 10) + 1;
             sleep(Duration::from_millis(delay as u64)).await;
             Ok(i)
-        });
+        }));
         task_ids.push(task_id);
     }
 

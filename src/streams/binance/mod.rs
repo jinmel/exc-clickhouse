@@ -22,6 +22,7 @@ pub const US_BINANCE_WS_URL: &str = "wss://stream.binance.us:9443";
 pub mod model;
 pub mod parser;
 
+#[derive(Clone)]
 pub struct BinanceClient {
     base_url: String,
     subscription: BinanceSubscription,

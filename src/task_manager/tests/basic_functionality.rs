@@ -7,10 +7,10 @@ async fn test_task_manager_basic_functionality() {
     let mut manager = TaskManager::new();
 
     // Spawn a simple task
-    let task_id = manager.spawn_task("test_task".to_string(), || async {
+    let task_id = manager.spawn_task("test_task".to_string(), || Box::pin(async {
         sleep(Duration::from_millis(10)).await;
         Ok::<String, Box<dyn std::error::Error + Send + Sync>>("completed".to_string())
-    });
+    }));
 
     // Verify task was registered
     assert!(manager.get_task(&task_id).is_some());
@@ -20,27 +20,6 @@ async fn test_task_manager_basic_functionality() {
     if let Some(completion) = manager.wait_for_next_completion().await {
         assert_eq!(completion.task_id, task_id);
         assert!(completion.result.is_ok());
-    }
-}
-
-#[tokio::test]
-async fn test_task_manager_blocking_tasks() {
-    let mut manager: TaskManager<i32> = TaskManager::new();
-
-    // Spawn a blocking task
-    let task_id = manager.spawn_blocking_task("blocking_task".to_string(), || {
-        std::thread::sleep(Duration::from_millis(10));
-        Ok(42)
-    });
-
-    // Wait for task completion
-    if let Some(completion) = manager.wait_for_next_completion().await {
-        assert_eq!(completion.task_id, task_id);
-        assert_eq!(completion.task_name, "blocking_task");
-        assert!(completion.result.is_ok());
-        assert_eq!(completion.result.unwrap(), 42);
-    } else {
-        panic!("Expected task completion");
     }
 }
 

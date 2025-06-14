@@ -1,8 +1,8 @@
 use clap::Parser;
 use dotenv::dotenv;
 use futures::{StreamExt, pin_mut};
-use std::time::Duration;
-use tokio::sync::mpsc;
+use std::{sync::Arc, time::Duration};
+use tokio::sync::{mpsc, Mutex};
 use tower::{Service, ServiceBuilder, ServiceExt};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
@@ -127,56 +127,63 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
 
     // Spawn tasks
     if !binance_symbols.is_empty() {
-        let symbols = binance_symbols.clone();
         let tx = msg_tx.clone();
-        task_manager.spawn_task(TaskName::BinanceStream, move || async move {
-            let client = BinanceClient::builder().add_symbols(symbols).build()?;
-            process_exchange_stream(client, tx).await.into_task_result()
+        let client = BinanceClient::builder().add_symbols(binance_symbols).build()?;
+        task_manager.spawn_task(TaskName::BinanceStream, move || {
+            let client = client.clone();
+            let tx = tx.clone();
+            Box::pin(async move { process_exchange_stream(client, tx).await.into_task_result() })
         });
     }
 
     if !bybit_symbols.is_empty() {
-        let symbols = bybit_symbols.clone();
         let tx = msg_tx.clone();
-        task_manager.spawn_task(TaskName::BybitStream, move || async move {
-            let client = BybitClient::builder().add_symbols(symbols).build()?;
-            process_exchange_stream(client, tx).await.into_task_result()
+        let client = BybitClient::builder().add_symbols(bybit_symbols).build()?;
+        task_manager.spawn_task(TaskName::BybitStream, move || {
+            let client = client.clone();
+            let tx = tx.clone();
+            Box::pin(async move { process_exchange_stream(client, tx).await.into_task_result() })
         });
     }
 
     if !okx_symbols.is_empty() {
-        let symbols = okx_symbols.clone();
         let tx = msg_tx.clone();
-        task_manager.spawn_task(TaskName::OkxStream, move || async move {
-            let client = OkxClient::builder().add_symbols(symbols).build()?;
-            process_exchange_stream(client, tx).await.into_task_result()
+        let client = OkxClient::builder().add_symbols(okx_symbols).build()?;
+        task_manager.spawn_task(TaskName::OkxStream, move || {
+            let client = client.clone();
+            let tx = tx.clone();
+            Box::pin(async move { process_exchange_stream(client, tx).await.into_task_result() })
         });
     }
 
     if !coinbase_symbols.is_empty() {
-        let symbols = coinbase_symbols.clone();
         let tx = msg_tx.clone();
-        task_manager.spawn_task(TaskName::CoinbaseStream, move || async move {
-            let client = CoinbaseClient::builder().add_symbols(symbols).build()?;
-            process_exchange_stream(client, tx).await.into_task_result()
+        let client = CoinbaseClient::builder().add_symbols(coinbase_symbols).build()?;
+        task_manager.spawn_task(TaskName::CoinbaseStream, move || {
+            let client = client.clone();
+            let tx = tx.clone();
+            Box::pin(async move { process_exchange_stream(client, tx).await.into_task_result() })
         });
     }
 
     if !kraken_symbols.is_empty() {
-        let symbols = kraken_symbols.clone();
         let tx = msg_tx.clone();
-        task_manager.spawn_task(TaskName::KrakenStream, move || async move {
-            let client = KrakenClient::builder().add_symbols(symbols).build()?;
-            process_exchange_stream(client, tx).await.into_task_result()
+        let client = KrakenClient::builder().add_symbols(kraken_symbols).build()?;
+        task_manager.spawn_task(TaskName::KrakenStream, move || {
+            let client = client.clone();
+            let tx = tx.clone();
+            Box::pin(async move { process_exchange_stream(client, tx).await.into_task_result() })
         });
     }
 
     if !kucoin_symbols.is_empty() {
         let symbols = kucoin_symbols.clone();
         let tx = msg_tx.clone();
-        task_manager.spawn_task(TaskName::KucoinStream, move || async move {
-            let client = KucoinClient::builder().add_symbols(symbols).build().await?;
-            process_exchange_stream(client, tx).await.into_task_result()
+        let client = KucoinClient::builder().add_symbols(symbols).build().await?;
+        task_manager.spawn_task(TaskName::KucoinStream, move || {
+            let client = client.clone();
+            let tx = tx.clone();
+            Box::pin(async move { process_exchange_stream(client, tx).await.into_task_result() })
         });
     }
 
@@ -188,30 +195,31 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
             rpc_url
         );
         let tx = msg_tx.clone();
-        task_manager.spawn_task(TaskName::EthereumBlockMetadata, move || async move {
-            ethereum::fetch_blocks_task(rpc_url, tx)
-                .await
-                .into_task_result()
+        task_manager.spawn_task(TaskName::EthereumBlockMetadata, move || {
+            let rpc_url = rpc_url.clone();
+            let tx = tx.clone();
+            Box::pin(async move { ethereum::fetch_blocks_task(rpc_url, tx).await.into_task_result() })
         });
     }
 
     // Automatically spawn ClickHouse writer if we have any data producers
     if has_producers {
         tracing::info!("Spawning clickhouse writer task (auto-enabled for producer tasks)");
-        task_manager.spawn_task(TaskName::ClickHouseWriter, move || async move {
-            clickhouse_writer_task(msg_rx, args.clickhouse_rate_limit, args.batch_size)
-                .await
-                .into_task_result()
+        let msg_rx = Arc::new(Mutex::new(msg_rx));
+        task_manager.spawn_task(TaskName::ClickHouseWriter, move || {   
+            let rx = msg_rx.clone();
+            let rate_limit = args.clickhouse_rate_limit;
+            let batch_size = args.batch_size;
+            Box::pin(async move { clickhouse_writer_task(rx, rate_limit, batch_size).await.into_task_result() })
         });
     }
 
     if app_config.timeboost_config.enabled {
         tracing::info!("Spawning timeboost bids task");
         let tx = msg_tx.clone();
-        task_manager.spawn_task(TaskName::TimeboostBids, move || async move {
-            timeboost::bids::fetch_bids_task(tx)
-                .await
-                .into_task_result()
+        task_manager.spawn_task(TaskName::TimeboostBids, move || {
+            let tx = tx.clone();
+            Box::pin(async move { timeboost::bids::fetch_bids_task(tx).await.into_task_result() })
         });
     }
 
@@ -291,7 +299,7 @@ where
 }
 
 async fn clickhouse_writer_task(
-    mut rx: mpsc::UnboundedReceiver<ClickhouseMessage>,
+    rx: Arc<Mutex<mpsc::UnboundedReceiver<ClickhouseMessage>>>,
     rate_limit: u64,
     batch_size: usize,
 ) -> eyre::Result<()> {
@@ -301,6 +309,7 @@ async fn clickhouse_writer_task(
         .rate_limit(rate_limit, Duration::from_secs(1))
         .service(clickhouse_svc);
     let mut buffer = Vec::with_capacity(batch_size);
+    let mut rx = rx.lock().await;
 
     while rx.recv_many(&mut buffer, batch_size).await > 0 {
         service.ready().await?;

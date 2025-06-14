@@ -6,3 +6,4 @@ mod restart_policies;
 mod shutdown;
 mod state_management;
 mod stress_tests;
+mod task_restart_integration;

@@ -17,6 +17,8 @@ use tokio::time::Duration;
 pub mod model;
 pub mod parser;
 
+#[derive(Clone)]
+
 pub struct KucoinClient {
     base_url: String,
     subscription: KucoinSubscription,

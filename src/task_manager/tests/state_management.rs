@@ -59,10 +59,10 @@ async fn test_task_manager_cancellation() {
     let mut manager: TaskManager<String> = TaskManager::new();
 
     // Spawn a long-running task
-    let task_id = manager.spawn_task("long_task".to_string(), || async {
+    let task_id = manager.spawn_task("long_task".to_string(), || Box::pin(async {
         sleep(Duration::from_secs(10)).await;
         Ok("completed".to_string())
-    });
+    }));
 
     // Verify task was registered
     assert!(manager.get_task(&task_id).is_some());

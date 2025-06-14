@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -17,7 +19,6 @@ use crate::task_manager::types::{
 };
 
 /// Main task manager with JoinSet-based task tracking
-#[derive(Debug)]
 pub struct TaskManager<T> {
     /// JoinSet for managing concurrent tasks
     join_set: JoinSet<TaskCompletion<T>>,
@@ -30,7 +31,6 @@ pub struct TaskManager<T> {
     /// Shutdown signal receiver
     shutdown_rx: watch::Receiver<bool>,
     /// Task counter for generating sequential IDs
-    #[allow(dead_code)] // Reserved for future task ID generation
     task_counter: Arc<AtomicU64>,
     /// Circuit breaker for handling persistent failures
     circuit_breaker: CircuitBreaker,
@@ -38,6 +38,17 @@ pub struct TaskManager<T> {
     restart_queue: Arc<parking_lot::Mutex<Vec<PendingRestart<T>>>>,
     /// Shutdown status tracking
     shutdown_status: Arc<parking_lot::Mutex<ShutdownStatus>>,
+
+    /// Storage for task functions to enable task restarts
+    task_fns: HashMap<
+        TaskId,
+        Arc<
+            dyn Fn() -> Pin<Box<dyn std::future::Future<Output = TaskResult<T>> + Send + 'static>>
+                + Send
+                + Sync
+                + 'static,
+        >,
+    >,
 }
 
 impl<T: Send + 'static> TaskManager<T> {
@@ -65,57 +76,28 @@ impl<T: Send + 'static> TaskManager<T> {
             circuit_breaker,
             restart_queue: Arc::new(parking_lot::Mutex::new(Vec::new())),
             shutdown_status: Arc::new(parking_lot::Mutex::new(ShutdownStatus::new())),
+            task_fns: HashMap::new(),
         }
     }
 
-    /// Spawn a new async task with automatic registration
-    pub fn spawn_task<F, Fut, N>(&mut self, name: N, task_fn: F) -> TaskId
+    /// Create an instrumented task future that produces TaskCompletion<T>
+    fn make_task<F>(
+        &self,
+        task_id: TaskId,
+        task_name: String,
+        task_fn: F,
+    ) -> Pin<Box<dyn std::future::Future<Output = TaskCompletion<T>> + Send + 'static>>
     where
-        F: FnOnce() -> Fut + Send + 'static,
-        Fut: std::future::Future<Output = TaskResult<T>> + Send + 'static,
-        N: std::fmt::Display,
+        F: Fn() -> Pin<Box<dyn std::future::Future<Output = TaskResult<T>> + Send + 'static>>
+            + Send
+            + 'static,
     {
-        // Check if shutdown is in progress and new tasks should be rejected
-        {
-            let shutdown_status = self.shutdown_status.lock();
-            if shutdown_status.phase != ShutdownPhase::Running
-                && self.config.shutdown_config.reject_new_tasks
-            {
-                tracing::warn!(
-                    name = %name,
-                    shutdown_phase = %shutdown_status.phase,
-                    "Task spawn rejected due to shutdown in progress"
-                );
-                // Return a dummy task ID for now - in production this should return a Result
-                return TaskId::new();
-            }
-        }
-
-        // Check capacity limits
-        if self.is_at_capacity() {
-            tracing::warn!(
-                name = %name,
-                active_tasks = self.active_task_count(),
-                max_tasks = self.config.max_concurrent_tasks,
-                "Task spawn rejected due to capacity limit"
-            );
-            // Return a dummy task ID for now - in production this should return a Result
-            return TaskId::new();
-        }
-
-        let task_id = TaskId::new();
-        let task_id_for_async = task_id.clone();
-        let name = name.to_string(); // Convert to String once
-        let task_name_for_async = name.clone();
-        let task_name_for_completion = name.clone();
-
-        // Create logging context and span for the task
         let correlation_id = CorrelationId::from_task_id(&task_id);
-        let _logging_context =
-            TaskLoggingContext::new(task_id.clone(), name.clone(), "task_execution".to_string());
+        let task_id_for_async = task_id.clone();
+        let task_name_for_async = task_name.clone();
+        let task_name_for_completion = task_name.clone();
 
-        // Spawn the task with structured logging and instrumentation
-        let _abort_handle = self.join_set.spawn(async move {
+        Box::pin(async move {
             let span = tracing::info_span!(
                 "task_execution",
                 correlation_id = %correlation_id,
@@ -169,7 +151,63 @@ impl<T: Send + 'static> TaskManager<T> {
             }
             .instrument(span)
             .await
-        });
+        })
+    }
+
+    /// Spawn a new async task with automatic registration
+    pub fn spawn_task<F, N>(&mut self, name: N, task_fn: F) -> TaskId
+    where
+        F: Fn() -> Pin<Box<dyn std::future::Future<Output = TaskResult<T>> + Send + 'static>>
+            + Send
+            + Sync
+            + Clone
+            + 'static,
+        N: std::fmt::Display,
+    {
+        // Check if shutdown is in progress and new tasks should be rejected
+        {
+            let shutdown_status = self.shutdown_status.lock();
+            if shutdown_status.phase != ShutdownPhase::Running
+                && self.config.shutdown_config.reject_new_tasks
+            {
+                tracing::warn!(
+                    name = %name,
+                    shutdown_phase = %shutdown_status.phase,
+                    "Task spawn rejected due to shutdown in progress"
+                );
+                // Return a dummy task ID for now - in production this should return a Result
+                return TaskId::new();
+            }
+        }
+
+        // Check capacity limits
+        if self.is_at_capacity() {
+            tracing::warn!(
+                name = %name,
+                active_tasks = self.active_task_count(),
+                max_tasks = self.config.max_concurrent_tasks,
+                "Task spawn rejected due to capacity limit"
+            );
+            // Return a dummy task ID for now - in production this should return a Result
+            return TaskId::new();
+        }
+
+        let task_id = TaskId::new();
+        let name = name.to_string(); // Convert to String once
+
+        // Create logging context
+        let _logging_context =
+            TaskLoggingContext::new(task_id.clone(), name.clone(), "task_execution".to_string());
+
+        // Store the task function for potential restarts
+        self.task_fns
+            .insert(task_id.clone(), Arc::new(task_fn.clone()));
+
+        // Create the instrumented task using our new method
+        let fut = self.make_task(task_id.clone(), name.clone(), task_fn.clone());
+
+        // Spawn the task
+        let _abort_handle = self.join_set.spawn(fut);
 
         // Create TaskHandle for tracking (JoinSet manages the actual execution)
         let handle = TaskHandle::new_managed(task_id.clone(), name.clone());
@@ -194,19 +232,6 @@ impl<T: Send + 'static> TaskManager<T> {
         );
 
         task_id
-    }
-
-    /// Spawn a blocking task that will be executed on a blocking thread pool
-    pub fn spawn_blocking_task<F, N>(&mut self, name: N, task_fn: F) -> TaskId
-    where
-        F: FnOnce() -> TaskResult<T> + Send + 'static,
-        N: std::fmt::Display,
-    {
-        self.spawn_task(name, move || async move {
-            tokio::task::spawn_blocking(task_fn)
-                .await
-                .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?
-        })
     }
 
     /// Get task handle by ID
@@ -288,50 +313,50 @@ impl<T: Send + 'static> TaskManager<T> {
 
     /// Wait for the next task to complete and handle the result
     pub async fn wait_for_next_completion(&mut self) -> Option<TaskCompletion<T>> {
-        tokio::select! {
-            // Check for task completion
-            result = self.join_set.join_next() => {
-                if let Some(join_result) = result {
-                    match join_result {
-                        Ok(task_completion) => {
-                            // Update task state based on completion result
-                            let task_id = task_completion.task_id.clone();
-                            if let Some(handle) = self.registry.get(&task_id) {
-                                match &task_completion.result {
-                                    Ok(_) => {
-                                        handle.set_state(TaskState::Completed);
-                                        self.circuit_breaker.record_success();
-                                    }
-                                    Err(e) => {
-                                        handle.record_failure(&**e);
-                                        self.circuit_breaker.record_failure();
+        loop {
+            tokio::select! {
+                // Check for task completion
+                result = self.join_set.join_next() => {
+                    if let Some(join_result) = result {
+                        match join_result {
+                            Ok(task_completion) => {
+                                // Update task state based on completion result
+                                let task_id = task_completion.task_id.clone();
+                                if let Some(handle) = self.registry.get(&task_id) {
+                                    match &task_completion.result {
+                                        Ok(_) => {
+                                            handle.set_state(TaskState::Completed);
+                                            self.circuit_breaker.record_success();
+                                        }
+                                        Err(e) => {
+                                            handle.record_failure(&**e);
+                                            self.circuit_breaker.record_failure();
+                                        }
                                     }
                                 }
+                                return Some(task_completion);
                             }
-                            Some(task_completion)
-                        }
-                        Err(join_error) => {
-                            tracing::error!(
-                                error = %join_error,
-                                "Task join failed"
-                            );
-                            None
+                            Err(join_error) => {
+                                tracing::error!(
+                                    error = %join_error,
+                                    "Task join failed"
+                                );
+                                return None;
+                            }
                         }
                     }
+                    else {
+                        return None;
+                    }
                 }
-                else {
-                    None
-                }
-            }
 
-            // Check for shutdown signal
-            _ = self.shutdown_rx.changed() => {
-                if *self.shutdown_rx.borrow() {
-                    tracing::info!("Shutdown signal received");
-                    None
-                } else {
-                    // Continue waiting if it's not a shutdown signal
-                    Box::pin(self.wait_for_next_completion()).await
+                // Check for shutdown signal
+                _ = self.shutdown_rx.changed() => {
+                    if *self.shutdown_rx.borrow() {
+                        tracing::info!("Shutdown signal received");
+                        return None;
+                    }
+                    // Continue waiting if it's not a shutdown signal - loop continues
                 }
             }
         }
@@ -342,81 +367,99 @@ impl<T: Send + 'static> TaskManager<T> {
         tracing::info!("Task manager started");
 
         while let Some(completion) = self.wait_for_next_completion().await {
-                let task_id = completion.task_id;
-                let task_name = completion.task_name.clone();
+            let task_id = completion.task_id;
+            let task_name = completion.task_name.clone();
 
-                // Handle task completion
-                if let Some(handle) = self.registry.get(&task_id) {
-                    match completion.result {
-                        Ok(_) => {
-                            handle.set_state(TaskState::Completed);
-                            self.circuit_breaker.record_success();
+            // Handle task completion
+            if let Some(handle) = self.registry.get(&task_id) {
+                match completion.result {
+                    Ok(_) => {
+                        handle.set_state(TaskState::Completed);
+                        self.circuit_breaker.record_success();
+
+
+                        tracing::info!(
+                            task_id = %task_id,
+                            task_name = %task_name,
+                            duration_ms = completion.duration.as_millis(),
+                            "Task completed successfully"
+                        );
+                    }
+                    Err(e) => {
+                        handle.record_failure(&*e);
+                        self.circuit_breaker.record_failure();
+
+                        tracing::error!(
+                            task_id = %task_id,
+                            task_name = %task_name,
+                            duration_ms = completion.duration.as_millis(),
+                            error = %e,
+                            "Task failed"
+                        );
+                        
+
+
+                        // Check if task should be restarted using new comprehensive logic
+                        let failure_type = RestartUtils::classify_failure(&*e);
+                        let should_restart = RestartUtils::should_restart_task(
+                            &*e,
+                            handle.restart_count(),
+                            handle.last_restart_time(),
+                            &self.config.default_restart_policy,
+                            Some(&self.circuit_breaker),
+                        );
+                        
+
+                        tracing::debug!(
+                            task_id = %task_id,
+                            error_type = ?failure_type,
+                            restart_count = handle.restart_count(),
+                            should_restart = should_restart,
+                            error_msg = %e,
+                            "Restart decision analysis"
+                        );
+                        
+                        if should_restart {
+                            let restart_delay = RestartUtils::calculate_backoff_delay(
+                                handle.restart_count(),
+                                &self.config.default_restart_policy,
+                            );
+
+                            let _restart_time = SystemTime::now()
+                                .duration_since(UNIX_EPOCH)
+                                .unwrap_or_default()
+                                .as_millis() as u64
+                                + restart_delay.as_millis() as u64;
 
                             tracing::info!(
                                 task_id = %task_id,
                                 task_name = %task_name,
-                                duration_ms = completion.duration.as_millis(),
-                                "Task completed successfully"
+                                restart_count = handle.restart_count(),
+                                delay_ms = restart_delay.as_millis(),
+                                "Scheduling task restart with exponential backoff"
                             );
-                        }
-                        Err(e) => {
-                            handle.record_failure(&*e);
-                            self.circuit_breaker.record_failure();
 
-                            tracing::error!(
+                            // Restart the task using the stored function and proper instrumentation
+                            handle.record_restart();
+                            let task_fn = self.task_fns.get(&task_id).unwrap().clone();
+                            let fut = self.make_task(task_id.clone(), task_name.clone(), move || {
+                                task_fn()
+                            });
+                            self.join_set.spawn(fut);
+                            
+                            // Don't remove task from registry since we're restarting it
+                        } else {
+                            tracing::warn!(
                                 task_id = %task_id,
                                 task_name = %task_name,
-                                duration_ms = completion.duration.as_millis(),
-                                error = %e,
-                                "Task failed"
+                                restart_count = handle.restart_count(),
+                                "Task restart denied by restart policy"
                             );
-
-                            // Check if task should be restarted using new comprehensive logic
-                            if RestartUtils::should_restart_task(
-                                &*e,
-                                handle.restart_count(),
-                                handle.last_restart_time(),
-                                &self.config.default_restart_policy,
-                                Some(&self.circuit_breaker),
-                            ) {
-                                let restart_delay = RestartUtils::calculate_backoff_delay(
-                                    handle.restart_count(),
-                                    &self.config.default_restart_policy,
-                                );
-
-                                let _restart_time = SystemTime::now()
-                                    .duration_since(UNIX_EPOCH)
-                                    .unwrap_or_default()
-                                    .as_millis()
-                                    as u64
-                                    + restart_delay.as_millis() as u64;
-
-                                tracing::info!(
-                                    task_id = %task_id,
-                                    task_name = %task_name,
-                                    restart_count = handle.restart_count(),
-                                    delay_ms = restart_delay.as_millis(),
-                                    "Scheduling task restart with exponential backoff"
-                                );
-
-                                // Note: For now, we'll just log the restart scheduling
-                                // In a full implementation, we'd store the task function for restart
-                                // This requires more complex task function storage which would be
-                                // implemented in a production system
-                                handle.record_restart();
-                            } else {
-                                tracing::warn!(
-                                    task_id = %task_id,
-                                    task_name = %task_name,
-                                    restart_count = handle.restart_count(),
-                                    "Task restart denied by restart policy"
-                                );
+                            // Clean up completed task from registry since not restarting
+                            self.registry.remove(&task_id);
                         }
                     }
                 }
-
-                // Clean up completed task from registry
-                self.registry.remove(&task_id);
             } else {
                 // No more tasks or shutdown signal received
                 break;
