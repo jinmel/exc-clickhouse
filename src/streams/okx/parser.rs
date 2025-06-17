@@ -71,6 +71,10 @@ impl Parser<Vec<NormalizedEvent>> for OkxParser {
                     tracing::debug!(?code, ?msg, ?conn_id, "received error");
                     Ok(None)
                 }
+                OkxEventMessage::Notice { msg, code, conn_id } => {
+                    tracing::debug!(?msg, ?code, ?conn_id, "received notice");
+                    Ok(None)
+                }
             },
         }
     }

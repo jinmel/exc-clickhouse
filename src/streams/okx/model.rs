@@ -248,6 +248,13 @@ pub enum OkxEventMessage {
         #[serde(rename = "connId")]
         conn_id: Option<String>,
     },
+    #[serde(rename = "notice")]
+    Notice {
+        msg: String,
+        code: String,
+        #[serde(rename = "connId")]
+        conn_id: Option<String>,
+    },
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -478,6 +485,26 @@ mod tests {
                 assert_eq!(conn_id, None);
             }
             _ => panic!("Expected Subscribe message, got {:?}", parsed),
+        }
+    }
+
+    #[test]
+    fn test_notice_message_parsing() {
+        let json = r#"{
+            "event": "notice",
+            "msg": "The connection will soon be closed for a service upgrade. Please reconnect.",
+            "code": "64008",
+            "connId": "982f5b6d"
+        }"#;
+
+        let parsed: OkxMessage = serde_json::from_str(json).expect("Failed to parse JSON");
+        match parsed {
+            OkxMessage::Event(OkxEventMessage::Notice { msg, code, conn_id }) => {
+                assert_eq!(msg, "The connection will soon be closed for a service upgrade. Please reconnect.");
+                assert_eq!(code, "64008");
+                assert_eq!(conn_id, Some("982f5b6d".to_string()));
+            }
+            _ => panic!("Expected Notice message, got {:?}", parsed),
         }
     }
 }
