@@ -11,10 +11,10 @@ use crate::{
     ethereum::BlockMetadata,
     models::{ClickhouseMessage, EthereumMetadataMessage, ExpresslaneMessage, NormalizedEvent},
 };
+use clickhouse::inserter::Inserter;
 use clickhouse::Compression;
 use clickhouse::Row;
-use clickhouse::inserter::Inserter;
-use clickhouse::{Client, inserter::Quantities};
+use clickhouse::{inserter::Quantities, Client};
 use eyre::WrapErr;
 use futures::pin_mut;
 use futures::{Stream, StreamExt};

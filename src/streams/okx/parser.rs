@@ -1,8 +1,8 @@
 use crate::{
     models::NormalizedEvent,
     streams::{
-        ExchangeStreamError, Parser,
         okx::model::{OkxDataMessage, OkxEventMessage, OkxMessage},
+        ExchangeStreamError, Parser,
     },
 };
 

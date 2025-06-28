@@ -12,10 +12,10 @@ use std::io::Read;
 use std::task::{Context, Poll};
 use tokio::sync::mpsc;
 use tokio::time::Duration;
-use tower::Service;
 use tower::limit::RateLimitLayer;
 use tower::timeout::TimeoutLayer;
 use tower::util::ServiceExt;
+use tower::Service;
 
 // ClickHouse table schema for proper time filtering:
 // CREATE TABLE timeboost.bids

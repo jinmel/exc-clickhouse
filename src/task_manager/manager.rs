@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 use std::pin::Pin;
-use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::watch;
 use tokio::task::JoinSet;
-use tracing::{Instrument, field};
+use tracing::{field, Instrument};
 
 use crate::task_manager::circuit_breaker::CircuitBreaker;
 use crate::task_manager::config::{ShutdownStatus, TaskManagerConfig};
@@ -377,7 +377,6 @@ impl<T: Send + 'static> TaskManager<T> {
                         handle.set_state(TaskState::Completed);
                         self.circuit_breaker.record_success();
 
-
                         tracing::info!(
                             task_id = %task_id,
                             task_name = %task_name,
@@ -396,8 +395,6 @@ impl<T: Send + 'static> TaskManager<T> {
                             error = %e,
                             "Task failed"
                         );
-                        
-
 
                         // Check if task should be restarted using new comprehensive logic
                         let failure_type = RestartUtils::classify_failure(&*e);
@@ -408,7 +405,6 @@ impl<T: Send + 'static> TaskManager<T> {
                             &self.config.default_restart_policy,
                             Some(&self.circuit_breaker),
                         );
-                        
 
                         tracing::debug!(
                             task_id = %task_id,
@@ -418,7 +414,7 @@ impl<T: Send + 'static> TaskManager<T> {
                             error_msg = %e,
                             "Restart decision analysis"
                         );
-                        
+
                         if should_restart {
                             let restart_delay = RestartUtils::calculate_backoff_delay(
                                 handle.restart_count(),
@@ -442,11 +438,12 @@ impl<T: Send + 'static> TaskManager<T> {
                             // Restart the task using the stored function and proper instrumentation
                             handle.record_restart();
                             let task_fn = self.task_fns.get(&task_id).unwrap().clone();
-                            let fut = self.make_task(task_id.clone(), task_name.clone(), move || {
-                                task_fn()
-                            });
+                            let fut =
+                                self.make_task(task_id.clone(), task_name.clone(), move || {
+                                    task_fn()
+                                });
                             self.join_set.spawn(fut);
-                            
+
                             // Don't remove task from registry since we're restarting it
                         } else {
                             tracing::warn!(

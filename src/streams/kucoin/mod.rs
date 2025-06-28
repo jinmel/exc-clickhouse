@@ -7,8 +7,8 @@ use crate::streams::kucoin::parser::KucoinParser;
 use crate::{
     models::NormalizedEvent,
     streams::{
-        ExchangeClient, ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
-        exchange_stream::ExchangeStreamBuilder, subscription::KucoinSubscription,
+        exchange_stream::ExchangeStreamBuilder, subscription::KucoinSubscription, ExchangeClient,
+        ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
     },
 };
 

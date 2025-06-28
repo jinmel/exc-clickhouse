@@ -8,7 +8,7 @@ use alloy::transports::ws::WsConnect;
 use async_stream::try_stream;
 use clickhouse::Row;
 use futures::StreamExt;
-use futures::{Stream, pin_mut};
+use futures::{pin_mut, Stream};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::sync::mpsc;
