@@ -8,3 +8,4 @@ pub mod task_manager;
 pub mod timeboost;
 pub mod tower_utils;
 pub mod trading_pairs;
+pub mod allium;

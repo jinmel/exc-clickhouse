@@ -28,6 +28,7 @@ mod task_manager;
 mod timeboost;
 mod tower_utils;
 mod trading_pairs;
+mod allium;
 
 /// Enum for task names to ensure type safety and consistency
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
