@@ -119,8 +119,7 @@ impl<T> IntoTaskResult<T> for eyre::Result<T> {
         self.map_err(|e| {
             // Convert eyre::Report to a standard error
             let error_msg = e.to_string();
-            Box::new(std::io::Error::other(error_msg))
-                as Box<dyn std::error::Error + Send + Sync>
+            Box::new(std::io::Error::other(error_msg)) as Box<dyn std::error::Error + Send + Sync>
         })
     }
 }

@@ -500,7 +500,10 @@ mod tests {
         let parsed: OkxMessage = serde_json::from_str(json).expect("Failed to parse JSON");
         match parsed {
             OkxMessage::Event(OkxEventMessage::Notice { msg, code, conn_id }) => {
-                assert_eq!(msg, "The connection will soon be closed for a service upgrade. Please reconnect.");
+                assert_eq!(
+                    msg,
+                    "The connection will soon be closed for a service upgrade. Please reconnect."
+                );
                 assert_eq!(code, "64008");
                 assert_eq!(conn_id, Some("982f5b6d".to_string()));
             }

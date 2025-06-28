@@ -1,8 +1,8 @@
 use crate::{
     models::NormalizedEvent,
     streams::{
-        ExchangeStreamError, Parser,
         kraken::model::{KrakenMessage, Response},
+        ExchangeStreamError, Parser,
     },
 };
 

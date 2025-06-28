@@ -7,10 +7,12 @@ async fn test_task_manager_basic_functionality() {
     let mut manager = TaskManager::new();
 
     // Spawn a simple task
-    let task_id = manager.spawn_task("test_task".to_string(), || Box::pin(async {
-        sleep(Duration::from_millis(10)).await;
-        Ok::<String, Box<dyn std::error::Error + Send + Sync>>("completed".to_string())
-    }));
+    let task_id = manager.spawn_task("test_task".to_string(), || {
+        Box::pin(async {
+            sleep(Duration::from_millis(10)).await;
+            Ok::<String, Box<dyn std::error::Error + Send + Sync>>("completed".to_string())
+        })
+    });
 
     // Verify task was registered
     assert!(manager.get_task(&task_id).is_some());

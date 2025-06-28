@@ -1,6 +1,6 @@
 use clap::Parser;
 use dotenv::dotenv;
-use futures::{StreamExt, pin_mut};
+use futures::{pin_mut, StreamExt};
 use std::{sync::Arc, time::Duration};
 use tokio::sync::{mpsc, Mutex};
 use tower::{Service, ServiceBuilder, ServiceExt};
@@ -12,8 +12,8 @@ use crate::{
     config::AppConfig,
     models::{ClickhouseMessage, NormalizedEvent},
     streams::{
-        ExchangeClient, WebsocketStream, binance::BinanceClient, bybit::BybitClient,
-        coinbase::CoinbaseClient, kraken::KrakenClient, kucoin::KucoinClient, okx::OkxClient,
+        binance::BinanceClient, bybit::BybitClient, coinbase::CoinbaseClient, kraken::KrakenClient,
+        kucoin::KucoinClient, okx::OkxClient, ExchangeClient, WebsocketStream,
     },
     task_manager::{IntoTaskResult, TaskManager},
 };
@@ -128,7 +128,9 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
     // Spawn tasks
     if !binance_symbols.is_empty() {
         let tx = msg_tx.clone();
-        let client = BinanceClient::builder().add_symbols(binance_symbols).build()?;
+        let client = BinanceClient::builder()
+            .add_symbols(binance_symbols)
+            .build()?;
         task_manager.spawn_task(TaskName::BinanceStream, move || {
             let client = client.clone();
             let tx = tx.clone();
@@ -158,7 +160,9 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
 
     if !coinbase_symbols.is_empty() {
         let tx = msg_tx.clone();
-        let client = CoinbaseClient::builder().add_symbols(coinbase_symbols).build()?;
+        let client = CoinbaseClient::builder()
+            .add_symbols(coinbase_symbols)
+            .build()?;
         task_manager.spawn_task(TaskName::CoinbaseStream, move || {
             let client = client.clone();
             let tx = tx.clone();
@@ -168,7 +172,9 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
 
     if !kraken_symbols.is_empty() {
         let tx = msg_tx.clone();
-        let client = KrakenClient::builder().add_symbols(kraken_symbols).build()?;
+        let client = KrakenClient::builder()
+            .add_symbols(kraken_symbols)
+            .build()?;
         task_manager.spawn_task(TaskName::KrakenStream, move || {
             let client = client.clone();
             let tx = tx.clone();
@@ -198,7 +204,11 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         task_manager.spawn_task(TaskName::EthereumBlockMetadata, move || {
             let rpc_url = rpc_url.clone();
             let tx = tx.clone();
-            Box::pin(async move { ethereum::fetch_blocks_task(rpc_url, tx).await.into_task_result() })
+            Box::pin(async move {
+                ethereum::fetch_blocks_task(rpc_url, tx)
+                    .await
+                    .into_task_result()
+            })
         });
     }
 
@@ -206,11 +216,15 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
     if has_producers {
         tracing::info!("Spawning clickhouse writer task (auto-enabled for producer tasks)");
         let msg_rx = Arc::new(Mutex::new(msg_rx));
-        task_manager.spawn_task(TaskName::ClickHouseWriter, move || {   
+        task_manager.spawn_task(TaskName::ClickHouseWriter, move || {
             let rx = msg_rx.clone();
             let rate_limit = args.clickhouse_rate_limit;
             let batch_size = args.batch_size;
-            Box::pin(async move { clickhouse_writer_task(rx, rate_limit, batch_size).await.into_task_result() })
+            Box::pin(async move {
+                clickhouse_writer_task(rx, rate_limit, batch_size)
+                    .await
+                    .into_task_result()
+            })
         });
     }
 
@@ -219,7 +233,11 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         let tx = msg_tx.clone();
         task_manager.spawn_task(TaskName::TimeboostBids, move || {
             let tx = tx.clone();
-            Box::pin(async move { timeboost::bids::fetch_bids_task(tx).await.into_task_result() })
+            Box::pin(async move {
+                timeboost::bids::fetch_bids_task(tx)
+                    .await
+                    .into_task_result()
+            })
         });
     }
 

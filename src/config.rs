@@ -37,8 +37,7 @@ pub struct TimeboostConfig {
     pub enabled: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ExchangeConfigs {
     pub binance_symbols: Vec<String>,
     pub bybit_symbols: Vec<String>,
@@ -88,7 +87,6 @@ impl Default for TimeboostConfig {
         Self { enabled: true }
     }
 }
-
 
 impl AppConfig {
     /// Create AppConfig from CLI arguments and symbols file

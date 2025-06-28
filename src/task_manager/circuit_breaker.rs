@@ -1,6 +1,6 @@
 use crate::task_manager::types::CircuitBreakerState;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// Circuit breaker for handling persistent failures

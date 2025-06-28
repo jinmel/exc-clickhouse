@@ -7,10 +7,12 @@ async fn test_task_manager_failure_handling() {
     let mut manager: TaskManager<String> = TaskManager::new();
 
     // Test spawning a failing task
-    let task_id = manager.spawn_task("failing_task".to_string(), || Box::pin(async {
-        sleep(Duration::from_millis(10)).await;
-        Err("task failed".into())
-    }));
+    let task_id = manager.spawn_task("failing_task".to_string(), || {
+        Box::pin(async {
+            sleep(Duration::from_millis(10)).await;
+            Err("task failed".into())
+        })
+    });
 
     // Wait for task completion
     if let Some(completion) = manager.wait_for_next_completion().await {

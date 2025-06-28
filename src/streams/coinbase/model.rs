@@ -301,8 +301,10 @@ mod tests {
             "best_ask_size": "13774"
         }"#;
 
-        let ticker: TickerEvent = serde_json::from_str(ticker_json).expect("Failed to parse ticker");
-        let normalized_quote = NormalizedQuote::try_from(ticker).expect("Failed to convert to NormalizedQuote");
+        let ticker: TickerEvent =
+            serde_json::from_str(ticker_json).expect("Failed to parse ticker");
+        let normalized_quote =
+            NormalizedQuote::try_from(ticker).expect("Failed to convert to NormalizedQuote");
 
         assert_eq!(normalized_quote.exchange, ExchangeName::Coinbase);
         assert_eq!(normalized_quote.symbol.as_str(), "LRC-BTC");

@@ -1,6 +1,6 @@
 use crate::task_manager::types::TaskId;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tracing::{Span, field};
+use tracing::{field, Span};
 use uuid::Uuid;
 
 /// Correlation ID for tracking operations across task boundaries
