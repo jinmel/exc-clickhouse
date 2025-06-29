@@ -75,11 +75,12 @@ fn init_tracing(log_level: &str) -> eyre::Result<()> {
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
+    // Load environment variables from .env file
+    dotenv()?;
+
     // Parse command line arguments
     let cli = Cli::parse();
 
-    // Load environment variables from .env file
-    dotenv()?;
     match cli.command {
         Commands::Db(db_cmd) => {
             init_tracing(&db_cmd.log_level)?;
@@ -249,7 +250,11 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         task_manager.spawn_task(TaskName::AlliumDexVolumes, move || {
             let tx = tx.clone();
             let config = config.clone();
-            Box::pin(async move { allium::fetch_dex_volumes_task(config, tx).await.into_task_result() })
+            Box::pin(async move {
+                allium::fetch_dex_volumes_task(config, tx)
+                    .await
+                    .into_task_result()
+            })
         });
     }
 

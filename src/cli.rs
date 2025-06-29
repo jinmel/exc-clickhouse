@@ -37,13 +37,13 @@ pub struct TradingPairsArgs {
 
 #[derive(Args, Clone)]
 pub struct DexVolumesArgs {
-    #[arg(short, long, default_value = "2500000")]
+    #[arg(short, long, default_value = "10_000")]
     pub limit: Option<usize>,
 
-    #[arg(short, long)]
+    #[arg(short, long, env = "ALLIUM_API_KEY")]
     pub api_key: String,
 
-    #[arg(short, long)]
+    #[arg(short, long, env = "ALLIUM_DEX_VOLUME_QUERY_ID")]
     pub query_id: String,
 }
 
