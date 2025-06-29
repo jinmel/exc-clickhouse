@@ -123,7 +123,7 @@ pub async fn backfill_timeboost_bids() -> eyre::Result<()> {
 
     for bids in bids_with_timestamp.chunks(5000) {
         tracing::info!("Writing {} bids to clickhouse", bids.len());
-        clickhouse.write_express_lane_bids(bids.to_vec()).await?;
+        clickhouse.write_express_lane_bids(bids).await?;
     }
     Ok(())
 }

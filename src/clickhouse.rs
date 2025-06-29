@@ -146,7 +146,7 @@ impl ClickHouseService {
             .wrap_err("failed to get latest bid")
     }
 
-    pub async fn write_express_lane_bids(&self, bids: Vec<BidData>) -> eyre::Result<Quantities> {
+    pub async fn write_express_lane_bids(&self, bids: &[BidData]) -> eyre::Result<Quantities> {
         if bids.is_empty() {
             return Ok(Quantities::ZERO);
         }
@@ -160,13 +160,13 @@ impl ClickHouseService {
 
         for bid in bids {
             tracing::debug!(?bid.round, ?bid.timestamp, "writing bid");
-            inserter.write(&bid)?;
+            inserter.write(bid)?;
             inserter.commit().await?;
         }
         inserter.end().await.wrap_err("failed to write bids")
     }
 
-    pub async fn write_dex_volumes(&self, volumes: Vec<DexVolume>) -> eyre::Result<Quantities> {
+    pub async fn write_dex_volumes(&self, volumes: &[DexVolume]) -> eyre::Result<Quantities> {
         if volumes.is_empty() {
             return Ok(Quantities::ZERO);
         }
@@ -179,7 +179,7 @@ impl ClickHouseService {
             .with_period_bias(0.1);
 
         for volume in volumes {
-            inserter.write(&volume)?;
+            inserter.write(volume)?;
             inserter.commit().await?;
         }
 

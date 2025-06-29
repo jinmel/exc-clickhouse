@@ -125,7 +125,7 @@ pub async fn backfill_dex_volumes(limit: Option<usize>) -> eyre::Result<()> {
     let volumes = client.query_dex_volumes(limit).await?;
     tracing::info!("Writing dex volumes to ClickHouse. Count: {:?}", volumes.len());
     let clickhouse = ClickHouseService::new(ClickHouseConfig::from_env()?);
-    clickhouse.write_dex_volumes(volumes).await?;
+    clickhouse.write_dex_volumes(volumes.as_ref()).await?;
     Ok(())
 }
 
