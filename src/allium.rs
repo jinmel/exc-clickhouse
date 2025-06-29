@@ -105,7 +105,7 @@ impl AlliumClient {
                 break;
             }
             tracing::trace!(?run_id, "Waiting for query to complete...");
-            tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
         }
 
         // Get results
