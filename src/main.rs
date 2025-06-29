@@ -99,7 +99,7 @@ async fn main() -> eyre::Result<()> {
                 }
                 DbCommands::DexVolumes(args) => {
                     tracing::info!("Backfilling dex volumes. Limit: {:?}", args.limit);
-                    allium::backfill_dex_volumes(args.api_key, args.query_id, args.limit).await?;
+                    allium::backfill_dex_volumes(args.api_key, args.query_id, Some(args.limit)).await?;
                     tracing::info!("Dex volumes backfill complete");
                     return Ok(());
                 }

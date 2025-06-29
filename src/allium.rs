@@ -18,12 +18,23 @@ where
     Ok(DateTime::from_naive_utc_and_offset(naive, Utc))
 }
 
+fn serialize_volume_usd<S>(volume: &Option<f64>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    match volume {
+        Some(value) => serializer.serialize_f64(*value),
+        None => serializer.serialize_f64(0.0),
+    }
+}
+
 #[derive(Serialize, Deserialize, Row, Debug, Clone)]
 pub struct DexVolume {
     #[serde(deserialize_with = "deserialize_period", serialize_with = "clickhouse::serde::chrono::datetime64::millis::serialize")]
     period: DateTime<Utc>,
     project: String,
-    volume_usd: f64,
+    #[serde(serialize_with = "serialize_volume_usd")]
+    volume_usd: Option<f64>,
     recipient: u64,
 }
 
@@ -158,7 +169,7 @@ mod tests {
         let dex_volume: DexVolume = serde_json::from_str(json_data).unwrap();
 
         assert_eq!(dex_volume.project, "odos");
-        assert_eq!(dex_volume.volume_usd, 61561.348599726654);
+        assert_eq!(dex_volume.volume_usd, Some(61561.348599726654));
         assert_eq!(dex_volume.recipient, 47);
 
         // Verify the datetime was parsed correctly
@@ -168,6 +179,46 @@ mod tests {
             Utc,
         );
         assert_eq!(dex_volume.period, expected_dt);
+    }
+
+    #[test]
+    fn test_dex_volume_serialization_with_none_volume() {
+        use chrono::{DateTime, Utc};
+        
+        let dex_volume = DexVolume {
+            period: DateTime::from_naive_utc_and_offset(
+                chrono::NaiveDateTime::parse_from_str("2025-06-28T06:00:00", "%Y-%m-%dT%H:%M:%S")
+                    .unwrap(),
+                Utc,
+            ),
+            project: "test_project".to_string(),
+            volume_usd: None,
+            recipient: 123,
+        };
+
+        let json = serde_json::to_string(&dex_volume).unwrap();
+        // Should serialize None volume_usd as 0.0
+        assert!(json.contains("\"volume_usd\":0.0"));
+    }
+
+    #[test]
+    fn test_dex_volume_serialization_with_some_volume() {
+        use chrono::{DateTime, Utc};
+        
+        let dex_volume = DexVolume {
+            period: DateTime::from_naive_utc_and_offset(
+                chrono::NaiveDateTime::parse_from_str("2025-06-28T06:00:00", "%Y-%m-%dT%H:%M:%S")
+                    .unwrap(),
+                Utc,
+            ),
+            project: "test_project".to_string(),
+            volume_usd: Some(1234.56),
+            recipient: 123,
+        };
+
+        let json = serde_json::to_string(&dex_volume).unwrap();
+        // Should serialize Some volume_usd as the actual value
+        assert!(json.contains("\"volume_usd\":1234.56"));
     }
 
     #[tokio::test]
