@@ -40,10 +40,10 @@ pub struct DexVolumesArgs {
     #[arg(short, long, default_value_t = 10_000)]
     pub limit: usize,
 
-    #[arg(short, long, env = "ALLIUM_API_KEY")]
+    #[arg(long, env = "ALLIUM_API_KEY")]
     pub api_key: String,
 
-    #[arg(short, long, env = "ALLIUM_DEX_VOLUME_QUERY_ID")]
+    #[arg(long, env = "ALLIUM_DEX_VOLUME_QUERY_ID")]
     pub query_id: String,
 }
 
@@ -106,9 +106,9 @@ pub struct StreamArgs {
     #[arg(long, default_value_t = 5)]
     pub clickhouse_rate_limit: u64,
 
-    #[arg(long)]
+    #[arg(long, env = "ALLIUM_API_KEY")]
     pub allium_api_key: Option<String>,
 
-    #[arg(long)]
+    #[arg(long, env = "ALLIUM_DEX_VOLUME_QUERY_ID")]
     pub allium_query_id: Option<String>,
 }
