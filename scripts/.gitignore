@@ -2,3 +2,4 @@ chain-config.yaml
 *.tsv
 *.json
 *.csv
+allium_dashboard.py
