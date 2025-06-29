@@ -16,6 +16,7 @@ pub struct AppConfig {
     pub ethereum_config: EthereumConfig,
     pub timeboost_config: TimeboostConfig,
     pub exchange_configs: ExchangeConfigs,
+    pub allium_config: AlliumConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,6 +36,13 @@ pub struct EthereumConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimeboostConfig {
     pub enabled: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AlliumConfig {
+    pub enabled: bool,
+    pub api_key: Option<String>,
+    pub dex_volume_query_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -57,6 +65,7 @@ impl Default for AppConfig {
             restart_config: RestartConfig::default(),
             ethereum_config: EthereumConfig::default(),
             timeboost_config: TimeboostConfig::default(),
+            allium_config: AlliumConfig::default(),
             exchange_configs: ExchangeConfigs::default(),
         }
     }
@@ -88,14 +97,24 @@ impl Default for TimeboostConfig {
     }
 }
 
+impl Default for AlliumConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            api_key: None,
+            dex_volume_query_id: None,
+        }
+    }
+}
+
 impl AppConfig {
     /// Create AppConfig from CLI arguments and symbols file
-    pub fn from_stream_args(args: &StreamArgs, cli_log_level: &str) -> eyre::Result<Self> {
+    pub fn from_stream_args(args: &StreamArgs) -> eyre::Result<Self> {
         let trading_pairs = read_trading_pairs(&args.trading_pairs_file)?;
         let exchange_configs = ExchangeConfigs::from_trading_pairs_config(&trading_pairs);
 
         Ok(Self {
-            log_level: cli_log_level.to_string(),
+            log_level: args.log_level.clone(),
             symbols_file: args.trading_pairs_file.clone(),
             batch_size: args.batch_size,
             clickhouse_rate_limit: args.clickhouse_rate_limit,
@@ -111,6 +130,11 @@ impl AppConfig {
             },
             timeboost_config: TimeboostConfig {
                 enabled: !args.skip_timeboost,
+            },
+            allium_config: AlliumConfig {
+                enabled: !args.skip_allium,
+                api_key: args.allium_api_key.clone(),
+                dex_volume_query_id: args.allium_query_id.clone(),
             },
             exchange_configs,
         })
@@ -254,16 +278,20 @@ mod tests {
     #[test]
     fn test_restart_config_from_args() {
         let args = StreamArgs {
+            log_level: "info".to_string(),
             trading_pairs_file: "test.yaml".to_string(),
             batch_size: 1000,
             skip_ethereum: false,
             skip_timeboost: false,
+            skip_allium: false,
             rpc_url: None,
             enable_restart: true,
             max_restart_attempts: 5,
             restart_delay_seconds: 2,
             max_restart_delay_seconds: 600,
             clickhouse_rate_limit: 10,
+            allium_api_key: None,
+            allium_query_id: None,
         };
 
         let config = AppConfig::from(&args);
@@ -320,6 +348,11 @@ impl From<&StreamArgs> for AppConfig {
             },
             timeboost_config: TimeboostConfig {
                 enabled: true, // Default, will be overridden by skip flags
+            },
+            allium_config: AlliumConfig {
+                enabled: true,
+                api_key: args.allium_api_key.clone(),
+                dex_volume_query_id: args.allium_query_id.clone(),
             },
             exchange_configs: ExchangeConfigs::default(), // Will be populated from symbols file
         }

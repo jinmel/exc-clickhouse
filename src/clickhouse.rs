@@ -3,6 +3,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
+use crate::allium::DexVolume;
 use crate::models::NormalizedQuote;
 use crate::models::NormalizedTrade;
 use crate::timeboost::bids::BidData;
@@ -20,6 +21,7 @@ use futures::pin_mut;
 use futures::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use tower::Service;
+
 
 #[derive(Debug, Clone)]
 pub struct ClickHouseConfig {
@@ -144,7 +146,7 @@ impl ClickHouseService {
             .wrap_err("failed to get latest bid")
     }
 
-    pub async fn write_express_lane_bids(&self, bids: Vec<BidData>) -> eyre::Result<Quantities> {
+    pub async fn write_express_lane_bids(&self, bids: &[BidData]) -> eyre::Result<Quantities> {
         if bids.is_empty() {
             return Ok(Quantities::ZERO);
         }
@@ -152,16 +154,36 @@ impl ClickHouseService {
         let mut inserter = self
             .client
             .inserter("timeboost.bids")?
-            .with_max_rows(100)
+            .with_max_rows(10000)
             .with_period(Some(Duration::from_secs(1)))
             .with_period_bias(0.1);
 
         for bid in bids {
             tracing::debug!(?bid.round, ?bid.timestamp, "writing bid");
-            inserter.write(&bid)?;
+            inserter.write(bid)?;
+            inserter.commit().await?;
         }
-        inserter.commit().await?;
         inserter.end().await.wrap_err("failed to write bids")
+    }
+
+    pub async fn write_dex_volumes(&self, volumes: &[DexVolume]) -> eyre::Result<Quantities> {
+        if volumes.is_empty() {
+            return Ok(Quantities::ZERO);
+        }
+
+        let mut inserter = self
+            .client
+            .inserter("dex.dex_volumes")?
+            .with_max_rows(10000)
+            .with_period(Some(Duration::from_secs(1)))
+            .with_period_bias(0.1);
+
+        for volume in volumes {
+            inserter.write(volume)?;
+            inserter.commit().await?;
+        }
+
+        inserter.end().await.wrap_err("failed to write dex volumes")
     }
 
     fn get_inserter<T: Row>(
@@ -187,9 +209,11 @@ impl ClickHouseService {
         let mut quote_inserter: Inserter<ClickhouseQuote> =
             self.get_inserter("cex.normalized_quotes", 5000, 1, 0.1)?;
         let mut block_inserter: Inserter<BlockMetadata> =
-            self.get_inserter("ethereum.blocks", 100, 1, 0.1)?;
+            self.get_inserter("ethereum.blocks", 10000, 1, 0.1)?;
         let mut bid_inserter: Inserter<BidData> =
-            self.get_inserter("timeboost.bids", 100, 1, 0.1)?;
+            self.get_inserter("timeboost.bids", 10000, 1, 0.1)?;
+        let mut dex_volume_inserter: Inserter<DexVolume> =
+            self.get_inserter("dex.dex_volumes", 10000, 1, 0.1)?;
 
         for msg in batch {
             match msg {
@@ -209,6 +233,10 @@ impl ClickHouseService {
                     block_inserter.write(block)?;
                     block_inserter.commit().await?;
                 }
+                ClickhouseMessage::DexVolume(dex_volume) => {
+                    dex_volume_inserter.write(dex_volume)?;
+                    dex_volume_inserter.commit().await?;
+                }
             }
         }
 
@@ -217,6 +245,7 @@ impl ClickHouseService {
         quote_inserter.end().await?;
         block_inserter.end().await?;
         bid_inserter.end().await?;
+        dex_volume_inserter.end().await?;
         Ok(())
     }
 
