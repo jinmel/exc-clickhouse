@@ -167,7 +167,7 @@ pub async fn fetch_dex_volumes_task(
 ) -> eyre::Result<()> {
     let client = AlliumClient::from_config(&config)?;
     loop {
-        let volumes = client.query_dex_volumes(None).await?;
+        let volumes = client.query_dex_volumes(Some(100)).await?;
         tracing::trace!("Fetched {} dex volumes", volumes.len());
         for volume in volumes {
             msg_tx.send(ClickhouseMessage::DexVolume(volume))?;
