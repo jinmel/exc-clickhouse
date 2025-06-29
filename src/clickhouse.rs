@@ -154,7 +154,7 @@ impl ClickHouseService {
         let mut inserter = self
             .client
             .inserter("timeboost.bids")?
-            .with_max_rows(100)
+            .with_max_rows(10000)
             .with_period(Some(Duration::from_secs(1)))
             .with_period_bias(0.1);
 
