@@ -1,8 +1,8 @@
 [package]
 name = "exc-clickhouse"
-version = "0.1.0"
-edition = "2021"
-rust-version = "1.70"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.90"
 authors = ["Eisen Labs"]
 description = "Exchange data collector to clickhouse db"
 [lib]
@@ -40,7 +40,7 @@ tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 url = "2.5.4"
 uuid = { version = "1.4", features = ["v4"] }
-reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12", features = ["json", "native-tls"] }
 ordered-float = "5.0.0"
 itertools = "0.14.0"
 parking_lot = "0.12"
