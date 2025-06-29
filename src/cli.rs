@@ -39,6 +39,12 @@ pub struct TradingPairsArgs {
 pub struct DexVolumesArgs {
     #[arg(short, long, default_value = "2500000")]
     pub limit: Option<usize>,
+
+    #[arg(short, long)]
+    pub api_key: String,
+
+    #[arg(short, long)]
+    pub query_id: String,
 }
 
 #[derive(Args, Clone)]

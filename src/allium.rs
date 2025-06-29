@@ -4,6 +4,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use clickhouse::Row;
 use crate::clickhouse::{ClickHouseConfig, ClickHouseService};
 use crate::models::ClickhouseMessage;
+use crate::config::AlliumConfig;
 use tokio::sync::mpsc;
 
 fn deserialize_period<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
@@ -59,13 +60,13 @@ pub struct ResultResponse {
 }
 
 pub struct AlliumClient {
-    base_url: String,
+    base_url: &'static str,
     client: Client,
-    query_id: String,
+    dex_volume_query_id: String,
 }
 
 impl AlliumClient {
-    pub fn new(base_url: String, api_key: String, query_id: String) -> eyre::Result<Self> {
+    pub fn new(base_url: &'static str, api_key: String, dex_volume_query_id: String) -> eyre::Result<Self> {
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert("X-API-Key", api_key.parse()?);
         headers.insert("Content-Type", "application/json".parse()?);
@@ -74,13 +75,21 @@ impl AlliumClient {
         Ok(Self {
             base_url,
             client,
-            query_id,
+            dex_volume_query_id,
         })
+    }
+
+    pub fn from_config(config: &AlliumConfig) -> eyre::Result<Self> {
+        Self::new(
+            "https://api.allium.so",
+            config.api_key.clone().ok_or(eyre::eyre!("Allium API key is required"))?,
+            config.dex_volume_query_id.clone().ok_or(eyre::eyre!("Allium query ID is required"))?,
+        )
     }
 
     pub async fn query_dex_volumes(&self, limit: Option<usize>) -> eyre::Result<Vec<DexVolume>> {
         let base_url = &self.base_url;
-        let query_id = &self.query_id;
+        let query_id = &self.dex_volume_query_id;
         let url = format!("{base_url}/api/v1/explorer/queries/{query_id}/run-async");
         let response = self
             .client
@@ -117,12 +126,8 @@ impl AlliumClient {
 }
 
 
-pub async fn backfill_dex_volumes(limit: Option<usize>) -> eyre::Result<()> {
-    let client = AlliumClient::new(
-        "https://api.allium.so".to_string(),
-        "r75AuiiUUM_W1F_WiyUpYlSUjlS9tf84wxhn5ndJ7zkBNSXwWp8Z_KPJMS2tuqzJYtqXVTNlpSONfXqh3jjL0A".to_string(),
-        "88FDvtgyUzthWmr4ZCM4".to_string(),
-    )?;
+pub async fn backfill_dex_volumes(api_key: String, query_id: String, limit: Option<usize>) -> eyre::Result<()> {
+    let client = AlliumClient::new("https://api.allium.so", api_key, query_id)?;
     tracing::info!("Querying dex volumes. Limit: {:?}", limit);
     let volumes = client.query_dex_volumes(limit).await?;
     tracing::info!("Writing dex volumes to ClickHouse. Count: {:?}", volumes.len());
@@ -131,13 +136,8 @@ pub async fn backfill_dex_volumes(limit: Option<usize>) -> eyre::Result<()> {
     Ok(())
 }
 
-pub async fn fetch_dex_volumes_task(msg_tx: mpsc::UnboundedSender<ClickhouseMessage>) -> eyre::Result<()> {
-    let client = AlliumClient::new(
-        "https://api.allium.so".to_string(),
-        "r75AuiiUUM_W1F_WiyUpYlSUjlS9tf84wxhn5ndJ7zkBNSXwWp8Z_KPJMS2tuqzJYtqXVTNlpSONfXqh3jjL0A".to_string(),
-        "88FDvtgyUzthWmr4ZCM4".to_string(),
-    )?;
-
+pub async fn fetch_dex_volumes_task(config: AlliumConfig, msg_tx: mpsc::UnboundedSender<ClickhouseMessage>) -> eyre::Result<()> {
+    let client = AlliumClient::from_config(&config)?;
     loop {
         let volumes = client.query_dex_volumes(None).await?;
         for volume in volumes {
@@ -150,6 +150,7 @@ pub async fn fetch_dex_volumes_task(msg_tx: mpsc::UnboundedSender<ClickhouseMess
 #[cfg(test)]
 mod tests {
     use super::*;
+    use dotenv::dotenv;
 
     #[test]
     fn test_dex_volume_deserialization() {
@@ -172,13 +173,12 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn test_query_dex_volumes() {
-        let client = AlliumClient::new(
-            "https://api.allium.so".to_string(),
-            "r75AuiiUUM_W1F_WiyUpYlSUjlS9tf84wxhn5ndJ7zkBNSXwWp8Z_KPJMS2tuqzJYtqXVTNlpSONfXqh3jjL0A".to_string(),
-            "88FDvtgyUzthWmr4ZCM4".to_string(),
-        ).unwrap();
-
+        dotenv().ok();
+        let api_key = std::env::var("ALLIUM_API_KEY").unwrap();
+        let dex_volume_query_id = std::env::var("ALLIUM_DEX_VOLUME_QUERY_ID").unwrap();
+        let client = AlliumClient::new("https://api.allium.so", api_key, dex_volume_query_id).unwrap();
         let volumes = client.query_dex_volumes(Some(100)).await.unwrap();
+        println!("{:?}", volumes);
         assert!(!volumes.is_empty());
         assert_eq!(volumes.len(), 100);
     }

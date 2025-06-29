@@ -42,7 +42,7 @@ pub struct TimeboostConfig {
 pub struct AlliumConfig {
     pub enabled: bool,
     pub api_key: Option<String>,
-    pub query_id: Option<String>,
+    pub dex_volume_query_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -102,7 +102,7 @@ impl Default for AlliumConfig {
         Self {
             enabled: true,
             api_key: None,
-            query_id: None,
+            dex_volume_query_id: None,
         }
     }
 }
@@ -134,7 +134,7 @@ impl AppConfig {
             allium_config: AlliumConfig {
                 enabled: !args.skip_allium,
                 api_key: args.allium_api_key.clone(),
-                query_id: args.allium_query_id.clone(),
+                dex_volume_query_id: args.allium_query_id.clone(),
             },
             exchange_configs,
         })
@@ -352,7 +352,7 @@ impl From<&StreamArgs> for AppConfig {
             allium_config: AlliumConfig {
                 enabled: true,
                 api_key: args.allium_api_key.clone(),
-                query_id: args.allium_query_id.clone(),
+                dex_volume_query_id: args.allium_query_id.clone(),
             },
             exchange_configs: ExchangeConfigs::default(), // Will be populated from symbols file
         }

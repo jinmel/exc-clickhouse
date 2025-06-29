@@ -98,7 +98,7 @@ async fn main() -> eyre::Result<()> {
                 }
                 DbCommands::DexVolumes(args) => {
                     tracing::info!("Backfilling dex volumes. Limit: {:?}", args.limit);
-                    allium::backfill_dex_volumes(args.limit).await?;
+                    allium::backfill_dex_volumes(args.api_key, args.query_id, args.limit).await?;
                     tracing::info!("Dex volumes backfill complete");
                     return Ok(());
                 }
@@ -244,10 +244,12 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
 
     if app_config.allium_config.enabled {
         tracing::info!("Spawning allium dex volumes task");
+        let config = app_config.allium_config.clone();
         let tx = msg_tx.clone();
         task_manager.spawn_task(TaskName::AlliumDexVolumes, move || {
             let tx = tx.clone();
-            Box::pin(async move { allium::fetch_dex_volumes_task(tx).await.into_task_result() })
+            let config = config.clone();
+            Box::pin(async move { allium::fetch_dex_volumes_task(config, tx).await.into_task_result() })
         });
     }
 
