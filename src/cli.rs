@@ -7,10 +7,6 @@ use clap::{Args, Parser, Subcommand};
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
-
-    /// Log level (trace, debug, info, warn, error)
-    #[arg(short, long, default_value = "info")]
-    pub log_level: String,
 }
 
 #[derive(Subcommand)]
@@ -47,12 +43,20 @@ pub struct DexVolumesArgs {
 
 #[derive(Args, Clone)]
 pub struct DbCmd {
+    /// Log level (trace, debug, info, warn, error)
+    #[arg(short, long, default_value = "info")]
+    pub log_level: String,
+
     #[command(subcommand)]
     pub command: DbCommands,
 }
 
 #[derive(Args, Clone)]
 pub struct StreamArgs {
+    /// Log level (trace, debug, info, warn, error)
+    #[arg(short, long, default_value = "info")]
+    pub log_level: String,
+    
     /// Path to trading pairs file
     #[arg(short, long, default_value = "trading_pairs.yaml")]
     pub trading_pairs_file: String,
@@ -67,6 +71,10 @@ pub struct StreamArgs {
     /// Skip Timeboost bids
     #[arg(long)]
     pub skip_timeboost: bool,
+
+    /// Skip Allium dex volumes
+    #[arg(long)]
+    pub skip_allium: bool,
 
     /// RPC URL for Ethereum (overrides environment variable)
     #[arg(long)]
@@ -91,4 +99,10 @@ pub struct StreamArgs {
     /// Rate limit for ClickHouse requests per second
     #[arg(long, default_value_t = 5)]
     pub clickhouse_rate_limit: u64,
+
+    #[arg(long)]
+    pub allium_api_key: Option<String>,
+
+    #[arg(long)]
+    pub allium_query_id: Option<String>,
 }

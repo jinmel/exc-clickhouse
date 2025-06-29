@@ -2,6 +2,7 @@ use arrayvec::ArrayString;
 use serde::{Deserialize, Serialize};
 
 use crate::{ethereum::BlockMetadata, timeboost::bids::BidData};
+use crate::allium::DexVolume;
 
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq, Eq)]
 pub enum ExchangeName {
@@ -55,6 +56,7 @@ pub enum ClickhouseMessage {
     Cex(NormalizedEvent),
     Expresslane(ExpresslaneMessage),
     Ethereum(EthereumMetadataMessage),
+    DexVolume(DexVolume),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

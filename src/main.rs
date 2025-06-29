@@ -18,6 +18,7 @@ use crate::{
     task_manager::{IntoTaskResult, TaskManager},
 };
 
+mod allium;
 mod cli;
 mod clickhouse;
 mod config;
@@ -28,7 +29,6 @@ mod task_manager;
 mod timeboost;
 mod tower_utils;
 mod trading_pairs;
-mod allium;
 
 /// Enum for task names to ensure type safety and consistency
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -42,6 +42,7 @@ enum TaskName {
     EthereumBlockMetadata,
     ClickHouseWriter,
     TimeboostBids,
+    AlliumDexVolumes,
 }
 
 impl std::fmt::Display for TaskName {
@@ -56,8 +57,20 @@ impl std::fmt::Display for TaskName {
             TaskName::EthereumBlockMetadata => write!(f, "Ethereum Block Metadata"),
             TaskName::ClickHouseWriter => write!(f, "ClickHouse Writer"),
             TaskName::TimeboostBids => write!(f, "Timeboost Bids"),
+            TaskName::AlliumDexVolumes => write!(f, "Allium Dex Volumes"),
         }
     }
+}
+
+fn init_tracing(log_level: &str) -> eyre::Result<()> {
+    let log_level = format!("exc_clickhouse={},info", log_level);
+    let subscriber = FmtSubscriber::builder()
+        .with_env_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&log_level)),
+        )
+        .finish();
+    tracing::subscriber::set_global_default(subscriber)?;
+    Ok(())
 }
 
 #[tokio::main]
@@ -67,44 +80,40 @@ async fn main() -> eyre::Result<()> {
 
     // Load environment variables from .env file
     dotenv()?;
-
-    // Initialize tracing with environment filter using CLI log level
-    let log_level = format!("exc_clickhouse={},info", cli.log_level);
-    let subscriber = FmtSubscriber::builder()
-        .with_env_filter(
-            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&log_level)),
-        )
-        .finish();
-    tracing::subscriber::set_global_default(subscriber)?;
-
     match cli.command {
-        Commands::Db(db_cmd) => match db_cmd.command {
-            DbCommands::Timeboost => {
-                tracing::info!("Backfilling timeboost bids");
-                timeboost::bids::backfill_timeboost_bids().await?;
-                tracing::info!("Timeboost bids backfill complete");
-                return Ok(());
+        Commands::Db(db_cmd) => {
+            init_tracing(&db_cmd.log_level)?;
+            match db_cmd.command {
+                DbCommands::Timeboost => {
+                    tracing::info!("Backfilling timeboost bids");
+                    timeboost::bids::backfill_timeboost_bids().await?;
+                    tracing::info!("Timeboost bids backfill complete");
+                    return Ok(());
+                }
+                DbCommands::TradingPairs(args) => {
+                    tracing::info!("Backfilling trading pairs");
+                    trading_pairs::backfill_trading_pairs(&args.trading_pairs_file).await?;
+                    tracing::info!("Trading pairs backfill complete");
+                    return Ok(());
+                }
+                DbCommands::DexVolumes(args) => {
+                    tracing::info!("Backfilling dex volumes. Limit: {:?}", args.limit);
+                    allium::backfill_dex_volumes(args.limit).await?;
+                    tracing::info!("Dex volumes backfill complete");
+                    return Ok(());
+                }
             }
-            DbCommands::TradingPairs(args) => {
-                tracing::info!("Backfilling trading pairs");
-                trading_pairs::backfill_trading_pairs(&args.trading_pairs_file).await?;
-                tracing::info!("Trading pairs backfill complete");
-                return Ok(());
-            }
-            DbCommands::DexVolumes(args) => {
-                tracing::info!("Backfilling dex volumes. Limit: {:?}", args.limit);
-                allium::backfill_dex_volumes(args.limit).await?;
-                tracing::info!("Dex volumes backfill complete");
-                return Ok(());
-            }
-        },
-        Commands::Stream(args) => run_stream(args).await,
+        }
+        Commands::Stream(args) => {
+            init_tracing(&args.log_level)?;
+            run_stream(args).await
+        }
     }
 }
 
 async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
     // Create app configuration from stream args
-    let app_config = AppConfig::from_stream_args(&args, "info")?;
+    let app_config = AppConfig::from_stream_args(&args)?;
 
     let binance_symbols: Vec<String> = app_config.exchange_configs.binance_symbols.clone();
     let bybit_symbols: Vec<String> = app_config.exchange_configs.bybit_symbols.clone();
@@ -116,7 +125,8 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
     // Check if any data producer tasks will be enabled
     let has_producers = app_config.has_exchange_symbols()
         || app_config.ethereum_config.enabled
-        || app_config.timeboost_config.enabled;
+        || app_config.timeboost_config.enabled
+        || app_config.allium_config.enabled;
 
     if !has_producers {
         tracing::warn!(
@@ -219,6 +229,28 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         });
     }
 
+    if app_config.timeboost_config.enabled {
+        tracing::info!("Spawning timeboost bids task");
+        let tx = msg_tx.clone();
+        task_manager.spawn_task(TaskName::TimeboostBids, move || {
+            let tx = tx.clone();
+            Box::pin(async move {
+                timeboost::bids::fetch_bids_task(tx)
+                    .await
+                    .into_task_result()
+            })
+        });
+    }
+
+    if app_config.allium_config.enabled {
+        tracing::info!("Spawning allium dex volumes task");
+        let tx = msg_tx.clone();
+        task_manager.spawn_task(TaskName::AlliumDexVolumes, move || {
+            let tx = tx.clone();
+            Box::pin(async move { allium::fetch_dex_volumes_task(tx).await.into_task_result() })
+        });
+    }
+
     // Automatically spawn ClickHouse writer if we have any data producers
     if has_producers {
         tracing::info!("Spawning clickhouse writer task (auto-enabled for producer tasks)");
@@ -229,19 +261,6 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
             let batch_size = args.batch_size;
             Box::pin(async move {
                 clickhouse_writer_task(rx, rate_limit, batch_size)
-                    .await
-                    .into_task_result()
-            })
-        });
-    }
-
-    if app_config.timeboost_config.enabled {
-        tracing::info!("Spawning timeboost bids task");
-        let tx = msg_tx.clone();
-        task_manager.spawn_task(TaskName::TimeboostBids, move || {
-            let tx = tx.clone();
-            Box::pin(async move {
-                timeboost::bids::fetch_bids_task(tx)
                     .await
                     .into_task_result()
             })

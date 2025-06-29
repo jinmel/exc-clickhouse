@@ -3,6 +3,8 @@ use reqwest::Client;
 use serde::{Deserialize, Deserializer, Serialize};
 use clickhouse::Row;
 use crate::clickhouse::{ClickHouseConfig, ClickHouseService};
+use crate::models::ClickhouseMessage;
+use tokio::sync::mpsc;
 
 fn deserialize_period<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
 where
@@ -15,7 +17,7 @@ where
     Ok(DateTime::from_naive_utc_and_offset(naive, Utc))
 }
 
-#[derive(Serialize, Deserialize, Row)]
+#[derive(Serialize, Deserialize, Row, Debug, Clone)]
 pub struct DexVolume {
     #[serde(deserialize_with = "deserialize_period", serialize_with = "clickhouse::serde::chrono::datetime64::millis::serialize")]
     period: DateTime<Utc>,
@@ -127,6 +129,22 @@ pub async fn backfill_dex_volumes(limit: Option<usize>) -> eyre::Result<()> {
     let clickhouse = ClickHouseService::new(ClickHouseConfig::from_env()?);
     clickhouse.write_dex_volumes(volumes.as_ref()).await?;
     Ok(())
+}
+
+pub async fn fetch_dex_volumes_task(msg_tx: mpsc::UnboundedSender<ClickhouseMessage>) -> eyre::Result<()> {
+    let client = AlliumClient::new(
+        "https://api.allium.so".to_string(),
+        "r75AuiiUUM_W1F_WiyUpYlSUjlS9tf84wxhn5ndJ7zkBNSXwWp8Z_KPJMS2tuqzJYtqXVTNlpSONfXqh3jjL0A".to_string(),
+        "88FDvtgyUzthWmr4ZCM4".to_string(),
+    )?;
+
+    loop {
+        let volumes = client.query_dex_volumes(None).await?;
+        for volume in volumes {
+            msg_tx.send(ClickhouseMessage::DexVolume(volume))?;
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(3600)).await;
+    }
 }
 
 #[cfg(test)]

@@ -209,9 +209,11 @@ impl ClickHouseService {
         let mut quote_inserter: Inserter<ClickhouseQuote> =
             self.get_inserter("cex.normalized_quotes", 5000, 1, 0.1)?;
         let mut block_inserter: Inserter<BlockMetadata> =
-            self.get_inserter("ethereum.blocks", 100, 1, 0.1)?;
+            self.get_inserter("ethereum.blocks", 10000, 1, 0.1)?;
         let mut bid_inserter: Inserter<BidData> =
-            self.get_inserter("timeboost.bids", 100, 1, 0.1)?;
+            self.get_inserter("timeboost.bids", 10000, 1, 0.1)?;
+        let mut dex_volume_inserter: Inserter<DexVolume> =
+            self.get_inserter("dex.dex_volumes", 10000, 1, 0.1)?;
 
         for msg in batch {
             match msg {
@@ -231,6 +233,10 @@ impl ClickHouseService {
                     block_inserter.write(block)?;
                     block_inserter.commit().await?;
                 }
+                ClickhouseMessage::DexVolume(dex_volume) => {
+                    dex_volume_inserter.write(dex_volume)?;
+                    dex_volume_inserter.commit().await?;
+                }
             }
         }
 
@@ -239,6 +245,7 @@ impl ClickHouseService {
         quote_inserter.end().await?;
         block_inserter.end().await?;
         bid_inserter.end().await?;
+        dex_volume_inserter.end().await?;
         Ok(())
     }
 
