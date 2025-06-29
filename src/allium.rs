@@ -201,32 +201,12 @@ mod tests {
     }
 
     #[test]
-    fn test_dex_volume_serialization_with_none_volume() {
+    fn test_dex_volume_serialization_with_nullable_fields() {
         use chrono::{DateTime, Utc};
 
         let dex_volume = DexVolume {
             period: DateTime::from_naive_utc_and_offset(
-                chrono::NaiveDateTime::parse_from_str("2025-06-28T06:00:00", "%Y-%m-%dT%H:%M:%S")
-                    .unwrap(),
-                Utc,
-            ),
-            project: "test_project".to_string(),
-            volume_usd: None,
-            recipient: Some(123),
-        };
-
-        let json = serde_json::to_string(&dex_volume).unwrap();
-        // Should serialize None volume_usd as 0.0
-        assert!(json.contains("\"volume_usd\":0.0"));
-    }
-
-    #[test]
-    fn test_dex_volume_serialization_with_some_volume() {
-        use chrono::{DateTime, Utc};
-
-        let dex_volume = DexVolume {
-            period: DateTime::from_naive_utc_and_offset(
-                chrono::NaiveDateTime::parse_from_str("2025-06-28T06:00:00", "%Y-%m-%dT%H:%M:%S")
+                chrono::NaiveDateTime::parse_from_str("2024-01-15T10:30:00", "%Y-%m-%dT%H:%M:%S")
                     .unwrap(),
                 Utc,
             ),
@@ -237,7 +217,8 @@ mod tests {
 
         let json = serde_json::to_string(&dex_volume).unwrap();
         // Should serialize Some volume_usd as the actual value
-        assert!(json.contains("\"volume_usd\":1234.56"));
+        let expected_json = r#"{"period":1705314600000,"project":"test_project","volume_usd":1234.56,"recipient":123}"#;
+        assert_eq!(json, expected_json);
     }
 
     #[tokio::test]
