@@ -1,8 +1,9 @@
 use clap::Parser;
 use dotenv::dotenv;
-use futures::{pin_mut, StreamExt};
+use futures::{StreamExt, pin_mut};
+use rustls::crypto::ring::default_provider;
 use std::{sync::Arc, time::Duration};
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{Mutex, mpsc};
 use tower::{Service, ServiceBuilder, ServiceExt};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
@@ -12,8 +13,8 @@ use crate::{
     config::AppConfig,
     models::{ClickhouseMessage, NormalizedEvent},
     streams::{
-        binance::BinanceClient, bybit::BybitClient, coinbase::CoinbaseClient, kraken::KrakenClient,
-        kucoin::KucoinClient, okx::OkxClient, ExchangeClient, WebsocketStream,
+        ExchangeClient, WebsocketStream, binance::BinanceClient, bybit::BybitClient,
+        coinbase::CoinbaseClient, kraken::KrakenClient, kucoin::KucoinClient, okx::OkxClient,
     },
     task_manager::{IntoTaskResult, TaskManager},
 };
@@ -75,6 +76,9 @@ fn init_tracing(log_level: &str) -> eyre::Result<()> {
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
+    default_provider()
+        .install_default()
+        .expect("provider already installed");
     // Load environment variables from .env file
     dotenv()?;
 
@@ -99,7 +103,8 @@ async fn main() -> eyre::Result<()> {
                 }
                 DbCommands::DexVolumes(args) => {
                     tracing::info!("Backfilling dex volumes. Limit: {:?}", args.limit);
-                    allium::backfill_dex_volumes(args.api_key, args.query_id, Some(args.limit)).await?;
+                    allium::backfill_dex_volumes(args.api_key, args.query_id, Some(args.limit))
+                        .await?;
                     tracing::info!("Dex volumes backfill complete");
                     return Ok(());
                 }

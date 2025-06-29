@@ -151,9 +151,11 @@ pub async fn fetch_dex_volumes_task(config: AlliumConfig, msg_tx: mpsc::Unbounde
     let client = AlliumClient::from_config(&config)?;
     loop {
         let volumes = client.query_dex_volumes(None).await?;
+        tracing::trace!("Fetched {} dex volumes", volumes.len());
         for volume in volumes {
             msg_tx.send(ClickhouseMessage::DexVolume(volume))?;
         }
+        tracing::trace!("Sleeping for 1 hour");
         tokio::time::sleep(std::time::Duration::from_secs(3600)).await;
     }
 }
