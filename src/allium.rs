@@ -1,39 +1,47 @@
-use chrono::{DateTime, Utc};
-use reqwest::Client;
-use serde::{Deserialize, Deserializer, Serialize};
-use clickhouse::Row;
 use crate::clickhouse::{ClickHouseConfig, ClickHouseService};
-use crate::models::ClickhouseMessage;
 use crate::config::AlliumConfig;
+use crate::models::ClickhouseMessage;
+use chrono::{DateTime, Utc};
+use clickhouse::Row;
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
-fn deserialize_period<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s = String::deserialize(deserializer)?;
-    // Parse naive datetime and assume UTC
-    let naive = chrono::NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%S")
-        .map_err(serde::de::Error::custom)?;
-    Ok(DateTime::from_naive_utc_and_offset(naive, Utc))
-}
+mod allium_serde {
+    use chrono::{DateTime, Utc};
+    use serde::Deserialize;
 
-fn serialize_volume_usd<S>(volume: &Option<f64>, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    match volume {
-        Some(value) => serializer.serialize_f64(*value),
-        None => serializer.serialize_f64(0.0),
+    pub fn deserialize_period<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        // Parse naive datetime and assume UTC
+        let naive = chrono::NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT%H:%M:%S")
+            .map_err(serde::de::Error::custom)?;
+        Ok(DateTime::from_naive_utc_and_offset(naive, Utc))
+    }
+
+    pub fn serialize_volume_usd<S>(volume: &Option<f64>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match volume {
+            Some(value) => serializer.serialize_f64(*value),
+            None => serializer.serialize_f64(0.0),
+        }
     }
 }
 
 #[derive(Serialize, Deserialize, Row, Debug, Clone)]
 pub struct DexVolume {
-    #[serde(deserialize_with = "deserialize_period", serialize_with = "clickhouse::serde::chrono::datetime64::millis::serialize")]
+    #[serde(
+        deserialize_with = "allium_serde::deserialize_period",
+        serialize_with = "clickhouse::serde::chrono::datetime64::millis::serialize"
+    )]
     period: DateTime<Utc>,
     project: String,
-    #[serde(serialize_with = "serialize_volume_usd")]
+    #[serde(serialize_with = "allium_serde::serialize_volume_usd")]
     volume_usd: Option<f64>,
     recipient: u64,
 }
@@ -77,7 +85,11 @@ pub struct AlliumClient {
 }
 
 impl AlliumClient {
-    pub fn new(base_url: &'static str, api_key: String, dex_volume_query_id: String) -> eyre::Result<Self> {
+    pub fn new(
+        base_url: &'static str,
+        api_key: String,
+        dex_volume_query_id: String,
+    ) -> eyre::Result<Self> {
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert("X-API-Key", api_key.parse()?);
         headers.insert("Content-Type", "application/json".parse()?);
@@ -93,8 +105,14 @@ impl AlliumClient {
     pub fn from_config(config: &AlliumConfig) -> eyre::Result<Self> {
         Self::new(
             "https://api.allium.so",
-            config.api_key.clone().ok_or(eyre::eyre!("Allium API key is required"))?,
-            config.dex_volume_query_id.clone().ok_or(eyre::eyre!("Allium query ID is required"))?,
+            config
+                .api_key
+                .clone()
+                .ok_or(eyre::eyre!("Allium API key is required"))?,
+            config
+                .dex_volume_query_id
+                .clone()
+                .ok_or(eyre::eyre!("Allium query ID is required"))?,
         )
     }
 
@@ -136,18 +154,27 @@ impl AlliumClient {
     }
 }
 
-
-pub async fn backfill_dex_volumes(api_key: String, query_id: String, limit: Option<usize>) -> eyre::Result<()> {
+pub async fn backfill_dex_volumes(
+    api_key: String,
+    query_id: String,
+    limit: Option<usize>,
+) -> eyre::Result<()> {
     let client = AlliumClient::new("https://api.allium.so", api_key, query_id)?;
     tracing::info!("Querying dex volumes. Limit: {:?}", limit);
     let volumes = client.query_dex_volumes(limit).await?;
-    tracing::info!("Writing dex volumes to ClickHouse. Count: {:?}", volumes.len());
+    tracing::info!(
+        "Writing dex volumes to ClickHouse. Count: {:?}",
+        volumes.len()
+    );
     let clickhouse = ClickHouseService::new(ClickHouseConfig::from_env()?);
     clickhouse.write_dex_volumes(volumes.as_ref()).await?;
     Ok(())
 }
 
-pub async fn fetch_dex_volumes_task(config: AlliumConfig, msg_tx: mpsc::UnboundedSender<ClickhouseMessage>) -> eyre::Result<()> {
+pub async fn fetch_dex_volumes_task(
+    config: AlliumConfig,
+    msg_tx: mpsc::UnboundedSender<ClickhouseMessage>,
+) -> eyre::Result<()> {
     let client = AlliumClient::from_config(&config)?;
     loop {
         let volumes = client.query_dex_volumes(None).await?;
@@ -186,7 +213,7 @@ mod tests {
     #[test]
     fn test_dex_volume_serialization_with_none_volume() {
         use chrono::{DateTime, Utc};
-        
+
         let dex_volume = DexVolume {
             period: DateTime::from_naive_utc_and_offset(
                 chrono::NaiveDateTime::parse_from_str("2025-06-28T06:00:00", "%Y-%m-%dT%H:%M:%S")
@@ -206,7 +233,7 @@ mod tests {
     #[test]
     fn test_dex_volume_serialization_with_some_volume() {
         use chrono::{DateTime, Utc};
-        
+
         let dex_volume = DexVolume {
             period: DateTime::from_naive_utc_and_offset(
                 chrono::NaiveDateTime::parse_from_str("2025-06-28T06:00:00", "%Y-%m-%dT%H:%M:%S")
@@ -229,7 +256,8 @@ mod tests {
         dotenv().ok();
         let api_key = std::env::var("ALLIUM_API_KEY").unwrap();
         let dex_volume_query_id = std::env::var("ALLIUM_DEX_VOLUME_QUERY_ID").unwrap();
-        let client = AlliumClient::new("https://api.allium.so", api_key, dex_volume_query_id).unwrap();
+        let client =
+            AlliumClient::new("https://api.allium.so", api_key, dex_volume_query_id).unwrap();
         let volumes = client.query_dex_volumes(Some(100)).await.unwrap();
         println!("{:?}", volumes);
         assert!(!volumes.is_empty());
