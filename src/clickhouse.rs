@@ -3,6 +3,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
+use crate::allium::DexVolume;
 use crate::models::NormalizedQuote;
 use crate::models::NormalizedTrade;
 use crate::timeboost::bids::BidData;
@@ -20,6 +21,7 @@ use futures::pin_mut;
 use futures::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use tower::Service;
+
 
 #[derive(Debug, Clone)]
 pub struct ClickHouseConfig {
@@ -159,9 +161,29 @@ impl ClickHouseService {
         for bid in bids {
             tracing::debug!(?bid.round, ?bid.timestamp, "writing bid");
             inserter.write(&bid)?;
+            inserter.commit().await?;
         }
-        inserter.commit().await?;
         inserter.end().await.wrap_err("failed to write bids")
+    }
+
+    pub async fn write_dex_volumes(&self, volumes: Vec<DexVolume>) -> eyre::Result<Quantities> {
+        if volumes.is_empty() {
+            return Ok(Quantities::ZERO);
+        }
+
+        let mut inserter = self
+            .client
+            .inserter("dex.dex_volumes")?
+            .with_max_rows(10000)
+            .with_period(Some(Duration::from_secs(1)))
+            .with_period_bias(0.1);
+
+        for volume in volumes {
+            inserter.write(&volume)?;
+            inserter.commit().await?;
+        }
+
+        inserter.end().await.wrap_err("failed to write dex volumes")
     }
 
     fn get_inserter<T: Row>(

@@ -66,7 +66,7 @@ async fn main() -> eyre::Result<()> {
     let cli = Cli::parse();
 
     // Load environment variables from .env file
-    dotenv().ok();
+    dotenv()?;
 
     // Initialize tracing with environment filter using CLI log level
     let log_level = format!("exc_clickhouse={},info", cli.log_level);
@@ -89,6 +89,12 @@ async fn main() -> eyre::Result<()> {
                 tracing::info!("Backfilling trading pairs");
                 trading_pairs::backfill_trading_pairs(&args.trading_pairs_file).await?;
                 tracing::info!("Trading pairs backfill complete");
+                return Ok(());
+            }
+            DbCommands::DexVolumes(args) => {
+                tracing::info!("Backfilling dex volumes. Limit: {:?}", args.limit);
+                allium::backfill_dex_volumes(args.limit).await?;
+                tracing::info!("Dex volumes backfill complete");
                 return Ok(());
             }
         },

@@ -1,6 +1,8 @@
 use chrono::{DateTime, Utc};
 use reqwest::Client;
 use serde::{Deserialize, Deserializer, Serialize};
+use clickhouse::Row;
+use crate::clickhouse::{ClickHouseConfig, ClickHouseService};
 
 fn deserialize_period<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
 where
@@ -13,9 +15,9 @@ where
     Ok(DateTime::from_naive_utc_and_offset(naive, Utc))
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Row)]
 pub struct DexVolume {
-    #[serde(deserialize_with = "deserialize_period")]
+    #[serde(deserialize_with = "deserialize_period", serialize_with = "clickhouse::serde::chrono::datetime64::millis::serialize")]
     period: DateTime<Utc>,
     project: String,
     volume_usd: f64,
@@ -110,6 +112,21 @@ impl AlliumClient {
         let result = response.json::<ResultResponse>().await?;
         Ok(result.data)
     }
+}
+
+
+pub async fn backfill_dex_volumes(limit: Option<usize>) -> eyre::Result<()> {
+    let client = AlliumClient::new(
+        "https://api.allium.so".to_string(),
+        "r75AuiiUUM_W1F_WiyUpYlSUjlS9tf84wxhn5ndJ7zkBNSXwWp8Z_KPJMS2tuqzJYtqXVTNlpSONfXqh3jjL0A".to_string(),
+        "88FDvtgyUzthWmr4ZCM4".to_string(),
+    )?;
+    tracing::info!("Querying dex volumes. Limit: {:?}", limit);
+    let volumes = client.query_dex_volumes(limit).await?;
+    tracing::info!("Writing dex volumes to ClickHouse. Count: {:?}", volumes.len());
+    let clickhouse = ClickHouseService::new(ClickHouseConfig::from_env()?);
+    clickhouse.write_dex_volumes(volumes).await?;
+    Ok(())
 }
 
 #[cfg(test)]

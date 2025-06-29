@@ -28,6 +28,8 @@ pub enum DbCommands {
     Timeboost,
     /// Backfill trading pairs
     TradingPairs(TradingPairsArgs),
+    /// Backfill dex volumes
+    DexVolumes(DexVolumesArgs),
 }
 
 #[derive(Args, Clone)]
@@ -35,6 +37,12 @@ pub struct TradingPairsArgs {
     /// Path to trading pairs file
     #[arg(short, long, default_value = "trading_pairs.yaml")]
     pub trading_pairs_file: String,
+}
+
+#[derive(Args, Clone)]
+pub struct DexVolumesArgs {
+    #[arg(short, long, default_value = "2500000")]
+    pub limit: Option<usize>,
 }
 
 #[derive(Args, Clone)]
