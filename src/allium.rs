@@ -7,6 +7,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
+// Custom serde functions for Allium API
 mod allium_serde {
     use chrono::{DateTime, Utc};
     use serde::Deserialize;
@@ -21,16 +22,6 @@ mod allium_serde {
             .map_err(serde::de::Error::custom)?;
         Ok(DateTime::from_naive_utc_and_offset(naive, Utc))
     }
-
-    pub fn serialize_volume_usd<S>(volume: &Option<f64>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match volume {
-            Some(value) => serializer.serialize_f64(*value),
-            None => serializer.serialize_f64(0.0),
-        }
-    }
 }
 
 #[derive(Serialize, Deserialize, Row, Debug, Clone)]
@@ -41,9 +32,8 @@ pub struct DexVolume {
     )]
     period: DateTime<Utc>,
     project: String,
-    #[serde(serialize_with = "allium_serde::serialize_volume_usd")]
     volume_usd: Option<f64>,
-    recipient: u64,
+    recipient: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -199,7 +189,7 @@ mod tests {
 
         assert_eq!(dex_volume.project, "odos");
         assert_eq!(dex_volume.volume_usd, Some(61561.348599726654));
-        assert_eq!(dex_volume.recipient, 47);
+        assert_eq!(dex_volume.recipient, Some(47));
 
         // Verify the datetime was parsed correctly
         let expected_dt: DateTime<Utc> = DateTime::from_naive_utc_and_offset(
@@ -222,7 +212,7 @@ mod tests {
             ),
             project: "test_project".to_string(),
             volume_usd: None,
-            recipient: 123,
+            recipient: Some(123),
         };
 
         let json = serde_json::to_string(&dex_volume).unwrap();
@@ -242,7 +232,7 @@ mod tests {
             ),
             project: "test_project".to_string(),
             volume_usd: Some(1234.56),
-            recipient: 123,
+            recipient: Some(123),
         };
 
         let json = serde_json::to_string(&dex_volume).unwrap();
