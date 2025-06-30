@@ -42,8 +42,8 @@ impl WebsocketStream for BinanceClient {
     type EventStream =
         Pin<Box<dyn Stream<Item = Result<NormalizedEvent, ExchangeStreamError>> + Send + 'static>>;
 
-    async fn stream_events(&self) -> Result<Self::EventStream, Self::Error> {
-        tracing::debug!("Binance URL: {}", self.base_url);
+    async fn stream_events(&self, cancellation_token: tokio_util::sync::CancellationToken) -> Result<Self::EventStream, Self::Error> {
+        tracing::debug!("Binance URL: {} (with cancellation token)", self.base_url);
         let timeout = Duration::from_secs(23 * 60 * 60); // Binance has 24 hour timeout.
         let parser = BinanceParser::new();
         let stream = ExchangeStreamBuilder::new(
@@ -52,6 +52,7 @@ impl WebsocketStream for BinanceClient {
             parser,
             self.subscription.clone(),
         )
+        .with_cancellation(cancellation_token)
         .build();
         Ok(stream)
     }

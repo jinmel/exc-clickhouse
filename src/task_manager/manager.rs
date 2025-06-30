@@ -17,6 +17,9 @@ use crate::task_manager::types::ShutdownPhase;
 use crate::task_manager::types::{
     PendingRestart, TaskCompletion, TaskId, TaskManagerStats, TaskResult, TaskState,
 };
+use futures::future::BoxFuture;
+use parking_lot::Mutex;
+use tokio_util::sync::CancellationToken;
 
 /// Type alias for a restartable task function
 ///
@@ -25,6 +28,17 @@ use crate::task_manager::types::{
 /// This allows tasks to be restarted by calling the stored function again.
 pub type TaskFunction<T> = Arc<
     dyn Fn() -> Pin<Box<dyn std::future::Future<Output = TaskResult<T>> + Send + 'static>>
+        + Send
+        + Sync
+        + 'static,
+>;
+
+/// Type alias for a restartable task function with cancellation token support
+///
+/// This represents a function that can be called to create a new instance of a task
+/// with access to a cancellation token for graceful shutdown.
+pub type CancellableTaskFunction<T> = Arc<
+    dyn Fn(CancellationToken) -> Pin<Box<dyn std::future::Future<Output = TaskResult<T>> + Send + 'static>>
         + Send
         + Sync
         + 'static,
@@ -53,6 +67,8 @@ pub struct TaskManager<T> {
 
     /// Storage for task functions to enable task restarts
     task_fns: HashMap<TaskId, TaskFunction<T>>,
+    /// Storage for cancellation tokens to enable graceful shutdown
+    cancellation_tokens: HashMap<TaskId, CancellationToken>,
 }
 
 impl<T: Send + 'static> TaskManager<T> {
@@ -81,6 +97,7 @@ impl<T: Send + 'static> TaskManager<T> {
             restart_queue: Arc::new(parking_lot::Mutex::new(Vec::new())),
             shutdown_status: Arc::new(parking_lot::Mutex::new(ShutdownStatus::new())),
             task_fns: HashMap::new(),
+            cancellation_tokens: HashMap::new(),
         }
     }
 
@@ -238,6 +255,96 @@ impl<T: Send + 'static> TaskManager<T> {
         task_id
     }
 
+    /// Spawn a new async task with cancellation token support for graceful shutdown
+    pub fn spawn_cancellable_task<F, N>(&mut self, name: N, task_fn: F) -> TaskId
+    where
+        F: Fn(CancellationToken) -> Pin<Box<dyn std::future::Future<Output = TaskResult<T>> + Send + 'static>>
+            + Send
+            + Sync
+            + Clone
+            + 'static,
+        N: std::fmt::Display,
+    {
+        // Check if shutdown is in progress and new tasks should be rejected
+        {
+            let shutdown_status = self.shutdown_status.lock();
+            if shutdown_status.phase != ShutdownPhase::Running
+                && self.config.shutdown_config.reject_new_tasks
+            {
+                tracing::warn!(
+                    name = %name,
+                    shutdown_phase = %shutdown_status.phase,
+                    "Cancellable task spawn rejected due to shutdown in progress"
+                );
+                return TaskId::new();
+            }
+        }
+
+        // Check capacity limits
+        if self.is_at_capacity() {
+            tracing::warn!(
+                name = %name,
+                active_tasks = self.active_task_count(),
+                max_tasks = self.config.max_concurrent_tasks,
+                "Cancellable task spawn rejected due to capacity limit"
+            );
+            return TaskId::new();
+        }
+
+        let task_id = TaskId::new();
+        let name = name.to_string();
+
+        // Create and store cancellation token
+        let cancellation_token = CancellationToken::new();
+        self.cancellation_tokens.insert(task_id.clone(), cancellation_token.clone());
+
+        // Create logging context
+        let _logging_context =
+            TaskLoggingContext::new(task_id.clone(), name.clone(), "task_execution".to_string());
+
+        // Create a task wrapper that calls the cancellable function with the token
+        let task_fn_wrapper = {
+            let token = cancellation_token.clone();
+            let task_fn = task_fn.clone();
+            move || task_fn(token.clone())
+        };
+
+        // Store the task function for potential restarts (as a regular TaskFunction)
+        self.task_fns.insert(task_id.clone(), Arc::new(move || {
+            let token = cancellation_token.clone();
+            let task_fn = task_fn.clone();
+            task_fn(token)
+        }));
+
+        // Create the instrumented task using our new method
+        let fut = self.make_task(task_id.clone(), name.clone(), task_fn_wrapper);
+
+        // Spawn the task
+        let _abort_handle = self.join_set.spawn(fut);
+
+        // Create TaskHandle for tracking
+        let handle = TaskHandle::new_managed(task_id.clone(), name.clone());
+        handle.set_state(TaskState::Running);
+
+        // Register the task
+        if let Err(e) = self.registry.register(handle) {
+            tracing::warn!(
+                task_id = %task_id,
+                error = %e,
+                "Failed to register cancellable task in registry"
+            );
+        }
+
+        tracing::debug!(
+            task_id = %task_id,
+            task_name = %name,
+            total_tasks = self.registry.len(),
+            "Cancellable task spawned and registered"
+        );
+
+        task_id
+    }
+
     /// Get task handle by ID
     pub fn get_task(&self, task_id: &TaskId) -> Option<&TaskHandle<TaskCompletion<T>>> {
         self.registry.get(task_id)
@@ -337,6 +444,9 @@ impl<T: Send + 'static> TaskManager<T> {
                                             self.circuit_breaker.record_failure();
                                         }
                                     }
+
+                                    // Clean up cancellation token for completed task
+                                    self.cancellation_tokens.remove(&task_completion.task_id);
                                 }
                                 return Some(task_completion);
                             }
@@ -458,6 +568,8 @@ impl<T: Send + 'static> TaskManager<T> {
                             );
                             // Clean up completed task from registry since not restarting
                             self.registry.remove(&task_id);
+                            // Also clean up cancellation token 
+                            self.cancellation_tokens.remove(&task_id);
                         }
                     }
                 }
@@ -518,6 +630,22 @@ impl<T: Send + 'static> TaskManager<T> {
         // Phase 2: Wait for running tasks to complete gracefully
         self.transition_shutdown_phase(ShutdownPhase::WaitingForTasks)
             .await;
+
+        // Trigger all cancellation tokens for graceful shutdown
+        let cancellation_count = self.cancellation_tokens.len();
+        if cancellation_count > 0 {
+            tracing::info!(
+                cancellation_tokens = cancellation_count,
+                "Triggering cancellation tokens for graceful shutdown"
+            );
+            for (task_id, token) in &self.cancellation_tokens {
+                token.cancel();
+                tracing::debug!(
+                    task_id = %task_id,
+                    "Cancellation token triggered"
+                );
+            }
+        }
 
         let graceful_timeout = self.config.shutdown_config.graceful_timeout;
         tracing::info!(
@@ -580,6 +708,16 @@ impl<T: Send + 'static> TaskManager<T> {
             status.tasks_remaining = self.active_task_count();
             status.clone()
         };
+
+        // Clean up all remaining cancellation tokens
+        let remaining_tokens = self.cancellation_tokens.len();
+        if remaining_tokens > 0 {
+            tracing::debug!(
+                remaining_tokens = remaining_tokens,
+                "Cleaning up remaining cancellation tokens"
+            );
+            self.cancellation_tokens.clear();
+        }
 
         tracing::info!(
             shutdown_duration_ms = final_status.shutdown_elapsed().as_millis(),

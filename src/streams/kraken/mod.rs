@@ -38,11 +38,12 @@ impl WebsocketStream for KrakenClient {
     type EventStream =
         Pin<Box<dyn Stream<Item = Result<NormalizedEvent, ExchangeStreamError>> + Send + 'static>>;
 
-    async fn stream_events(&self) -> Result<Self::EventStream, Self::Error> {
-        tracing::debug!("Kraken URL: {}", self.base_url);
+    async fn stream_events(&self, cancellation_token: tokio_util::sync::CancellationToken) -> Result<Self::EventStream, Self::Error> {
+        tracing::debug!("Kraken URL: {} (with cancellation token)", self.base_url);
         let parser = KrakenParser::new();
         let stream =
             ExchangeStreamBuilder::new(&self.base_url, None, parser, self.subscription.clone())
+                .with_cancellation(cancellation_token)
                 .build();
         Ok(stream)
     }

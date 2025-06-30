@@ -20,7 +20,7 @@ pub trait WebsocketStream {
     type Error: std::error::Error + Send + Sync + 'static;
     type EventStream: Stream<Item = Result<NormalizedEvent, Self::Error>> + Send + Unpin + 'static;
 
-    async fn stream_events(&self) -> Result<Self::EventStream, Self::Error>;
+    async fn stream_events(&self, cancellation_token: tokio_util::sync::CancellationToken) -> Result<Self::EventStream, Self::Error>;
 }
 
 /// Trait for exchange clients to provide metadata about themselves

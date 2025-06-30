@@ -38,8 +38,8 @@ impl WebsocketStream for HyperliquidClient {
     type EventStream =
         Pin<Box<dyn Stream<Item = Result<NormalizedEvent, ExchangeStreamError>> + Send + 'static>>;
 
-    async fn stream_events(&self) -> Result<Self::EventStream, Self::Error> {
-        tracing::debug!("Hyperliquid URL: {}", self.base_url);
+    async fn stream_events(&self, cancellation_token: tokio_util::sync::CancellationToken) -> Result<Self::EventStream, Self::Error> {
+        tracing::debug!("Hyperliquid URL: {} (with cancellation token)", self.base_url);
         let timeout = Duration::from_secs(30); // Keep connection alive with heartbeat
         let parser = HyperliquidParser::new();
         let stream = ExchangeStreamBuilder::new(
@@ -48,6 +48,7 @@ impl WebsocketStream for HyperliquidClient {
             parser,
             self.subscription.clone(),
         )
+        .with_cancellation(cancellation_token)
         .build();
         Ok(stream)
     }
