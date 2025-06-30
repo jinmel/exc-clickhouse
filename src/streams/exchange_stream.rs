@@ -99,13 +99,13 @@ where
                                             // No parsed result, continue
                                         }
                                         Err(e) => {
-                                            tracing::error!("Parse error: {:?} for {:?}", e, &text);
+                                            tracing::warn!("Parse error: {:?} for {:?}", e, &text);
                                             // Continue processing other messages
                                         }
                                     }
                                 }
                                 Some(Ok(Message::Close(frame))) => {
-                                    tracing::error!("Stream closed: {frame:?}");
+                                    tracing::trace!("Stream closed: {frame:?}");
                                     // Break from inner loop to reconnect
                                     break;
                                 }
@@ -113,12 +113,12 @@ where
                                     // Ping/pong handled automatically
                                 }
                                 Some(Err(e)) => {
-                                    tracing::error!("Stream error: {e:?}");
+                                    tracing::warn!("Stream error: {e:?}");
                                     // Break from inner loop to reconnect
                                     break;
                                 }
                                 None => {
-                                    tracing::warn!("WebSocket stream ended");
+                                    tracing::trace!("WebSocket stream ended");
                                     break;
                                 }
                             }
