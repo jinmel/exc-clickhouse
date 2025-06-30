@@ -1,6 +1,6 @@
 use crate::{
     models::NormalizedEvent,
-    streams::{binance::model::BinanceMessage, ExchangeStreamError, Parser},
+    streams::{ExchangeStreamError, Parser, binance::model::BinanceMessage},
 };
 
 #[derive(Debug, Clone)]

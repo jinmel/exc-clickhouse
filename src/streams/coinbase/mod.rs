@@ -6,8 +6,8 @@ use crate::streams::coinbase::parser::CoinbaseParser;
 use crate::{
     models::NormalizedEvent,
     streams::{
-        exchange_stream::ExchangeStreamBuilder, subscription::CoinbaseSubscription, ExchangeClient,
-        ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
+        ExchangeClient, ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
+        exchange_stream::ExchangeStreamBuilder, subscription::CoinbaseSubscription,
     },
 };
 

@@ -12,16 +12,15 @@ use crate::{
     ethereum::BlockMetadata,
     models::{ClickhouseMessage, EthereumMetadataMessage, ExpresslaneMessage, NormalizedEvent},
 };
-use clickhouse::inserter::Inserter;
 use clickhouse::Compression;
 use clickhouse::Row;
-use clickhouse::{inserter::Quantities, Client};
+use clickhouse::inserter::Inserter;
+use clickhouse::{Client, inserter::Quantities};
 use eyre::WrapErr;
 use futures::pin_mut;
 use futures::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use tower::Service;
-
 
 #[derive(Debug, Clone)]
 pub struct ClickHouseConfig {

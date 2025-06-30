@@ -1,12 +1,12 @@
 use exc_clickhouse::streams::{
-    binance::BinanceClient, bybit::BybitClient, coinbase::CoinbaseClient, 
-    hyperliquid::HyperliquidClient, kraken::KrakenClient,
-    kucoin::KucoinClient, okx::OkxClient, WebsocketStream,
+    WebsocketStream, binance::BinanceClient, bybit::BybitClient, coinbase::CoinbaseClient, 
+    hyperliquid::HyperliquidClient,
+    kraken::KrakenClient, kucoin::KucoinClient, okx::OkxClient,
 };
 use futures::StreamExt;
 use rustls::crypto::ring::default_provider;
 use std::sync::Once;
-use tokio::time::{timeout, Duration};
+use tokio::time::{Duration, timeout};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 static INIT: Once = Once::new();

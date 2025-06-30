@@ -152,12 +152,11 @@ impl RestartUtils {
         }
 
         // Check circuit breaker if enabled
-        if policy.enable_circuit_breaker {
-            if let Some(cb) = circuit_breaker {
-                if !cb.can_execute() {
-                    return false;
-                }
-            }
+        if policy.enable_circuit_breaker
+            && let Some(cb) = circuit_breaker
+            && !cb.can_execute()
+        {
+            return false;
         }
 
         // Check minimum time between restarts

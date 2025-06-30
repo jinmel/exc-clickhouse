@@ -1,8 +1,8 @@
 use crate::{
     models::NormalizedEvent,
     streams::{
-        kraken::model::{KrakenMessage, Response},
         ExchangeStreamError, Parser,
+        kraken::model::{KrakenMessage, Response},
     },
 };
 
@@ -55,13 +55,13 @@ impl Parser<Vec<NormalizedEvent>> for KrakenParser {
                 }
             },
             KrakenMessage::Subscription(sub_result) => {
-                if !sub_result.success {
-                    if let Some(error) = sub_result.error {
-                        tracing::error!("Subscription failed: {error}");
-                        return Err(ExchangeStreamError::Subscription(format!(
-                            "Subscription failed: {error}"
-                        )));
-                    }
+                if !sub_result.success
+                    && let Some(error) = sub_result.error
+                {
+                    tracing::error!("Subscription failed: {error}");
+                    return Err(ExchangeStreamError::Subscription(format!(
+                        "Subscription failed: {error}"
+                    )));
                 }
                 tracing::trace!("Subscription result: {:?}", sub_result);
                 Ok(None)

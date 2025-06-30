@@ -62,7 +62,7 @@ pub struct StreamArgs {
     /// Log level (trace, debug, info, warn, error)
     #[arg(short, long, default_value = "info")]
     pub log_level: String,
-    
+
     /// Path to trading pairs file
     #[arg(short, long, default_value = "trading_pairs.yaml")]
     pub trading_pairs_file: String,

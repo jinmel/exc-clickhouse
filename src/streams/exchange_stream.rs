@@ -2,9 +2,9 @@ use crate::streams::ExchangeStreamError;
 use crate::streams::Parser;
 use crate::streams::Subscription;
 use async_stream::try_stream;
+use futures::SinkExt;
 use futures::stream::Stream;
 use futures::stream::StreamExt;
-use futures::SinkExt;
 use std::fmt::Debug;
 use std::pin::Pin;
 use tokio::time::{Duration, Instant};
@@ -99,13 +99,13 @@ where
                                             // No parsed result, continue
                                         }
                                         Err(e) => {
-                                            tracing::error!("Parse error: {:?} for {:?}", e, &text);
+                                            tracing::warn!("Parse error: {:?} for {:?}", e, &text);
                                             // Continue processing other messages
                                         }
                                     }
                                 }
                                 Some(Ok(Message::Close(frame))) => {
-                                    tracing::error!("Stream closed: {frame:?}");
+                                    tracing::trace!("Stream closed: {frame:?}");
                                     // Break from inner loop to reconnect
                                     break;
                                 }
@@ -113,12 +113,12 @@ where
                                     // Ping/pong handled automatically
                                 }
                                 Some(Err(e)) => {
-                                    tracing::error!("Stream error: {e:?}");
+                                    tracing::warn!("Stream error: {e:?}");
                                     // Break from inner loop to reconnect
                                     break;
                                 }
                                 None => {
-                                    tracing::warn!("WebSocket stream ended");
+                                    tracing::trace!("WebSocket stream ended");
                                     break;
                                 }
                             }
