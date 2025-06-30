@@ -45,8 +45,8 @@ async fn test_binance_stream_event() {
         .unwrap();
     let mut stream = client.stream_events().await.unwrap();
 
-    let result = timeout(Duration::from_secs(10), async {
-        for _ in 0..30 {
+    let result = timeout(Duration::from_secs(20), async {
+        for _ in 0..100 {
             let item = stream.next().await;
             assert!(item.is_some(), "no event received");
             assert!(item.unwrap().is_ok(), "event returned error");
@@ -56,7 +56,7 @@ async fn test_binance_stream_event() {
 
     assert!(
         result.is_ok(),
-        "timed out waiting for 30 events within 10 seconds"
+        "timed out waiting for 100 events within 20 seconds"
     );
 }
 
@@ -79,8 +79,8 @@ async fn test_bybit_stream_event() {
     let client = BybitClient::builder().add_symbols(symbols).build().unwrap();
     let mut stream = client.stream_events().await.unwrap();
 
-    let result = timeout(Duration::from_secs(10), async {
-        for _ in 0..30 {
+    let result = timeout(Duration::from_secs(20), async {
+        for _ in 0..100 {
             let item = stream.next().await;
             assert!(item.is_some(), "no event received");
             assert!(item.unwrap().is_ok(), "event returned error");
@@ -90,7 +90,7 @@ async fn test_bybit_stream_event() {
 
     assert!(
         result.is_ok(),
-        "timed out waiting for 30 events within 10 seconds"
+        "timed out waiting for 100 events within 20 seconds"
     );
 }
 
@@ -116,8 +116,8 @@ async fn test_coinbase_stream_event() {
         .unwrap();
     let mut stream = client.stream_events().await.unwrap();
 
-    let result = timeout(Duration::from_secs(10), async {
-        for _ in 0..30 {
+    let result = timeout(Duration::from_secs(20), async {
+        for _ in 0..100 {
             let item = stream.next().await;
             assert!(item.is_some(), "no event received");
             assert!(item.unwrap().is_ok(), "event returned error");
@@ -127,7 +127,7 @@ async fn test_coinbase_stream_event() {
 
     assert!(
         result.is_ok(),
-        "timed out waiting for 30 events within 10 seconds"
+        "timed out waiting for 100 events within 20 seconds"
     );
 }
 
@@ -150,8 +150,8 @@ async fn test_okx_stream_event() {
     let client = OkxClient::builder().add_symbols(symbols).build().unwrap();
     let mut stream = client.stream_events().await.unwrap();
 
-    let result = timeout(Duration::from_secs(10), async {
-        for _ in 0..30 {
+    let result = timeout(Duration::from_secs(20), async {
+        for _ in 0..100 {
             let item = stream.next().await;
             assert!(item.is_some(), "no event received");
             assert!(item.unwrap().is_ok(), "event returned error");
@@ -161,7 +161,7 @@ async fn test_okx_stream_event() {
 
     assert!(
         result.is_ok(),
-        "timed out waiting for 30 events within 10 seconds"
+        "timed out waiting for 100 events within 20 seconds"
     );
 }
 
@@ -179,9 +179,8 @@ async fn test_kraken_stream_event() {
         .unwrap();
     let mut stream = client.stream_events().await.unwrap();
 
-    let result = timeout(Duration::from_secs(10), async {
-        // test 10 messages for kraken since it rarely give us updates
-        for _ in 0..10 {
+    let result = timeout(Duration::from_secs(20), async {
+        for _ in 0..100 {
             let item = stream.next().await;
             assert!(item.is_some(), "no event received");
             assert!(item.unwrap().is_ok(), "event returned error");
@@ -191,7 +190,7 @@ async fn test_kraken_stream_event() {
 
     assert!(
         result.is_ok(),
-        "timed out waiting for 30 events within 10 seconds"
+        "timed out waiting for 100 events within 20 seconds"
     );
 }
 
@@ -217,8 +216,8 @@ async fn test_kucoin_stream_event() {
         .unwrap();
     let mut stream = client.stream_events().await.unwrap();
 
-    let result = timeout(Duration::from_secs(10), async {
-        for _ in 0..30 {
+    let result = timeout(Duration::from_secs(20), async {
+        for _ in 0..100 {
             let item = stream.next().await;
             assert!(item.is_some(), "no event received");
             assert!(item.unwrap().is_ok(), "event returned error");
@@ -228,7 +227,7 @@ async fn test_kucoin_stream_event() {
 
     assert!(
         result.is_ok(),
-        "timed out waiting for 30 events within 10 seconds"
+        "timed out waiting for 100 events within 20 seconds"
     );
 }
 
@@ -245,8 +244,8 @@ async fn test_hyperliquid_stream_event() {
         .unwrap();
     let mut stream = client.stream_events().await.unwrap();
 
-    let result = timeout(Duration::from_secs(10), async {
-        for _ in 0..30 {
+    let result = timeout(Duration::from_secs(20), async {
+        for _ in 0..100 {
             let item = stream.next().await;
             assert!(item.is_some(), "no event received");
             assert!(item.unwrap().is_ok(), "event returned error");
@@ -256,6 +255,6 @@ async fn test_hyperliquid_stream_event() {
 
     assert!(
         result.is_ok(),
-        "timed out waiting for 30 events within 10 seconds"
+        "timed out waiting for 100 events within 20 seconds"
     );
 }
