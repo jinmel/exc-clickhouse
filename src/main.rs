@@ -11,7 +11,7 @@ use crate::{
     cli::{Cli, Commands, DbCommands, StreamArgs},
     clickhouse::{ClickHouseConfig, ClickHouseService},
     config::AppConfig,
-    models::{ClickhouseMessage, NormalizedEvent},
+    models::ClickhouseMessage,
     streams::{
         ExchangeClient, WebsocketStream, binance::BinanceClient, bybit::BybitClient,
         coinbase::CoinbaseClient, kraken::KrakenClient, kucoin::KucoinClient, okx::OkxClient,
@@ -64,7 +64,7 @@ impl std::fmt::Display for TaskName {
 }
 
 fn init_tracing(log_level: &str) -> eyre::Result<()> {
-    let log_level = format!("exc_clickhouse={},info", log_level);
+    let log_level = format!("exc_clickhouse={log_level},info");
     let subscriber = FmtSubscriber::builder()
         .with_env_filter(
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&log_level)),
@@ -330,7 +330,7 @@ where
         .stream_events()
         .await
         .map_err(|e| eyre::eyre!("Failed to create stream: {}", e))?;
-    
+
     pin_mut!(combined_stream);
     while let Some(event_result) = combined_stream.next().await {
         match event_result {

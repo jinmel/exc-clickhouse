@@ -12,10 +12,10 @@ use std::io::Read;
 use std::task::{Context, Poll};
 use tokio::sync::mpsc;
 use tokio::time::Duration;
+use tower::Service;
 use tower::limit::RateLimitLayer;
 use tower::timeout::TimeoutLayer;
 use tower::util::ServiceExt;
-use tower::Service;
 
 // ClickHouse table schema for proper time filtering:
 // CREATE TABLE timeboost.bids
@@ -121,7 +121,9 @@ pub async fn backfill_timeboost_bids() -> eyre::Result<()> {
         })
         .collect();
 
-    clickhouse.write_express_lane_bids(bids_with_timestamp.as_ref()).await?;
+    clickhouse
+        .write_express_lane_bids(bids_with_timestamp.as_ref())
+        .await?;
     Ok(())
 }
 
@@ -153,11 +155,11 @@ pub async fn fetch_bids_task(msg_tx: mpsc::UnboundedSender<ClickhouseMessage>) -
 
         let last_bid = bids.last().unwrap().clone();
         let last_bid_db = clickhouse.get_latest_bid().await.ok();
-        if let Some(last_bid_db) = last_bid_db {
-            if last_bid_db.round == last_bid.round {
-                tracing::debug!(?last_bid_db.round, ?last_bid.round, "No new round found");
-                continue;
-            }
+        if let Some(last_bid_db) = last_bid_db
+            && last_bid_db.round == last_bid.round
+        {
+            tracing::debug!(?last_bid_db.round, ?last_bid.round, "No new round found");
+            continue;
         }
 
         let bids = bids

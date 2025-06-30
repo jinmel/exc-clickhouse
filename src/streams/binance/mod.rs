@@ -4,8 +4,8 @@ use crate::streams::binance::parser::BinanceParser;
 use crate::{
     models::NormalizedEvent,
     streams::{
-        exchange_stream::ExchangeStreamBuilder, subscription::BinanceSubscription, ExchangeClient,
-        ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
+        ExchangeClient, ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
+        exchange_stream::ExchangeStreamBuilder, subscription::BinanceSubscription,
     },
 };
 use futures::stream::Stream;

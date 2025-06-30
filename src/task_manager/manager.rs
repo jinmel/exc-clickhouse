@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 use std::pin::Pin;
-use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
+use std::sync::atomic::AtomicU64;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::watch;
 use tokio::task::JoinSet;
-use tracing::{field, Instrument};
+use tracing::{Instrument, field};
 
 use crate::task_manager::circuit_breaker::CircuitBreaker;
 use crate::task_manager::config::{ShutdownStatus, TaskManagerConfig};
@@ -17,6 +17,18 @@ use crate::task_manager::types::ShutdownPhase;
 use crate::task_manager::types::{
     PendingRestart, TaskCompletion, TaskId, TaskManagerStats, TaskResult, TaskState,
 };
+
+/// Type alias for a restartable task function
+///
+/// This represents a function that can be called to create a new instance of a task.
+/// The function returns a pinned boxed future that will eventually produce a TaskResult<T>.
+/// This allows tasks to be restarted by calling the stored function again.
+pub type TaskFunction<T> = Arc<
+    dyn Fn() -> Pin<Box<dyn std::future::Future<Output = TaskResult<T>> + Send + 'static>>
+        + Send
+        + Sync
+        + 'static,
+>;
 
 /// Main task manager with JoinSet-based task tracking
 pub struct TaskManager<T> {
@@ -40,15 +52,7 @@ pub struct TaskManager<T> {
     shutdown_status: Arc<parking_lot::Mutex<ShutdownStatus>>,
 
     /// Storage for task functions to enable task restarts
-    task_fns: HashMap<
-        TaskId,
-        Arc<
-            dyn Fn() -> Pin<Box<dyn std::future::Future<Output = TaskResult<T>> + Send + 'static>>
-                + Send
-                + Sync
-                + 'static,
-        >,
-    >,
+    task_fns: HashMap<TaskId, TaskFunction<T>>,
 }
 
 impl<T: Send + 'static> TaskManager<T> {

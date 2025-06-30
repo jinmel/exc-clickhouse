@@ -1,7 +1,7 @@
 use super::super::*;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 use tokio::time::timeout;
 
@@ -48,10 +48,10 @@ fn create_failing_task(
     fail_count: u32,
     error: TestError,
 ) -> impl Fn() -> Pin<Box<dyn std::future::Future<Output = TaskResult<String>> + Send + 'static>>
-       + Send
-       + Sync
-       + Clone
-       + 'static {
++ Send
++ Sync
++ Clone
++ 'static {
     move || {
         let call_count = call_count.clone();
         let error = TestError {
@@ -74,10 +74,10 @@ fn create_always_failing_task(
     call_count: Arc<AtomicU32>,
     error: TestError,
 ) -> impl Fn() -> Pin<Box<dyn std::future::Future<Output = TaskResult<String>> + Send + 'static>>
-       + Send
-       + Sync
-       + Clone
-       + 'static {
++ Send
++ Sync
++ Clone
++ 'static {
     move || {
         let call_count = call_count.clone();
         let error = TestError {

@@ -6,8 +6,8 @@ use crate::streams::okx::parser::OkxParser;
 use crate::{
     models::NormalizedEvent,
     streams::{
-        exchange_stream::ExchangeStreamBuilder, subscription::OkxSubscription, ExchangeClient,
-        ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
+        ExchangeClient, ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
+        exchange_stream::ExchangeStreamBuilder, subscription::OkxSubscription,
     },
 };
 

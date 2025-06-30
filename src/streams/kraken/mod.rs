@@ -6,8 +6,8 @@ use std::pin::Pin;
 use crate::{
     models::NormalizedEvent,
     streams::{
-        exchange_stream::ExchangeStreamBuilder, subscription::KrakenSubscription, ExchangeClient,
-        ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
+        ExchangeClient, ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
+        exchange_stream::ExchangeStreamBuilder, subscription::KrakenSubscription,
     },
 };
 

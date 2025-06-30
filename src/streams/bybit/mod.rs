@@ -4,8 +4,8 @@ use crate::streams::bybit::parser::BybitParser;
 use crate::{
     models::NormalizedEvent,
     streams::{
-        exchange_stream::ExchangeStreamBuilder, subscription::BybitSubscription, ExchangeClient,
-        ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
+        ExchangeClient, ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
+        exchange_stream::ExchangeStreamBuilder, subscription::BybitSubscription,
     },
 };
 use futures::stream::Stream;

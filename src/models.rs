@@ -1,8 +1,8 @@
 use arrayvec::ArrayString;
 use serde::{Deserialize, Serialize};
 
-use crate::{ethereum::BlockMetadata, timeboost::bids::BidData};
 use crate::allium::DexVolume;
+use crate::{ethereum::BlockMetadata, timeboost::bids::BidData};
 
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq, Eq)]
 pub enum ExchangeName {

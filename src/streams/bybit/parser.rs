@@ -318,17 +318,19 @@ mod tests {
             let bids: Vec<_> = book.bids.iter().collect();
             assert_eq!(bids.len(), 4); // 3 original + 1 new - 1 removed + 1 added = 4
             assert!(!bids.iter().any(|(p, _)| p.into_inner() == 16578.49)); // removed
-            assert!(bids
-                .iter()
-                .any(|(p, q)| p.into_inner() == 16578.51 && **q == 1.200)); // added
+            assert!(
+                bids.iter()
+                    .any(|(p, q)| p.into_inner() == 16578.51 && **q == 1.200)
+            ); // added
 
             // Check asks - 16578.52 should be removed, 16578.50 should be added
             let asks: Vec<_> = book.asks.iter().collect();
             assert_eq!(asks.len(), 4); // 3 original + 1 new - 1 removed + 1 added = 4
             assert!(!asks.iter().any(|(p, _)| p.into_inner() == 16578.52)); // removed
-            assert!(asks
-                .iter()
-                .any(|(p, q)| p.into_inner() == 16578.50 && **q == 0.800)); // added
+            assert!(
+                asks.iter()
+                    .any(|(p, q)| p.into_inner() == 16578.50 && **q == 0.800)
+            ); // added
 
             // Verify best bid/ask (note: this creates a crossed market which is unusual but tests the logic)
             assert_eq!(book.best_bid(), Some((16578.51, 1.200)));

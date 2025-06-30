@@ -1,9 +1,9 @@
 use exc_clickhouse::streams::{
-    binance::BinanceClient, bybit::BybitClient, coinbase::CoinbaseClient, kraken::KrakenClient,
-    kucoin::KucoinClient, okx::OkxClient, WebsocketStream,
+    WebsocketStream, binance::BinanceClient, bybit::BybitClient, coinbase::CoinbaseClient,
+    kraken::KrakenClient, kucoin::KucoinClient, okx::OkxClient,
 };
 use futures::StreamExt;
-use tokio::time::{timeout, Duration};
+use tokio::time::{Duration, timeout};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 fn init_tracing() {
