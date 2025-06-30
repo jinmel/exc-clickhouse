@@ -330,28 +330,25 @@ where
         .stream_events()
         .await
         .map_err(|e| eyre::eyre!("Failed to create stream: {}", e))?;
-    let stream =
-        combined_stream.filter_map(|event: Result<NormalizedEvent, T::Error>| async move {
-            match event {
-                Ok(NormalizedEvent::Trade(trade)) => {
-                    Some(ClickhouseMessage::Cex(NormalizedEvent::Trade(trade)))
-                }
-                Ok(NormalizedEvent::Quote(quote)) => {
-                    Some(ClickhouseMessage::Cex(NormalizedEvent::Quote(quote)))
-                }
-                Err(e) => {
-                    tracing::error!("Error streaming {} event: {:?}", exchange_name, e);
-                    None
+    
+    pin_mut!(combined_stream);
+    while let Some(event_result) = combined_stream.next().await {
+        match event_result {
+            Ok(event) => {
+                let msg = ClickhouseMessage::Cex(event);
+                if evt_tx.send(msg).is_err() {
+                    tracing::error!("Failed to send message to channel");
+                    return Err(eyre::eyre!("Channel send failed"));
                 }
             }
-        });
-    pin_mut!(stream);
-    while let Some(msg) = stream.next().await {
-        if evt_tx.send(msg).is_err() {
-            tracing::error!("Failed to send message to channel");
+            Err(e) => {
+                tracing::error!("Error streaming {} event: {:?}", exchange_name, e);
+                return Err(eyre::eyre!("Stream error: {}", e));
+            }
         }
     }
-    Ok(())
+    tracing::warn!("{} stream ended unexpectedly", exchange_name);
+    Err(eyre::eyre!("{} stream terminated", exchange_name))
 }
 
 async fn clickhouse_writer_task(
