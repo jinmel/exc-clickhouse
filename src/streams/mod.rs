@@ -2,6 +2,7 @@ pub mod binance;
 pub mod bybit;
 pub mod coinbase;
 pub mod exchange_stream;
+pub mod hyperliquid;
 pub mod kraken;
 pub mod kucoin;
 pub mod okx;

@@ -454,3 +454,73 @@ impl Subscription for KrakenSubscription {
         Some(Duration::from_secs(10)) // Send ping every 50 seconds
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct HyperliquidSubscription {
+    symbols: Vec<StreamSymbols>,
+}
+
+impl Default for HyperliquidSubscription {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl HyperliquidSubscription {
+    pub fn new() -> Self {
+        Self { symbols: vec![] }
+    }
+
+    pub fn add_markets(&mut self, markets: Vec<StreamSymbols>) {
+        self.symbols.extend(markets);
+    }
+}
+
+impl Subscription for HyperliquidSubscription {
+    fn to_json(&self) -> Result<Vec<serde_json::Value>, serde_json::Error> {
+        #[derive(Serialize)]
+        struct SubscriptionMessage {
+            method: String,
+            subscription: SubscriptionData,
+        }
+
+        #[derive(Serialize)]
+        struct SubscriptionData {
+            #[serde(rename = "type")]
+            subscription_type: String,
+            coin: String,
+        }
+
+        let mut messages = Vec::new();
+
+        for symbol in &self.symbols {
+            let subscription_type = match symbol.stream_type {
+                StreamType::Trade => "trades",
+                StreamType::Quote => "l2Book",
+            };
+
+            let message = SubscriptionMessage {
+                method: "subscribe".to_string(),
+                subscription: SubscriptionData {
+                    subscription_type: subscription_type.to_string(),
+                    coin: symbol.symbol.clone(),
+                },
+            };
+
+            messages.push(serde_json::to_value(message)?);
+        }
+
+        Ok(messages)
+    }
+
+    fn heartbeat(&self) -> Option<tokio_tungstenite::tungstenite::Message> {
+        // Hyperliquid doesn't require explicit heartbeat/ping messages
+        // The WebSocket connection is maintained automatically
+        None
+    }
+
+    fn heartbeat_interval(&self) -> Option<Duration> {
+        // No heartbeat needed for Hyperliquid
+        None
+    }
+}

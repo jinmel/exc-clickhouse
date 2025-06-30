@@ -1,16 +1,26 @@
 use exc_clickhouse::streams::{
-    binance::BinanceClient, bybit::BybitClient, coinbase::CoinbaseClient, kraken::KrakenClient,
+    binance::BinanceClient, bybit::BybitClient, coinbase::CoinbaseClient, 
+    hyperliquid::HyperliquidClient, kraken::KrakenClient,
     kucoin::KucoinClient, okx::OkxClient, WebsocketStream,
 };
 use futures::StreamExt;
+use rustls::crypto::ring::default_provider;
+use std::sync::Once;
 use tokio::time::{timeout, Duration};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
+static INIT: Once = Once::new();
+
 fn init_tracing() {
-    let _ = FmtSubscriber::builder()
-        .with_env_filter(EnvFilter::new("exc_clickhouse=trace"))
-        .with_test_writer()
-        .try_init();
+    INIT.call_once(|| {
+        // Install crypto provider for TLS connections
+        let _ = default_provider().install_default();
+        
+        let _ = FmtSubscriber::builder()
+            .with_env_filter(EnvFilter::new("exc_clickhouse=trace"))
+            .with_test_writer()
+            .try_init();
+    });
 }
 
 #[tokio::test]
@@ -204,6 +214,34 @@ async fn test_kucoin_stream_event() {
         ])
         .build()
         .await
+        .unwrap();
+    let mut stream = client.stream_events().await.unwrap();
+
+    let result = timeout(Duration::from_secs(10), async {
+        for _ in 0..30 {
+            let item = stream.next().await;
+            assert!(item.is_some(), "no event received");
+            assert!(item.unwrap().is_ok(), "event returned error");
+        }
+    })
+    .await;
+
+    assert!(
+        result.is_ok(),
+        "timed out waiting for 30 events within 10 seconds"
+    );
+}
+
+#[tokio::test]
+#[ignore]
+async fn test_hyperliquid_stream_event() {
+    init_tracing();
+    let symbols = vec![
+        "BTC", "ETH", "SOL", "XRP", "DOGE", "ADA", "AVAX", "LTC", "LINK", "MATIC",
+    ];
+    let client = HyperliquidClient::builder()
+        .add_symbols(symbols)
+        .build()
         .unwrap();
     let mut stream = client.stream_events().await.unwrap();
 

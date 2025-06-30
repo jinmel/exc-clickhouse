@@ -20,6 +20,8 @@ pub enum ExchangeName {
     Kucoin,
     #[serde(rename = "upbit")]
     Upbit,
+    #[serde(rename = "hyperliquid")]
+    Hyperliquid,
 }
 
 impl std::fmt::Display for ExchangeName {
@@ -32,11 +34,12 @@ impl std::fmt::Display for ExchangeName {
             ExchangeName::Kraken => write!(f, "kraken"),
             ExchangeName::Kucoin => write!(f, "kucoin"),
             ExchangeName::Upbit => write!(f, "upbit"),
+            ExchangeName::Hyperliquid => write!(f, "hyperliquid"),
         }
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Copy, Clone)]
+#[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq, Eq)]
 pub enum TradeSide {
     Buy,
     Sell,

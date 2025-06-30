@@ -1,3 +1,4 @@
+pub mod allium;
 pub mod cli;
 pub mod clickhouse;
 pub mod config;
@@ -8,4 +9,3 @@ pub mod task_manager;
 pub mod timeboost;
 pub mod tower_utils;
 pub mod trading_pairs;
-pub mod allium;

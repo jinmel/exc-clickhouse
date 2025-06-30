@@ -14,7 +14,8 @@ use crate::{
     models::{ClickhouseMessage, NormalizedEvent},
     streams::{
         ExchangeClient, WebsocketStream, binance::BinanceClient, bybit::BybitClient,
-        coinbase::CoinbaseClient, kraken::KrakenClient, kucoin::KucoinClient, okx::OkxClient,
+        coinbase::CoinbaseClient, hyperliquid::HyperliquidClient, kraken::KrakenClient,
+        kucoin::KucoinClient, okx::OkxClient,
     },
     task_manager::{IntoTaskResult, TaskManager},
 };
@@ -40,6 +41,7 @@ enum TaskName {
     CoinbaseStream,
     KrakenStream,
     KucoinStream,
+    HyperliquidStream,
     EthereumBlockMetadata,
     ClickHouseWriter,
     TimeboostBids,
@@ -55,6 +57,7 @@ impl std::fmt::Display for TaskName {
             TaskName::CoinbaseStream => write!(f, "Coinbase Stream"),
             TaskName::KrakenStream => write!(f, "Kraken Stream"),
             TaskName::KucoinStream => write!(f, "KuCoin Stream"),
+            TaskName::HyperliquidStream => write!(f, "Hyperliquid Stream"),
             TaskName::EthereumBlockMetadata => write!(f, "Ethereum Block Metadata"),
             TaskName::ClickHouseWriter => write!(f, "ClickHouse Writer"),
             TaskName::TimeboostBids => write!(f, "Timeboost Bids"),
@@ -127,6 +130,7 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
     let coinbase_symbols: Vec<String> = app_config.exchange_configs.coinbase_symbols.clone();
     let kraken_symbols: Vec<String> = app_config.exchange_configs.kraken_symbols.clone();
     let kucoin_symbols: Vec<String> = app_config.exchange_configs.kucoin_symbols.clone();
+    let hyperliquid_symbols: Vec<String> = app_config.exchange_configs.hyperliquid_symbols.clone();
 
     // Check if any data producer tasks will be enabled
     let has_producers = app_config.has_exchange_symbols()
@@ -210,6 +214,18 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         let tx = msg_tx.clone();
         let client = KucoinClient::builder().add_symbols(symbols).build().await?;
         task_manager.spawn_task(TaskName::KucoinStream, move || {
+            let client = client.clone();
+            let tx = tx.clone();
+            Box::pin(async move { process_exchange_stream(client, tx).await.into_task_result() })
+        });
+    }
+
+    if !hyperliquid_symbols.is_empty() {
+        let tx = msg_tx.clone();
+        let client = HyperliquidClient::builder()
+            .add_symbols(hyperliquid_symbols)
+            .build()?;
+        task_manager.spawn_task(TaskName::HyperliquidStream, move || {
             let client = client.clone();
             let tx = tx.clone();
             Box::pin(async move { process_exchange_stream(client, tx).await.into_task_result() })
