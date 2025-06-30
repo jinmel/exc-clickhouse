@@ -454,3 +454,85 @@ impl Subscription for KrakenSubscription {
         Some(Duration::from_secs(10)) // Send ping every 50 seconds
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct HyperliquidSubscription {
+    symbols: Vec<StreamSymbols>,
+}
+
+impl Default for HyperliquidSubscription {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl HyperliquidSubscription {
+    pub fn new() -> Self {
+        Self { symbols: vec![] }
+    }
+
+    pub fn add_markets(&mut self, markets: Vec<StreamSymbols>) {
+        self.symbols.extend(markets);
+    }
+}
+
+impl Subscription for HyperliquidSubscription {
+    fn to_json(&self) -> Result<Vec<serde_json::Value>, serde_json::Error> {
+        #[derive(Serialize)]
+        struct SubscriptionMessage {
+            method: String,
+            subscription: SubscriptionData,
+        }
+
+        #[derive(Serialize)]
+        struct SubscriptionData {
+            #[serde(rename = "type")]
+            subscription_type: String,
+            coin: String,
+        }
+
+        let mut messages = Vec::new();
+
+        for symbol in &self.symbols {
+            let subscription_type = match symbol.stream_type {
+                StreamType::Trade => "trades",
+                StreamType::Quote => "l2Book",
+            };
+
+            let message = SubscriptionMessage {
+                method: "subscribe".to_string(),
+                subscription: SubscriptionData {
+                    subscription_type: subscription_type.to_string(),
+                    coin: symbol.symbol.clone(),
+                },
+            };
+
+            messages.push(serde_json::to_value(message)?);
+        }
+
+        Ok(messages)
+    }
+
+    fn heartbeat(&self) -> Option<tokio_tungstenite::tungstenite::Message> {
+        // Hyperliquid requires ping messages to keep connection alive
+        // Format: { "method": "ping" }
+        // Server responds with: { "channel": "pong" }
+        #[derive(Serialize)]
+        struct PingMessage {
+            method: String,
+        }
+
+        let ping = PingMessage {
+            method: "ping".to_string(),
+        };
+
+        Some(tokio_tungstenite::tungstenite::Message::Text(
+            serde_json::to_string(&ping).unwrap().into(),
+        ))
+    }
+
+    fn heartbeat_interval(&self) -> Option<Duration> {
+        // Send ping every 50 seconds to stay under the 60-second timeout
+        Some(Duration::from_secs(50))
+    }
+}
