@@ -109,6 +109,8 @@ pub enum HyperliquidMessage {
     Trades { data: Vec<HyperliquidTrade> },
     #[serde(rename = "l2Book")]
     L2Book { data: HyperliquidL2Book },
+    #[serde(rename = "pong")]
+    Pong,
 }
 
 #[cfg(test)]

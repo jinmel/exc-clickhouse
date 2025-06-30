@@ -39,6 +39,11 @@ impl Parser<Vec<NormalizedEvent>> for HyperliquidParser {
                 tracing::debug!("Received subscription response from Hyperliquid");
                 Ok(None)
             }
+            HyperliquidMessage::Pong => {
+                // Heartbeat pong response - connection is alive
+                tracing::debug!("Received pong response from Hyperliquid");
+                Ok(None)
+            }
             HyperliquidMessage::Trades { data: trades } => {
                 tracing::debug!("Received {} trades from Hyperliquid", trades.len());
                 let mut events = Vec::new();
@@ -48,20 +53,18 @@ impl Parser<Vec<NormalizedEvent>> for HyperliquidParser {
                             events.push(NormalizedEvent::Trade(normalized_trade));
                         }
                         Err(e) => {
-                            tracing::warn!("Failed to parse Hyperliquid trade: {e}");
+                            tracing::warn!("Failed to convert Hyperliquid trade: {e}");
                         }
                     }
                 }
-                Ok(if events.is_empty() { None } else { Some(events) })
+                Ok(Some(events))
             }
-            HyperliquidMessage::L2Book { data: book } => {
-                tracing::debug!("Received L2 book update for {} from Hyperliquid", book.coin);
-                match book.try_into() {
-                    Ok(normalized_quote) => {
-                        Ok(Some(vec![NormalizedEvent::Quote(normalized_quote)]))
-                    }
+            HyperliquidMessage::L2Book { data: l2_book } => {
+                tracing::debug!("Received L2 book from Hyperliquid for {}", l2_book.coin);
+                match l2_book.try_into() {
+                    Ok(normalized_quote) => Ok(Some(vec![NormalizedEvent::Quote(normalized_quote)])),
                     Err(e) => {
-                        tracing::warn!("Failed to parse Hyperliquid L2 book: {e}");
+                        tracing::warn!("Failed to convert Hyperliquid L2 book: {e}");
                         Ok(None)
                     }
                 }
@@ -80,6 +83,14 @@ mod tests {
         let json = r#"{"channel":"subscriptionResponse","data":{"method":"subscribe","subscription":{"type":"trades","coin":"BTC"}}}"#;
         let result = parser.parse(json).unwrap();
         assert!(result.is_none()); // Subscription responses don't generate events
+    }
+
+    #[test]
+    fn test_pong_parsing() {
+        let parser = HyperliquidParser::new();
+        let json = r#"{"channel":"pong"}"#;
+        let result = parser.parse(json).unwrap();
+        assert!(result.is_none()); // Pong responses don't generate events
     }
 
     #[test]

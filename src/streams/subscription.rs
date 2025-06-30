@@ -514,13 +514,25 @@ impl Subscription for HyperliquidSubscription {
     }
 
     fn heartbeat(&self) -> Option<tokio_tungstenite::tungstenite::Message> {
-        // Hyperliquid doesn't require explicit heartbeat/ping messages
-        // The WebSocket connection is maintained automatically
-        None
+        // Hyperliquid requires ping messages to keep connection alive
+        // Format: { "method": "ping" }
+        // Server responds with: { "channel": "pong" }
+        #[derive(Serialize)]
+        struct PingMessage {
+            method: String,
+        }
+
+        let ping = PingMessage {
+            method: "ping".to_string(),
+        };
+
+        Some(tokio_tungstenite::tungstenite::Message::Text(
+            serde_json::to_string(&ping).unwrap().into(),
+        ))
     }
 
     fn heartbeat_interval(&self) -> Option<Duration> {
-        // No heartbeat needed for Hyperliquid
-        None
+        // Send ping every 50 seconds to stay under the 60-second timeout
+        Some(Duration::from_secs(50))
     }
 }
