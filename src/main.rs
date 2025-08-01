@@ -14,7 +14,8 @@ use crate::{
     models::ClickhouseMessage,
     streams::{
         ExchangeClient, WebsocketStream, binance::BinanceClient, bybit::BybitClient,
-        coinbase::CoinbaseClient, kraken::KrakenClient, kucoin::KucoinClient, okx::OkxClient,
+        coinbase::CoinbaseClient, hyperliquid::HyperliquidClient, kraken::KrakenClient,
+        kucoin::KucoinClient, okx::OkxClient,
     },
     task_manager::{IntoTaskResult, TaskManager},
 };
@@ -40,6 +41,7 @@ enum TaskName {
     CoinbaseStream,
     KrakenStream,
     KucoinStream,
+    HyperliquidStream,
     EthereumBlockMetadata,
     ClickHouseWriter,
     TimeboostBids,
@@ -55,6 +57,7 @@ impl std::fmt::Display for TaskName {
             TaskName::CoinbaseStream => write!(f, "Coinbase Stream"),
             TaskName::KrakenStream => write!(f, "Kraken Stream"),
             TaskName::KucoinStream => write!(f, "KuCoin Stream"),
+            TaskName::HyperliquidStream => write!(f, "Hyperliquid Stream"),
             TaskName::EthereumBlockMetadata => write!(f, "Ethereum Block Metadata"),
             TaskName::ClickHouseWriter => write!(f, "ClickHouse Writer"),
             TaskName::TimeboostBids => write!(f, "Timeboost Bids"),
@@ -127,6 +130,7 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
     let coinbase_symbols: Vec<String> = app_config.exchange_configs.coinbase_symbols.clone();
     let kraken_symbols: Vec<String> = app_config.exchange_configs.kraken_symbols.clone();
     let kucoin_symbols: Vec<String> = app_config.exchange_configs.kucoin_symbols.clone();
+    let hyperliquid_symbols: Vec<String> = app_config.exchange_configs.hyperliquid_symbols.clone();
 
     // Check if any data producer tasks will be enabled
     let has_producers = app_config.has_exchange_symbols()
@@ -154,30 +158,30 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         let client = BinanceClient::builder()
             .add_symbols(binance_symbols)
             .build()?;
-        task_manager.spawn_task(TaskName::BinanceStream, move || {
+        task_manager.spawn_cancellable_task(TaskName::BinanceStream, move |cancellation_token| {
             let client = client.clone();
             let tx = tx.clone();
-            Box::pin(async move { process_exchange_stream(client, tx).await.into_task_result() })
+            Box::pin(async move { process_exchange_stream(client, tx, cancellation_token).await.into_task_result() })
         });
     }
 
     if !bybit_symbols.is_empty() {
         let tx = msg_tx.clone();
         let client = BybitClient::builder().add_symbols(bybit_symbols).build()?;
-        task_manager.spawn_task(TaskName::BybitStream, move || {
+        task_manager.spawn_cancellable_task(TaskName::BybitStream, move |cancellation_token| {
             let client = client.clone();
             let tx = tx.clone();
-            Box::pin(async move { process_exchange_stream(client, tx).await.into_task_result() })
+            Box::pin(async move { process_exchange_stream(client, tx, cancellation_token).await.into_task_result() })
         });
     }
 
     if !okx_symbols.is_empty() {
         let tx = msg_tx.clone();
         let client = OkxClient::builder().add_symbols(okx_symbols).build()?;
-        task_manager.spawn_task(TaskName::OkxStream, move || {
+        task_manager.spawn_cancellable_task(TaskName::OkxStream, move |cancellation_token| {
             let client = client.clone();
             let tx = tx.clone();
-            Box::pin(async move { process_exchange_stream(client, tx).await.into_task_result() })
+            Box::pin(async move { process_exchange_stream(client, tx, cancellation_token).await.into_task_result() })
         });
     }
 
@@ -186,10 +190,10 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         let client = CoinbaseClient::builder()
             .add_symbols(coinbase_symbols)
             .build()?;
-        task_manager.spawn_task(TaskName::CoinbaseStream, move || {
+        task_manager.spawn_cancellable_task(TaskName::CoinbaseStream, move |cancellation_token| {
             let client = client.clone();
             let tx = tx.clone();
-            Box::pin(async move { process_exchange_stream(client, tx).await.into_task_result() })
+            Box::pin(async move { process_exchange_stream(client, tx, cancellation_token).await.into_task_result() })
         });
     }
 
@@ -198,10 +202,10 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         let client = KrakenClient::builder()
             .add_symbols(kraken_symbols)
             .build()?;
-        task_manager.spawn_task(TaskName::KrakenStream, move || {
+        task_manager.spawn_cancellable_task(TaskName::KrakenStream, move |cancellation_token| {
             let client = client.clone();
             let tx = tx.clone();
-            Box::pin(async move { process_exchange_stream(client, tx).await.into_task_result() })
+            Box::pin(async move { process_exchange_stream(client, tx, cancellation_token).await.into_task_result() })
         });
     }
 
@@ -209,10 +213,22 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         let symbols = kucoin_symbols.clone();
         let tx = msg_tx.clone();
         let client = KucoinClient::builder().add_symbols(symbols).build().await?;
-        task_manager.spawn_task(TaskName::KucoinStream, move || {
+        task_manager.spawn_cancellable_task(TaskName::KucoinStream, move |cancellation_token| {
             let client = client.clone();
             let tx = tx.clone();
-            Box::pin(async move { process_exchange_stream(client, tx).await.into_task_result() })
+            Box::pin(async move { process_exchange_stream(client, tx, cancellation_token).await.into_task_result() })
+        });
+    }
+
+    if !hyperliquid_symbols.is_empty() {
+        let tx = msg_tx.clone();
+        let client = HyperliquidClient::builder()
+            .add_symbols(hyperliquid_symbols)
+            .build()?;
+        task_manager.spawn_cancellable_task(TaskName::HyperliquidStream, move |cancellation_token| {
+            let client = client.clone();
+            let tx = tx.clone();
+            Box::pin(async move { process_exchange_stream(client, tx, cancellation_token).await.into_task_result() })
         });
     }
 
@@ -311,9 +327,10 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
 async fn process_exchange_stream<T>(
     client: T,
     evt_tx: mpsc::UnboundedSender<ClickhouseMessage>,
+    cancellation_token: tokio_util::sync::CancellationToken,
 ) -> eyre::Result<()>
 where
-    T: WebsocketStream + ExchangeClient,
+    T: WebsocketStream + ExchangeClient + Sync,
     T::Error: std::error::Error + Send + Sync + 'static,
 {
     let exchange_name = client.get_exchange_name();
@@ -327,7 +344,7 @@ where
     );
 
     let combined_stream = client
-        .stream_events()
+        .stream_events(cancellation_token)
         .await
         .map_err(|e| eyre::eyre!("Failed to create stream: {}", e))?;
 

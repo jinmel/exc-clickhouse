@@ -9,6 +9,7 @@ use std::fmt::Debug;
 use std::pin::Pin;
 use tokio::time::{Duration, Instant};
 use tokio_tungstenite::tungstenite::Message;
+use tokio_util::sync::CancellationToken;
 
 pub struct ExchangeStreamBuilder<T, P, S>
 where
@@ -20,6 +21,7 @@ where
     parser: P,
     url: String,
     subscription: S,
+    cancellation_token: Option<CancellationToken>,
     _phantom: std::marker::PhantomData<T>,
 }
 
@@ -35,8 +37,14 @@ where
             parser,
             url: url.to_owned(),
             subscription,
+            cancellation_token: None,
             _phantom: std::marker::PhantomData,
         }
+    }
+
+    pub fn with_cancellation(mut self, token: CancellationToken) -> Self {
+        self.cancellation_token = Some(token);
+        self
     }
 
     pub fn build(
@@ -46,6 +54,7 @@ where
         let subscription = self.subscription;
         let parser = self.parser;
         let timeout = self.timeout;
+        let cancellation_token = self.cancellation_token;
 
         let stream = try_stream! {
             loop {
@@ -140,6 +149,22 @@ where
                         _ = &mut timeout_sleep => {
                             tracing::trace!("Timeout reached, reconnecting");
                             break;
+                        }
+
+                        // Handle graceful shutdown
+                        _ = async {
+                            if let Some(ref token) = cancellation_token {
+                                token.cancelled().await
+                            } else {
+                                futures::future::pending().await
+                            }
+                        } => {
+                            tracing::info!("Graceful shutdown requested, closing WebSocket connection");
+                            // Attempt graceful close
+                            if let Err(e) = ws.close(None).await {
+                                tracing::warn!("Failed to close WebSocket gracefully: {e}");
+                            }
+                            return;
                         }
                     }
                 }
