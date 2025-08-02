@@ -15,6 +15,7 @@ use crate::{
     streams::{
         ExchangeClient, WebsocketStream, binance::BinanceClient, bybit::BybitClient,
         coinbase::CoinbaseClient, kraken::KrakenClient, kucoin::KucoinClient, okx::OkxClient,
+        binancefutures::BinanceFuturesClient,
     },
     task_manager::{IntoTaskResult, TaskManager},
 };
@@ -35,6 +36,7 @@ mod trading_pairs;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum TaskName {
     BinanceStream,
+    BinanceFuturesStream,
     BybitStream,
     OkxStream,
     CoinbaseStream,
@@ -50,6 +52,7 @@ impl std::fmt::Display for TaskName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             TaskName::BinanceStream => write!(f, "Binance Stream"),
+            TaskName::BinanceFuturesStream => write!(f, "Binance Futures Stream"),
             TaskName::BybitStream => write!(f, "Bybit Stream"),
             TaskName::OkxStream => write!(f, "OKX Stream"),
             TaskName::CoinbaseStream => write!(f, "Coinbase Stream"),
@@ -122,6 +125,7 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
     let app_config = AppConfig::from_stream_args(&args)?;
 
     let binance_symbols: Vec<String> = app_config.exchange_configs.binance_symbols.clone();
+    let binance_futures_symbols: Vec<String> = app_config.exchange_configs.binance_futures_symbols.clone();
     let bybit_symbols: Vec<String> = app_config.exchange_configs.bybit_symbols.clone();
     let okx_symbols: Vec<String> = app_config.exchange_configs.okx_symbols.clone();
     let coinbase_symbols: Vec<String> = app_config.exchange_configs.coinbase_symbols.clone();
@@ -155,6 +159,18 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
             .add_symbols(binance_symbols)
             .build()?;
         task_manager.spawn_task(TaskName::BinanceStream, move || {
+            let client = client.clone();
+            let tx = tx.clone();
+            Box::pin(async move { process_exchange_stream(client, tx).await.into_task_result() })
+        });
+    }
+
+    if !binance_futures_symbols.is_empty() {
+        let tx = msg_tx.clone();
+        let client = BinanceFuturesClient::builder()
+            .add_symbols(binance_futures_symbols)
+            .build()?;
+        task_manager.spawn_task(TaskName::BinanceFuturesStream, move || {
             let client = client.clone();
             let tx = tx.clone();
             Box::pin(async move { process_exchange_stream(client, tx).await.into_task_result() })
