@@ -48,6 +48,7 @@ pub struct AlliumConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ExchangeConfigs {
     pub binance_symbols: Vec<String>,
+    pub binance_futures_symbols: Vec<String>,
     pub bybit_symbols: Vec<String>,
     pub okx_symbols: Vec<String>,
     pub coinbase_symbols: Vec<String>,
@@ -206,6 +207,14 @@ impl ExchangeConfigs {
             })
             .collect();
 
+        let binance_futures_symbols: Vec<String> = cfg
+            .trading_pairs
+            .iter()
+            .filter(|e| e.exchange.eq_ignore_ascii_case("binance"))
+            .filter(|e| e.trading_type.eq_ignore_ascii_case("futures"))
+            .map(|e| format!("{}{}", e.base_asset, e.quote_asset))
+            .collect();
+
         let bybit_symbols: Vec<String> = cfg
             .trading_pairs
             .iter()
@@ -248,6 +257,7 @@ impl ExchangeConfigs {
 
         Self {
             binance_symbols,
+            binance_futures_symbols,
             bybit_symbols,
             okx_symbols,
             coinbase_symbols,

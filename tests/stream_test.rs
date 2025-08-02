@@ -1,12 +1,17 @@
 use exc_clickhouse::streams::{
-    WebsocketStream, binance::BinanceClient, bybit::BybitClient, coinbase::CoinbaseClient,
-    kraken::KrakenClient, kucoin::KucoinClient, okx::OkxClient,
+    WebsocketStream, binance::BinanceClient, binancefutures::BinanceFuturesClient, 
+    bybit::BybitClient, coinbase::CoinbaseClient, kraken::KrakenClient, 
+    kucoin::KucoinClient, okx::OkxClient,
 };
 use futures::StreamExt;
+use rustls::crypto::ring::default_provider;
 use tokio::time::{Duration, timeout};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 fn init_tracing() {
+    // Initialize crypto provider for TLS connections
+    let _ = default_provider().install_default();
+    
     let _ = FmtSubscriber::builder()
         .with_env_filter(EnvFilter::new("exc_clickhouse=trace"))
         .with_test_writer()
@@ -30,6 +35,43 @@ async fn test_binance_stream_event() {
         "maticusdt",
     ];
     let client = BinanceClient::builder()
+        .add_symbols(symbols)
+        .build()
+        .unwrap();
+    let mut stream = client.stream_events().await.unwrap();
+
+    let result = timeout(Duration::from_secs(10), async {
+        for _ in 0..30 {
+            let item = stream.next().await;
+            assert!(item.is_some(), "no event received");
+            assert!(item.unwrap().is_ok(), "event returned error");
+        }
+    })
+    .await;
+
+    assert!(
+        result.is_ok(),
+        "timed out waiting for 30 events within 10 seconds"
+    );
+}
+
+#[tokio::test]
+#[ignore]
+async fn test_binance_futures_stream_event() {
+    init_tracing();
+    let symbols = vec![
+        "btcusdt",
+        "ethusdt",
+        "bnbusdt",
+        "xrpusdt",
+        "solusdt",
+        "dogeusdt",
+        "adausdt",
+        "linkusdt",
+        "ltcusdt",
+        "maticusdt",
+    ];
+    let client = BinanceFuturesClient::builder()
         .add_symbols(symbols)
         .build()
         .unwrap();
