@@ -157,6 +157,7 @@ impl AppConfig {
     /// Check if any exchange has symbols configured
     pub fn has_exchange_symbols(&self) -> bool {
         !self.exchange_configs.binance_symbols.is_empty()
+            || !self.exchange_configs.binance_futures_symbols.is_empty()
             || !self.exchange_configs.bybit_symbols.is_empty()
             || !self.exchange_configs.okx_symbols.is_empty()
             || !self.exchange_configs.coinbase_symbols.is_empty()
