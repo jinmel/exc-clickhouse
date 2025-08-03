@@ -2,7 +2,7 @@
 """
 Complete trading pairs fetcher script.
 
-Fetches SPOT trading pairs from all supported exchanges and exports to YAML format
+Fetches SPOT and FUTURES trading pairs from all supported exchanges and exports to YAML format
 compatible with the Rust symbols.yaml structure.
 """
 
@@ -105,7 +105,7 @@ def filter_trading_pairs(
 def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="Fetch SPOT trading pairs from cryptocurrency exchanges",
+        description="Fetch SPOT and FUTURES trading pairs from cryptocurrency exchanges",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -151,7 +151,7 @@ async def main():
     
     logger = logging.getLogger(__name__)
     
-    print("🚀 Starting Multi-Exchange SPOT Trading Pairs Fetcher")
+    print("🚀 Starting Multi-Exchange SPOT & FUTURES Trading Pairs Fetcher")
     print("=" * 60)
     
     # Load base assets filter if provided

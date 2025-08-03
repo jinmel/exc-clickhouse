@@ -226,7 +226,7 @@ class ExchangeAdapter(ABC):
                 success=True
             )
             
-            self.logger.info(f"Successfully processed {len(spot_pairs)} SPOT pairs from {self.exchange_name}")
+            self.logger.info(f"Successfully processed {len(spot_pairs)} trading pairs from {self.exchange_name}")
             return response
         
         except Exception as e:

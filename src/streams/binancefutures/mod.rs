@@ -57,7 +57,7 @@ impl WebsocketStream for BinanceFuturesClient {
 
 impl ExchangeClient for BinanceFuturesClient {
     fn get_exchange_name(&self) -> &'static str {
-        "binancefutures"
+        "binance-futures"
     }
 
     fn get_symbols(&self) -> &[String] {

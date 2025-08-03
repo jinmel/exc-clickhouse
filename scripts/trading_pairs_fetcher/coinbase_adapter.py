@@ -26,7 +26,7 @@ class CoinbaseAdapter(ExchangeAdapter):
     def __init__(self):
         """Initialize Coinbase adapter with API configuration."""
         super().__init__(
-            exchange_name="Coinbase",
+            exchange_name="coinbase",
             base_url="https://api.exchange.coinbase.com",
             timeout=30,
             max_retries=3

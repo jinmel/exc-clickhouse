@@ -26,7 +26,7 @@ class OKXAdapter(ExchangeAdapter):
     def __init__(self):
         """Initialize OKX adapter with API configuration."""
         super().__init__(
-            exchange_name="OKX",
+            exchange_name="okx",
             base_url="https://www.okx.com",
             timeout=30,
             max_retries=3
