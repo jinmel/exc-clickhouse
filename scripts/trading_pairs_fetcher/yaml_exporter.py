@@ -125,6 +125,20 @@ class YAMLExporter:
             return False
 
 
+def create_sample_yaml() -> str:
+    """Create sample YAML content for testing purposes."""
+    sample_pairs = [
+        TradingPair(exchange="binance", trading_type="SPOT", pair="BTCUSDT", base_asset="BTC", quote_asset="USDT"),
+        TradingPair(exchange="binance-futures", trading_type="FUTURES", pair="ETHUSDT", base_asset="ETH", quote_asset="USDT"),
+        TradingPair(exchange="bybit", trading_type="SPOT", pair="ADAUSDT", base_asset="ADA", quote_asset="USDT"),
+        TradingPair(exchange="okx", trading_type="SPOT", pair="SOLUSDT", base_asset="SOL", quote_asset="USDT"),
+    ]
+    
+    exporter = YAMLExporter()
+    trading_pairs_list = exporter.create_trading_pairs_list(sample_pairs)
+    return exporter.to_yaml_string(trading_pairs_list)
+
+
 # Example usage and testing
 if __name__ == "__main__":
     import logging

@@ -1,7 +1,7 @@
 """
-Binance exchange adapter implementation.
+Binance Futures exchange adapter implementation.
 
-Fetches SPOT trading pairs from Binance using the /api/v3/exchangeInfo endpoint.
+Fetches FUTURES trading pairs from Binance using the /fapi/v1/exchangeInfo endpoint.
 """
 
 from typing import List, Dict, Any
@@ -15,37 +15,37 @@ except ImportError:
     from base_adapter import ExchangeAdapter
 
 
-class BinanceAdapter(ExchangeAdapter):
+class BinanceFuturesAdapter(ExchangeAdapter):
     """
-    Binance exchange adapter for fetching SPOT trading pairs.
+    Binance Futures exchange adapter for fetching FUTURES trading pairs.
     
-    Uses the GET /api/v3/exchangeInfo endpoint to fetch all trading symbols
-    and filters for SPOT pairs with TRADING status.
+    Uses the GET /fapi/v1/exchangeInfo endpoint to fetch all futures trading symbols
+    and filters for FUTURES pairs with TRADING status.
     """
     
     def __init__(self):
-        """Initialize Binance adapter with API configuration."""
+        """Initialize Binance Futures adapter with API configuration."""
         super().__init__(
-            exchange_name="binance",
-            base_url="https://api.binance.com",
+            exchange_name="binance-futures",
+            base_url="https://fapi.binance.com",
             timeout=30,
             max_retries=3
         )
     
     def get_endpoint(self) -> str:
-        """Get the Binance exchange info endpoint."""
-        return "/api/v3/exchangeInfo"
+        """Get the Binance Futures exchange info endpoint."""
+        return "/fapi/v1/exchangeInfo"
     
     def get_params(self) -> Dict[str, Any]:
-        """Get query parameters for Binance API request."""
+        """Get query parameters for Binance Futures API request."""
         return {}  # No parameters needed for exchangeInfo
     
     def parse_response(self, raw_data: Dict[str, Any]) -> List[TradingPair]:
         """
-        Parse Binance exchangeInfo response into TradingPair objects.
+        Parse Binance Futures exchangeInfo response into TradingPair objects.
         
         Args:
-            raw_data: Raw JSON response from Binance API
+            raw_data: Raw JSON response from Binance Futures API
             
         Returns:
             List of TradingPair objects
@@ -62,38 +62,25 @@ class BinanceAdapter(ExchangeAdapter):
                 status = symbol_data.get('status', '')
                 base_asset = symbol_data.get('baseAsset', '')
                 quote_asset = symbol_data.get('quoteAsset', '')
+                contract_type = symbol_data.get('contractType', '')
                 
                 # Skip if any required field is missing
                 if not all([symbol, base_asset, quote_asset]):
                     self.logger.warning(f"Skipping incomplete symbol data: {symbol_data}")
                     continue
                 
-                # Create TradingPair object
+                # Create TradingPair object for futures
                 trading_pair = TradingPair(
                     exchange=self.exchange_name,
-                    trading_type="SPOT",  # Will be validated by the model
+                    trading_type="FUTURES",
                     pair=symbol,
                     base_asset=base_asset,
                     quote_asset=quote_asset
                 )
                 
-                # Store status and SPOT trading info for filtering
+                # Store status and contract info for filtering
                 trading_pair._status = status
-                trading_pair._is_spot_trading_allowed = symbol_data.get('isSpotTradingAllowed', False)
-                
-                # Check permissionSets for SPOT
-                permission_sets = symbol_data.get('permissionSets', [])
-                trading_pair._has_spot_permission = False
-                
-                for permission_set in permission_sets:
-                    if isinstance(permission_set, list) and 'SPOT' in permission_set:
-                        trading_pair._has_spot_permission = True
-                        break
-                
-                # Also check old permissions field for backwards compatibility
-                permissions = symbol_data.get('permissions', [])
-                if 'SPOT' in permissions:
-                    trading_pair._has_spot_permission = True
+                trading_pair._contract_type = contract_type
                 
                 trading_pairs.append(trading_pair)
                 
@@ -101,20 +88,23 @@ class BinanceAdapter(ExchangeAdapter):
                 self.logger.warning(f"Failed to parse symbol {symbol_data.get('symbol', 'unknown')}: {e}")
                 continue
         
-        self.logger.info(f"Parsed {len(trading_pairs)} symbols from Binance")
+        self.logger.info(f"Parsed {len(trading_pairs)} symbols from Binance Futures")
         return trading_pairs
     
     def filter_spot_pairs(self, pairs: List[TradingPair]) -> List[TradingPair]:
         """
-        Filter Binance trading pairs to include only active SPOT pairs.
+        Filter Binance Futures trading pairs to include only PERPETUAL futures (no expiry).
+        
+        Note: This method is named filter_spot_pairs for compatibility with the base class,
+        but actually filters for perpetual futures pairs.
         
         Args:
             pairs: List of all trading pairs
             
         Returns:
-            List of SPOT trading pairs with TRADING status
+            List of PERPETUAL FUTURES trading pairs with TRADING status
         """
-        spot_pairs = []
+        futures_pairs = []
         
         for pair in pairs:
             try:
@@ -123,35 +113,32 @@ class BinanceAdapter(ExchangeAdapter):
                 if status != 'TRADING':
                     continue
                 
-                # Check if SPOT trading is allowed
-                is_spot_allowed = getattr(pair, '_is_spot_trading_allowed', False)
-                has_spot_permission = getattr(pair, '_has_spot_permission', False)
-                
-                # Must have either explicit SPOT permission or isSpotTradingAllowed=True
-                if not (is_spot_allowed or has_spot_permission):
+                # Only include PERPETUAL contracts (exclude CURRENT_QUARTER, NEXT_QUARTER)
+                contract_type = getattr(pair, '_contract_type', '')
+                if contract_type != 'PERPETUAL':
                     continue
                 
                 # Clean up temporary attributes
-                for attr in ['_status', '_is_spot_trading_allowed', '_has_spot_permission']:
+                for attr in ['_status', '_contract_type']:
                     if hasattr(pair, attr):
                         delattr(pair, attr)
                 
-                spot_pairs.append(pair)
+                futures_pairs.append(pair)
                 
             except Exception as e:
                 self.logger.warning(f"Failed to filter pair {pair.pair}: {e}")
                 continue
         
-        self.logger.info(f"Filtered to {len(spot_pairs)} SPOT pairs from Binance")
-        return spot_pairs
+        self.logger.info(f"Filtered to {len(futures_pairs)} PERPETUAL FUTURES pairs from Binance Futures")
+        return futures_pairs
 
 
 # Convenience function for testing
-async def test_binance_adapter():
-    """Test function for Binance adapter."""
-    async with BinanceAdapter() as adapter:
+async def test_binance_futures_adapter():
+    """Test function for Binance Futures adapter."""
+    async with BinanceFuturesAdapter() as adapter:
         response = await adapter.fetch_trading_pairs()
-        print(f"Binance: {len(response.trading_pairs)} SPOT pairs")
+        print(f"Binance Futures: {len(response.trading_pairs)} FUTURES pairs")
         
         # Show first few pairs
         for pair in response.trading_pairs[:5]:
@@ -168,4 +155,4 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     
     # Run test
-    asyncio.run(test_binance_adapter()) 
+    asyncio.run(test_binance_futures_adapter()) 

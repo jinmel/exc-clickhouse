@@ -49,7 +49,7 @@ class KrakenAdapter(ExchangeAdapter):
     def __init__(self):
         """Initialize Kraken adapter with API configuration."""
         super().__init__(
-            exchange_name="Kraken",
+            exchange_name="kraken",
             base_url="https://api.kraken.com",
             timeout=30,
             max_retries=3

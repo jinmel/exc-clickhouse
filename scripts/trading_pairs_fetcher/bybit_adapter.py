@@ -26,7 +26,7 @@ class BybitAdapter(ExchangeAdapter):
     def __init__(self):
         """Initialize Bybit adapter with API configuration."""
         super().__init__(
-            exchange_name="Bybit",
+            exchange_name="bybit",
             base_url="https://api.bybit.com",
             timeout=30,
             max_retries=3
