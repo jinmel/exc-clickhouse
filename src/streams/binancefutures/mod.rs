@@ -5,7 +5,7 @@ use crate::{
     models::NormalizedEvent,
     streams::{
         ExchangeClient, ExchangeStreamError, StreamSymbols, StreamType, WebsocketStream,
-        exchange_stream::ExchangeStreamBuilder, subscription::BinanceSubscription,
+        exchange_stream::ExchangeStreamBuilder, subscription::BinanceFuturesSubscription,
     },
 };
 use futures::stream::Stream;
@@ -23,7 +23,7 @@ pub mod parser;
 #[derive(Clone)]
 pub struct BinanceFuturesClient {
     base_url: String,
-    subscription: BinanceSubscription,
+    subscription: BinanceFuturesSubscription,
     symbols: Vec<String>,
 }
 
@@ -57,7 +57,7 @@ impl WebsocketStream for BinanceFuturesClient {
 
 impl ExchangeClient for BinanceFuturesClient {
     fn get_exchange_name(&self) -> &'static str {
-        "binance-futures"
+        "binance"
     }
 
     fn get_symbols(&self) -> &[String] {
@@ -89,7 +89,7 @@ impl BinanceFuturesClientBuilder {
 
     /// Build the BinanceFuturesClient instance
     pub fn build(self) -> eyre::Result<BinanceFuturesClient> {
-        let mut subscription = BinanceSubscription::new();
+        let mut subscription = BinanceFuturesSubscription::new();
         subscription.add_markets(
             self.symbols
                 .iter()
@@ -128,7 +128,7 @@ mod tests {
             .build()
             .expect("Failed to build BinanceFuturesClient");
 
-        assert_eq!(client.get_exchange_name(), "binancefutures");
+        assert_eq!(client.get_exchange_name(), "binance");
         assert_eq!(client.get_symbols(), &["btcusdt", "ethusdt"]);
         assert_eq!(client.base_url, DEFAULT_BINANCE_FUTURES_WS_URL);
     }
@@ -139,7 +139,7 @@ mod tests {
             .build()
             .expect("Failed to build BinanceFuturesClient with empty symbols");
 
-        assert_eq!(client.get_exchange_name(), "binancefutures");
+        assert_eq!(client.get_exchange_name(), "binance");
         assert!(client.get_symbols().is_empty());
     }
 }

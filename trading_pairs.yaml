@@ -1,879 +1,279 @@
 - exchange: binance
-  trading_type: SPOT
-  pair: 1INCHBTC
-  base_asset: 1INCH
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: 1INCHUSDT
-  base_asset: 1INCH
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: ACXUSDC
-  base_asset: ACX
-  quote_asset: USDC
-- exchange: binance
-  trading_type: SPOT
-  pair: ACXUSDT
-  base_asset: ACX
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: APEBTC
-  base_asset: APE
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: APEUSDC
-  base_asset: APE
-  quote_asset: USDC
-- exchange: binance
-  trading_type: SPOT
-  pair: APEUSDT
-  base_asset: APE
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: ARBBTC
-  base_asset: ARB
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: ARBETH
-  base_asset: ARB
-  quote_asset: ETH
-- exchange: binance
-  trading_type: SPOT
-  pair: ARBUSDC
-  base_asset: ARB
-  quote_asset: USDC
-- exchange: binance
-  trading_type: SPOT
-  pair: ARBUSDT
-  base_asset: ARB
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: ATABTC
-  base_asset: ATA
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: ATAUSDT
-  base_asset: ATA
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: AXLBTC
-  base_asset: AXL
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: AXLUSDT
-  base_asset: AXL
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: BTCDAI
-  base_asset: BTC
-  quote_asset: DAI
-- exchange: binance
-  trading_type: SPOT
-  pair: BTCUSDC
-  base_asset: BTC
-  quote_asset: USDC
-- exchange: binance
-  trading_type: SPOT
-  pair: BTCUSDT
-  base_asset: BTC
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: CAKEBTC
-  base_asset: CAKE
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: CAKEUSDC
-  base_asset: CAKE
-  quote_asset: USDC
-- exchange: binance
-  trading_type: SPOT
-  pair: CAKEUSDT
-  base_asset: CAKE
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: CELOBTC
-  base_asset: CELO
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: CELOUSDT
-  base_asset: CELO
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: COMPBTC
-  base_asset: COMP
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: COMPUSDC
-  base_asset: COMP
-  quote_asset: USDC
-- exchange: binance
-  trading_type: SPOT
-  pair: COMPUSDT
-  base_asset: COMP
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: COTIBTC
-  base_asset: COTI
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: COTIUSDT
-  base_asset: COTI
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: COWUSDC
-  base_asset: COW
-  quote_asset: USDC
-- exchange: binance
-  trading_type: SPOT
-  pair: COWUSDT
-  base_asset: COW
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: CRVBTC
-  base_asset: CRV
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: CRVUSDC
-  base_asset: CRV
-  quote_asset: USDC
-- exchange: binance
-  trading_type: SPOT
-  pair: CRVUSDT
-  base_asset: CRV
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: CTSIBTC
-  base_asset: CTSI
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: CTSIUSDT
-  base_asset: CTSI
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: DIABTC
-  base_asset: DIA
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: DIAUSDT
-  base_asset: DIA
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: DODOBTC
-  base_asset: DODO
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: DODOUSDT
-  base_asset: DODO
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: ENABTC
-  base_asset: ENA
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: ENAUSDC
-  base_asset: ENA
-  quote_asset: USDC
-- exchange: binance
-  trading_type: SPOT
-  pair: ENAUSDT
-  base_asset: ENA
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: ETHBTC
-  base_asset: ETH
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: ETHDAI
-  base_asset: ETH
-  quote_asset: DAI
-- exchange: binance
-  trading_type: SPOT
-  pair: ETHFIUSDC
-  base_asset: ETHFI
-  quote_asset: USDC
-- exchange: binance
-  trading_type: SPOT
-  pair: ETHFIUSDT
-  base_asset: ETHFI
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: ETHUSDC
-  base_asset: ETH
-  quote_asset: USDC
-- exchange: binance
-  trading_type: SPOT
-  pair: ETHUSDT
-  base_asset: ETH
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: FXSUSDT
-  base_asset: FXS
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: GMXUSDC
-  base_asset: GMX
-  quote_asset: USDC
-- exchange: binance
-  trading_type: SPOT
-  pair: GMXUSDT
-  base_asset: GMX
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: GNOUSDT
-  base_asset: GNO
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: GNSUSDT
-  base_asset: GNS
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: GRTBTC
-  base_asset: GRT
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: GRTETH
-  base_asset: GRT
-  quote_asset: ETH
-- exchange: binance
-  trading_type: SPOT
-  pair: GRTUSDC
-  base_asset: GRT
-  quote_asset: USDC
-- exchange: binance
-  trading_type: SPOT
-  pair: GRTUSDT
-  base_asset: GRT
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: HYPERUSDC
-  base_asset: HYPER
-  quote_asset: USDC
-- exchange: binance
-  trading_type: SPOT
-  pair: HYPERUSDT
-  base_asset: HYPER
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: JOEBTC
-  base_asset: JOE
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: JOEUSDT
-  base_asset: JOE
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: KNCBTC
-  base_asset: KNC
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: KNCUSDT
-  base_asset: KNC
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: LDOBTC
-  base_asset: LDO
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: LDOUSDC
-  base_asset: LDO
-  quote_asset: USDC
-- exchange: binance
-  trading_type: SPOT
-  pair: LDOUSDT
-  base_asset: LDO
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: LINKBTC
-  base_asset: LINK
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: LINKETH
-  base_asset: LINK
-  quote_asset: ETH
-- exchange: binance
-  trading_type: SPOT
-  pair: LINKUSDC
-  base_asset: LINK
-  quote_asset: USDC
-- exchange: binance
-  trading_type: SPOT
-  pair: LINKUSDT
-  base_asset: LINK
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: LPTBTC
-  base_asset: LPT
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: LPTUSDC
-  base_asset: LPT
-  quote_asset: USDC
-- exchange: binance
-  trading_type: SPOT
-  pair: LPTUSDT
-  base_asset: LPT
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: LRCBTC
-  base_asset: LRC
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: LRCETH
-  base_asset: LRC
-  quote_asset: ETH
-- exchange: binance
-  trading_type: SPOT
-  pair: LRCUSDT
-  base_asset: LRC
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: MAGICBTC
-  base_asset: MAGIC
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: MAGICUSDT
-  base_asset: MAGIC
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: PENDLEBTC
-  base_asset: PENDLE
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: PENDLEUSDC
-  base_asset: PENDLE
-  quote_asset: USDC
-- exchange: binance
-  trading_type: SPOT
-  pair: PENDLEUSDT
-  base_asset: PENDLE
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: PEPEUSDC
-  base_asset: PEPE
-  quote_asset: USDC
-- exchange: binance
-  trading_type: SPOT
-  pair: PEPEUSDT
-  base_asset: PEPE
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: PERPUSDT
-  base_asset: PERP
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: PONDUSDT
-  base_asset: POND
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: PYTHBTC
-  base_asset: PYTH
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: PYTHUSDC
-  base_asset: PYTH
-  quote_asset: USDC
-- exchange: binance
-  trading_type: SPOT
-  pair: PYTHUSDT
-  base_asset: PYTH
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: RDNTUSDT
-  base_asset: RDNT
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: STGBTC
-  base_asset: STG
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: STGUSDT
-  base_asset: STG
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: SUSHIBTC
-  base_asset: SUSHI
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: SUSHIUSDC
-  base_asset: SUSHI
-  quote_asset: USDC
-- exchange: binance
-  trading_type: SPOT
-  pair: SUSHIUSDT
-  base_asset: SUSHI
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: TRBBTC
-  base_asset: TRB
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: TRBUSDC
-  base_asset: TRB
-  quote_asset: USDC
-- exchange: binance
-  trading_type: SPOT
-  pair: TRBUSDT
-  base_asset: TRB
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: UMABTC
-  base_asset: UMA
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: UMAUSDT
-  base_asset: UMA
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: UNIBTC
-  base_asset: UNI
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: UNIETH
-  base_asset: UNI
-  quote_asset: ETH
-- exchange: binance
-  trading_type: SPOT
-  pair: UNIUSDC
-  base_asset: UNI
-  quote_asset: USDC
-- exchange: binance
-  trading_type: SPOT
-  pair: UNIUSDT
-  base_asset: UNI
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: USUALBTC
-  base_asset: USUAL
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: USUALUSDC
-  base_asset: USUAL
-  quote_asset: USDC
-- exchange: binance
-  trading_type: SPOT
-  pair: USUALUSDT
-  base_asset: USUAL
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: WBTC
-  base_asset: W
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: WBTCBTC
-  base_asset: WBTC
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: WBTCETH
-  base_asset: WBTC
-  quote_asset: ETH
-- exchange: binance
-  trading_type: SPOT
-  pair: WBTCUSDT
-  base_asset: WBTC
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: WOOUSDT
-  base_asset: WOO
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: WUSDC
-  base_asset: W
-  quote_asset: USDC
-- exchange: binance
-  trading_type: SPOT
-  pair: WUSDT
-  base_asset: W
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: XAIUSDC
-  base_asset: XAI
-  quote_asset: USDC
-- exchange: binance
-  trading_type: SPOT
-  pair: XAIUSDT
-  base_asset: XAI
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: YFIBTC
-  base_asset: YFI
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: YFIUSDT
-  base_asset: YFI
-  quote_asset: USDT
-- exchange: binance
-  trading_type: SPOT
-  pair: ZROBTC
-  base_asset: ZRO
-  quote_asset: BTC
-- exchange: binance
-  trading_type: SPOT
-  pair: ZROUSDC
-  base_asset: ZRO
-  quote_asset: USDC
-- exchange: binance
-  trading_type: SPOT
-  pair: ZROUSDT
-  base_asset: ZRO
-  quote_asset: USDT
-- exchange: binance-futures
   trading_type: FUTURES
   pair: 1INCHUSDT
   base_asset: 1INCH
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: ACXUSDT
   base_asset: ACX
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: APEUSDT
   base_asset: APE
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: ARBUSDC
   base_asset: ARB
   quote_asset: USDC
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: ARBUSDT
   base_asset: ARB
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: ATAUSDT
   base_asset: ATA
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: ATHUSDT
   base_asset: ATH
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: AXLUSDT
   base_asset: AXL
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: BTCUSDC
   base_asset: BTC
   quote_asset: USDC
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: BTCUSDT
   base_asset: BTC
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: CAKEUSDT
   base_asset: CAKE
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: CELOUSDT
   base_asset: CELO
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: COMPUSDT
   base_asset: COMP
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: COTIUSDT
   base_asset: COTI
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: COWUSDT
   base_asset: COW
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: CRVUSDC
   base_asset: CRV
   quote_asset: USDC
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: CRVUSDT
   base_asset: CRV
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: CTSIUSDT
   base_asset: CTSI
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: DIAUSDT
   base_asset: DIA
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: ENAUSDC
   base_asset: ENA
   quote_asset: USDC
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: ENAUSDT
   base_asset: ENA
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: ETHBTC
   base_asset: ETH
   quote_asset: BTC
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: ETHFIUSDC
   base_asset: ETHFI
   quote_asset: USDC
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: ETHFIUSDT
   base_asset: ETHFI
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: ETHUSDC
   base_asset: ETH
   quote_asset: USDC
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: ETHUSDT
   base_asset: ETH
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: FXSUSDT
   base_asset: FXS
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: GMXUSDT
   base_asset: GMX
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: GRTUSDT
   base_asset: GRT
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: HYPERUSDT
   base_asset: HYPER
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: JOEUSDT
   base_asset: JOE
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: KNCUSDT
   base_asset: KNC
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: LDOUSDT
   base_asset: LDO
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: LINKUSDC
   base_asset: LINK
   quote_asset: USDC
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: LINKUSDT
   base_asset: LINK
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: LPTUSDT
   base_asset: LPT
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: LRCUSDT
   base_asset: LRC
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: MAGICUSDT
   base_asset: MAGIC
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: PENDLEUSDT
   base_asset: PENDLE
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: PERPUSDT
   base_asset: PERP
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: PYTHUSDT
   base_asset: PYTH
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: RDNTUSDT
   base_asset: RDNT
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: SQDUSDT
   base_asset: SQD
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: STGUSDT
   base_asset: STG
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: SUSHIUSDT
   base_asset: SUSHI
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: TRBUSDT
   base_asset: TRB
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: UMAUSDT
   base_asset: UMA
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: UNIUSDC
   base_asset: UNI
   quote_asset: USDC
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: UNIUSDT
   base_asset: UNI
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: USUALUSDT
   base_asset: USUAL
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: UXLINKUSDT
   base_asset: UXLINK
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: WOOUSDT
   base_asset: WOO
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: WUSDT
   base_asset: W
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: XAIUSDT
   base_asset: XAI
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: YFIUSDT
   base_asset: YFI
   quote_asset: USDT
-- exchange: binance-futures
+- exchange: binance
   trading_type: FUTURES
   pair: ZROUSDT
   base_asset: ZRO

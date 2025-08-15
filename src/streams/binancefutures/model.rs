@@ -87,7 +87,7 @@ impl TryFrom<TradeEvent> for NormalizedTrade {
             .wrap_err("Failed to parse quantity")?;
         
         Ok(NormalizedTrade::new(
-            ExchangeName::BinanceFutures,
+            ExchangeName::Binance,
             &trade.symbol,
             trade.trade_time * 1000, // Convert milliseconds to microseconds
             if trade.is_buyer_market_maker {
@@ -122,7 +122,7 @@ impl TryFrom<BookTickerEvent> for NormalizedQuote {
             .wrap_err("Failed to parse ask quantity")?;
         
         Ok(NormalizedQuote::new(
-            ExchangeName::BinanceFutures,
+            ExchangeName::Binance,
             &ticker.symbol,
             ticker.event_time * 1000, // Convert milliseconds to microseconds
             ask_amount,

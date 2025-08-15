@@ -8,8 +8,6 @@ use crate::{ethereum::BlockMetadata, timeboost::bids::BidData};
 pub enum ExchangeName {
     #[serde(rename = "binance")]
     Binance,
-    #[serde(rename = "binancefutures")]
-    BinanceFutures,
     #[serde(rename = "bybit")]
     Bybit,
     #[serde(rename = "okex")]
@@ -28,7 +26,6 @@ impl std::fmt::Display for ExchangeName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ExchangeName::Binance => write!(f, "binance"),
-            ExchangeName::BinanceFutures => write!(f, "binancefutures"),
             ExchangeName::Bybit => write!(f, "bybit"),
             ExchangeName::Okx => write!(f, "okex"),
             ExchangeName::Coinbase => write!(f, "coinbase"),

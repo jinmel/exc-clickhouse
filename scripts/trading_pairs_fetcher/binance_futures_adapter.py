@@ -26,7 +26,7 @@ class BinanceFuturesAdapter(ExchangeAdapter):
     def __init__(self):
         """Initialize Binance Futures adapter with API configuration."""
         super().__init__(
-            exchange_name="binance-futures",
+            exchange_name="binance",
             base_url="https://fapi.binance.com",
             timeout=30,
             max_retries=3

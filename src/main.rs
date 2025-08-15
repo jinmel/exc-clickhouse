@@ -152,8 +152,17 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
     let task_config = app_config.get_task_manager_config();
     let mut task_manager = TaskManager::<()>::with_config(task_config);
 
+    tracing::info!("Spawn tasks");
+    tracing::info!("Binance symbols: {:?}", binance_symbols);
+    tracing::info!("Binance futures symbols: {:?}", binance_futures_symbols);
+    tracing::info!("Bybit symbols: {:?}", bybit_symbols);
+    tracing::info!("OKX symbols: {:?}", okx_symbols);
+    tracing::info!("Coinbase symbols: {:?}", coinbase_symbols);
+    tracing::info!("Kraken symbols: {:?}", kraken_symbols);
+    tracing::info!("Kucoin symbols: {:?}", kucoin_symbols);
     // Spawn tasks
     if !binance_symbols.is_empty() {
+        tracing::info!("Spawn Binance stream with symbols: {:?}", binance_symbols);
         let tx = msg_tx.clone();
         let client = BinanceClient::builder()
             .add_symbols(binance_symbols)
@@ -166,6 +175,7 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
     }
 
     if !binance_futures_symbols.is_empty() {
+        tracing::info!("Spawn Binance futures stream with symbols: {:?}", binance_futures_symbols);
         let tx = msg_tx.clone();
         let client = BinanceFuturesClient::builder()
             .add_symbols(binance_futures_symbols)
@@ -178,6 +188,7 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
     }
 
     if !bybit_symbols.is_empty() {
+        tracing::info!("Spawn Bybit stream");
         let tx = msg_tx.clone();
         let client = BybitClient::builder().add_symbols(bybit_symbols).build()?;
         task_manager.spawn_task(TaskName::BybitStream, move || {
@@ -188,6 +199,7 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
     }
 
     if !okx_symbols.is_empty() {
+        tracing::info!("Spawn OKX stream");
         let tx = msg_tx.clone();
         let client = OkxClient::builder().add_symbols(okx_symbols).build()?;
         task_manager.spawn_task(TaskName::OkxStream, move || {
@@ -198,6 +210,7 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
     }
 
     if !coinbase_symbols.is_empty() {
+        tracing::info!("Spawn Coinbase stream");
         let tx = msg_tx.clone();
         let client = CoinbaseClient::builder()
             .add_symbols(coinbase_symbols)
@@ -210,6 +223,7 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
     }
 
     if !kraken_symbols.is_empty() {
+        tracing::info!("Spawn Kraken stream");
         let tx = msg_tx.clone();
         let client = KrakenClient::builder()
             .add_symbols(kraken_symbols)
@@ -222,6 +236,7 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
     }
 
     if !kucoin_symbols.is_empty() {
+        tracing::info!("Spawn Kucoin stream");
         let symbols = kucoin_symbols.clone();
         let tx = msg_tx.clone();
         let client = KucoinClient::builder().add_symbols(symbols).build().await?;

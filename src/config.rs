@@ -213,7 +213,13 @@ impl ExchangeConfigs {
             .iter()
             .filter(|e| e.exchange.eq_ignore_ascii_case("binance"))
             .filter(|e| e.trading_type.eq_ignore_ascii_case("futures"))
-            .map(|e| format!("{}{}", e.base_asset, e.quote_asset))
+            .map(|e| {
+                format!(
+                    "{}{}",
+                    e.base_asset.to_lowercase(),
+                    e.quote_asset.to_lowercase()
+                )
+            })
             .collect();
 
         let bybit_symbols: Vec<String> = cfg
@@ -270,6 +276,7 @@ impl ExchangeConfigs {
 
 /// Read symbols configuration from YAML file
 pub fn read_trading_pairs(filename: &str) -> eyre::Result<TradingPairsConfig> {
+    tracing::info!("Reading trading pairs from {}", filename);
     let file = File::open(filename).wrap_err("Failed to open symbols YAML file")?;
     TradingPairsConfig::from_yaml(file)
 }

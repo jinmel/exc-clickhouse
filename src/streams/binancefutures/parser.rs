@@ -90,7 +90,7 @@ mod tests {
         
         match &events[0] {
             NormalizedEvent::Trade(trade) => {
-                assert_eq!(trade.exchange, ExchangeName::BinanceFutures);
+                assert_eq!(trade.exchange, ExchangeName::Binance);
                 assert_eq!(trade.symbol.as_str(), "BTCUSDT");
                 assert_eq!(trade.price, 50000.00);
                 assert_eq!(trade.amount, 0.001);
@@ -122,7 +122,7 @@ mod tests {
         
         match &events[0] {
             NormalizedEvent::Quote(quote) => {
-                assert_eq!(quote.exchange, ExchangeName::BinanceFutures);
+                assert_eq!(quote.exchange, ExchangeName::Binance);
                 assert_eq!(quote.symbol.as_str(), "BNBUSDT");
                 assert_eq!(quote.ask_price, 25.36520000);
                 assert_eq!(quote.bid_price, 25.35190000);

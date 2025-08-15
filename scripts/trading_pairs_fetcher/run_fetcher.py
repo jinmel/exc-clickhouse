@@ -113,6 +113,7 @@ Examples:
   python run_fetcher.py --base_assets assets.txt             # Filter by base assets only
   python run_fetcher.py --quote_assets quotes.txt            # Filter by quote assets only
   python run_fetcher.py --base_assets assets.txt --quote_assets quotes.txt  # Filter by both
+  python run_fetcher.py --futures-only                       # Fetch only from Binance Futures adapter
   
 Base/Quote assets file format (one asset per line):
   BTC
@@ -132,6 +133,12 @@ Base/Quote assets file format (one asset per line):
         '--quote_assets',
         type=str,
         help='Path to text file containing quote assets to filter by (one per line)'
+    )
+
+    parser.add_argument(
+        '--futures-only',
+        action='store_true',
+        help='Fetch only from the Binance Futures adapter'
     )
     
     return parser.parse_args()
@@ -172,17 +179,20 @@ async def main():
     
     # Initialize factory
     factory = AdapterFactory()
-    available_exchanges = factory.get_available_exchanges()
+    if args.futures_only:
+        selected_exchanges = ['binance-futures']
+    else:
+        selected_exchanges = factory.get_available_exchanges()
     
-    print(f"📡 Fetching from {len(available_exchanges)} exchanges:")
-    for exchange in available_exchanges:
+    print(f"📡 Fetching from {len(selected_exchanges)} exchanges:")
+    for exchange in selected_exchanges:
         print(f"  • {exchange.title()}")
     print()
     
     # Fetch from all exchanges
     try:
         start_time = datetime.now()
-        responses = await factory.fetch_from_all_exchanges(max_concurrent=3)
+        responses = await factory.fetch_from_all_exchanges(exchanges=selected_exchanges, max_concurrent=3)
         end_time = datetime.now()
         duration = (end_time - start_time).total_seconds()
         
