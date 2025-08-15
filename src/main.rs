@@ -151,15 +151,7 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
     // Create TaskManager with restart configuration from AppConfig
     let task_config = app_config.get_task_manager_config();
     let mut task_manager = TaskManager::<()>::with_config(task_config);
-
-    tracing::info!("Spawn tasks");
-    tracing::info!("Binance symbols: {:?}", binance_symbols);
-    tracing::info!("Binance futures symbols: {:?}", binance_futures_symbols);
-    tracing::info!("Bybit symbols: {:?}", bybit_symbols);
-    tracing::info!("OKX symbols: {:?}", okx_symbols);
-    tracing::info!("Coinbase symbols: {:?}", coinbase_symbols);
-    tracing::info!("Kraken symbols: {:?}", kraken_symbols);
-    tracing::info!("Kucoin symbols: {:?}", kucoin_symbols);
+    
     // Spawn tasks
     if !binance_symbols.is_empty() {
         tracing::info!("Spawn Binance stream with symbols: {:?}", binance_symbols);

@@ -10,7 +10,7 @@ pub enum ExchangeName {
     Binance,
     #[serde(rename = "bybit")]
     Bybit,
-    #[serde(rename = "okex")]
+    #[serde(rename = "okx")]
     Okx,
     #[serde(rename = "coinbase")]
     Coinbase,
