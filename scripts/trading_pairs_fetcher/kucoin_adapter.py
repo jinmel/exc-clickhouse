@@ -26,7 +26,7 @@ class KuCoinAdapter(ExchangeAdapter):
     def __init__(self):
         """Initialize KuCoin adapter with API configuration."""
         super().__init__(
-            exchange_name="Kucoin",
+            exchange_name="kucoin",
             base_url="https://api.kucoin.com",
             timeout=30,
             max_retries=3

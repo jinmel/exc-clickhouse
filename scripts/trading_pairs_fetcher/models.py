@@ -15,12 +15,13 @@ from enum import Enum
 
 class ExchangeName(str, Enum):
     """Supported exchange names."""
-    BINANCE = "Binance"
-    BYBIT = "Bybit" 
-    KRAKEN = "Kraken"
-    KUCOIN = "Kucoin"
-    COINBASE = "Coinbase"
-    OKX = "OKX"
+    BINANCE = "binance"
+    BINANCE_FUTURES = "binance-futures"
+    BYBIT = "bybit" 
+    KRAKEN = "kraken"
+    KUCOIN = "kucoin"
+    COINBASE = "coinbase"
+    OKX = "okx"
 
 
 class TradingPair(BaseModel):
@@ -29,22 +30,22 @@ class TradingPair(BaseModel):
     
     Fields match src/symbols.rs TradingPair:
     - exchange: String
-    - trading_type: String (always "SPOT")
+    - trading_type: String ("SPOT" or "FUTURES")
     - pair: String (the symbol name like "BTCUSDT")
     - base_asset: String (like "BTC")
     - quote_asset: String (like "USDT")
     """
     exchange: str = Field(..., description="Exchange name (e.g., 'binance')")
-    trading_type: str = Field(default="SPOT", description="Trading type, always SPOT")
+    trading_type: str = Field(default="SPOT", description="Trading type: SPOT or FUTURES")
     pair: str = Field(..., description="Trading pair symbol (e.g., 'BTCUSDT')")
     base_asset: str = Field(..., description="Base asset (e.g., 'BTC')")
     quote_asset: str = Field(..., description="Quote asset (e.g., 'USDT')")
     
     @validator('trading_type')
     def validate_trading_type(cls, v):
-        """Ensure trading_type is always SPOT."""
-        if v != "SPOT":
-            raise ValueError("trading_type must be 'SPOT'")
+        """Ensure trading_type is SPOT or FUTURES."""
+        if v not in ["SPOT", "FUTURES"]:
+            raise ValueError("trading_type must be 'SPOT' or 'FUTURES'")
         return v
     
     @validator('pair')
@@ -74,21 +75,19 @@ class SymbolsConfigEntry(BaseModel):
         - ETHUSDT
     """
     exchange: str = Field(..., description="Exchange name")
-    market: str = Field(default="SPOT", description="Market type, always SPOT")
+    market: str = Field(default="SPOT", description="Market type: SPOT or FUTURES")
     symbols: List[str] = Field(default_factory=list, description="List of trading pair symbols")
     
     @validator('market')
     def validate_market_type(cls, v):
-        """Ensure market is always SPOT."""
-        if v != "SPOT":
-            raise ValueError("market must be 'SPOT'")
+        """Ensure market is SPOT or FUTURES."""
+        if v not in ["SPOT", "FUTURES"]:
+            raise ValueError("market must be 'SPOT' or 'FUTURES'")
         return v
     
     @validator('symbols')
     def validate_symbols_unique(cls, v):
-        """Ensure symbols list contains unique values."""
-        if len(v) != len(set(v)):
-            raise ValueError("symbols list must contain unique values")
+        """Remove duplicates and ensure symbols list is sorted."""
         return sorted(list(set(v)))  # Remove duplicates and sort
 
 
@@ -106,29 +105,34 @@ class SymbolsConfig(BaseModel):
         """
         Create SymbolsConfig from a list of TradingPair objects.
         
-        Groups trading pairs by exchange and creates the appropriate structure
-        for YAML output.
+        Groups trading pairs by exchange and trading type, creating separate entries
+        for SPOT and FUTURES markets from the same exchange.
         """
-        # Group pairs by exchange
-        exchange_groups: Dict[str, List[str]] = {}
+        # Group pairs by exchange and trading type
+        exchange_groups: Dict[str, Dict[str, List[str]]] = {}
         
         for pair in trading_pairs:
             if pair.exchange not in exchange_groups:
-                exchange_groups[pair.exchange] = []
-            exchange_groups[pair.exchange].append(pair.pair)
+                exchange_groups[pair.exchange] = {}
+            
+            if pair.trading_type not in exchange_groups[pair.exchange]:
+                exchange_groups[pair.exchange][pair.trading_type] = []
+            
+            exchange_groups[pair.exchange][pair.trading_type].append(pair.pair)
         
-        # Create SymbolsConfigEntry for each exchange
+        # Create SymbolsConfigEntry for each exchange/market combination
         entries = []
-        for exchange_name, symbols in exchange_groups.items():
-            entry = SymbolsConfigEntry(
-                exchange=exchange_name,
-                market="SPOT",
-                symbols=sorted(list(set(symbols)))  # Remove duplicates and sort
-            )
-            entries.append(entry)
+        for exchange_name, trading_types in exchange_groups.items():
+            for trading_type, symbols in trading_types.items():
+                entry = SymbolsConfigEntry(
+                    exchange=exchange_name,
+                    market=trading_type,
+                    symbols=sorted(list(set(symbols)))  # Remove duplicates and sort
+                )
+                entries.append(entry)
         
-        # Sort entries by exchange name for consistent output
-        entries.sort(key=lambda x: x.exchange)
+        # Sort entries by exchange name and then by market type for consistent output
+        entries.sort(key=lambda x: (x.exchange, x.market))
         
         return cls(entries=entries)
     

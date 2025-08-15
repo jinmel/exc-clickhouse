@@ -232,8 +232,8 @@ class AdapterTester:
             
             # Test YAML export
             exporter = YAMLExporter()
-            symbols_config = exporter.create_symbols_config(all_pairs)
-            yaml_content = exporter.to_yaml_string(symbols_config)
+            trading_pairs_list = exporter.create_trading_pairs_list(all_pairs)
+            yaml_content = exporter.to_yaml_string(trading_pairs_list)
             
             # Validate the YAML content
             if exporter.validate_yaml_format(yaml_content):

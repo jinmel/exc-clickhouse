@@ -48,6 +48,7 @@ pub struct AlliumConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ExchangeConfigs {
     pub binance_symbols: Vec<String>,
+    pub binance_futures_symbols: Vec<String>,
     pub bybit_symbols: Vec<String>,
     pub okx_symbols: Vec<String>,
     pub coinbase_symbols: Vec<String>,
@@ -156,6 +157,7 @@ impl AppConfig {
     /// Check if any exchange has symbols configured
     pub fn has_exchange_symbols(&self) -> bool {
         !self.exchange_configs.binance_symbols.is_empty()
+            || !self.exchange_configs.binance_futures_symbols.is_empty()
             || !self.exchange_configs.bybit_symbols.is_empty()
             || !self.exchange_configs.okx_symbols.is_empty()
             || !self.exchange_configs.coinbase_symbols.is_empty()
@@ -197,6 +199,20 @@ impl ExchangeConfigs {
             .filter(|e| e.exchange.eq_ignore_ascii_case("binance"))
             .filter(|e| e.trading_type.eq_ignore_ascii_case("spot"))
             // Binance accepts lowercase symbols only
+            .map(|e| {
+                format!(
+                    "{}{}",
+                    e.base_asset.to_lowercase(),
+                    e.quote_asset.to_lowercase()
+                )
+            })
+            .collect();
+
+        let binance_futures_symbols: Vec<String> = cfg
+            .trading_pairs
+            .iter()
+            .filter(|e| e.exchange.eq_ignore_ascii_case("binance"))
+            .filter(|e| e.trading_type.eq_ignore_ascii_case("futures"))
             .map(|e| {
                 format!(
                     "{}{}",
@@ -248,6 +264,7 @@ impl ExchangeConfigs {
 
         Self {
             binance_symbols,
+            binance_futures_symbols,
             bybit_symbols,
             okx_symbols,
             coinbase_symbols,
@@ -259,6 +276,7 @@ impl ExchangeConfigs {
 
 /// Read symbols configuration from YAML file
 pub fn read_trading_pairs(filename: &str) -> eyre::Result<TradingPairsConfig> {
+    tracing::info!("Reading trading pairs from {}", filename);
     let file = File::open(filename).wrap_err("Failed to open symbols YAML file")?;
     TradingPairsConfig::from_yaml(file)
 }

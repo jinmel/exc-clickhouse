@@ -67,6 +67,69 @@ impl Subscription for BinanceSubscription {
 }
 
 #[derive(Debug, Clone)]
+pub struct BinanceFuturesSubscription {
+    symbols: Vec<StreamSymbols>,
+}
+
+impl Default for BinanceFuturesSubscription {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BinanceFuturesSubscription {
+    pub fn new() -> Self {
+        Self { symbols: vec![] }
+    }
+
+    pub fn add_markets(&mut self, symbols: Vec<StreamSymbols>) {
+        self.symbols.extend(symbols);
+    }
+}
+
+impl Subscription for BinanceFuturesSubscription {
+    fn to_json(&self) -> Result<Vec<serde_json::Value>, serde_json::Error> {
+        #[derive(Serialize)]
+        struct SubscriptionMessage {
+            method: String,
+            params: Vec<String>,
+            id: Option<String>,
+        }
+
+        let pararms = self
+            .symbols
+            .iter()
+            .map(|market| {
+                let stream_type = match market.stream_type {
+                    StreamType::Trade => "aggTrade",
+                    StreamType::Quote => "bookTicker",
+                };
+                format!(
+                    "{symbol}@{stream_type}",
+                    symbol = market.symbol.to_lowercase(),
+                    stream_type = stream_type
+                )
+            })
+            .collect::<Vec<String>>();
+        let id = rand::random::<u64>();
+        let subscription_message = SubscriptionMessage {
+            method: "SUBSCRIBE".to_string(),
+            params: pararms,
+            id: Some(id.to_string()),
+        };
+        Ok(vec![serde_json::to_value(subscription_message)?])
+    }
+
+    fn heartbeat(&self) -> Option<tokio_tungstenite::tungstenite::Message> {
+        None
+    }
+
+    fn heartbeat_interval(&self) -> Option<Duration> {
+        None
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct BybitSubscription {
     symbols: Vec<StreamSymbols>,
 }

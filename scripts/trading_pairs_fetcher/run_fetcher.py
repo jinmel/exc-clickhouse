@@ -2,7 +2,7 @@
 """
 Complete trading pairs fetcher script.
 
-Fetches SPOT trading pairs from all supported exchanges and exports to YAML format
+Fetches SPOT and FUTURES trading pairs from all supported exchanges and exports to YAML format
 compatible with the Rust symbols.yaml structure.
 """
 
@@ -105,7 +105,7 @@ def filter_trading_pairs(
 def parse_arguments():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="Fetch SPOT trading pairs from cryptocurrency exchanges",
+        description="Fetch SPOT and FUTURES trading pairs from cryptocurrency exchanges",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -113,6 +113,7 @@ Examples:
   python run_fetcher.py --base_assets assets.txt             # Filter by base assets only
   python run_fetcher.py --quote_assets quotes.txt            # Filter by quote assets only
   python run_fetcher.py --base_assets assets.txt --quote_assets quotes.txt  # Filter by both
+  python run_fetcher.py --futures-only                       # Fetch only from Binance Futures adapter
   
 Base/Quote assets file format (one asset per line):
   BTC
@@ -133,6 +134,12 @@ Base/Quote assets file format (one asset per line):
         type=str,
         help='Path to text file containing quote assets to filter by (one per line)'
     )
+
+    parser.add_argument(
+        '--futures-only',
+        action='store_true',
+        help='Fetch only from the Binance Futures adapter'
+    )
     
     return parser.parse_args()
 
@@ -151,7 +158,7 @@ async def main():
     
     logger = logging.getLogger(__name__)
     
-    print("🚀 Starting Multi-Exchange SPOT Trading Pairs Fetcher")
+    print("🚀 Starting Multi-Exchange SPOT & FUTURES Trading Pairs Fetcher")
     print("=" * 60)
     
     # Load base assets filter if provided
@@ -172,17 +179,20 @@ async def main():
     
     # Initialize factory
     factory = AdapterFactory()
-    available_exchanges = factory.get_available_exchanges()
+    if args.futures_only:
+        selected_exchanges = ['binance-futures']
+    else:
+        selected_exchanges = factory.get_available_exchanges()
     
-    print(f"📡 Fetching from {len(available_exchanges)} exchanges:")
-    for exchange in available_exchanges:
+    print(f"📡 Fetching from {len(selected_exchanges)} exchanges:")
+    for exchange in selected_exchanges:
         print(f"  • {exchange.title()}")
     print()
     
     # Fetch from all exchanges
     try:
         start_time = datetime.now()
-        responses = await factory.fetch_from_all_exchanges(max_concurrent=3)
+        responses = await factory.fetch_from_all_exchanges(exchanges=selected_exchanges, max_concurrent=3)
         end_time = datetime.now()
         duration = (end_time - start_time).total_seconds()
         
