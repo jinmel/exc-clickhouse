@@ -15,6 +15,7 @@ use crate::{
     streams::{
         ExchangeClient, WebsocketStream, binance::BinanceClient, bybit::BybitClient,
         coinbase::CoinbaseClient, kraken::KrakenClient, kucoin::KucoinClient, okx::OkxClient,
+        binancefutures::BinanceFuturesClient,
     },
     task_manager::{IntoTaskResult, TaskManager},
 };
@@ -35,6 +36,7 @@ mod trading_pairs;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum TaskName {
     BinanceStream,
+    BinanceFuturesStream,
     BybitStream,
     OkxStream,
     CoinbaseStream,
@@ -50,6 +52,7 @@ impl std::fmt::Display for TaskName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             TaskName::BinanceStream => write!(f, "Binance Stream"),
+            TaskName::BinanceFuturesStream => write!(f, "Binance Futures Stream"),
             TaskName::BybitStream => write!(f, "Bybit Stream"),
             TaskName::OkxStream => write!(f, "OKX Stream"),
             TaskName::CoinbaseStream => write!(f, "Coinbase Stream"),
@@ -122,6 +125,7 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
     let app_config = AppConfig::from_stream_args(&args)?;
 
     let binance_symbols: Vec<String> = app_config.exchange_configs.binance_symbols.clone();
+    let binance_futures_symbols: Vec<String> = app_config.exchange_configs.binance_futures_symbols.clone();
     let bybit_symbols: Vec<String> = app_config.exchange_configs.bybit_symbols.clone();
     let okx_symbols: Vec<String> = app_config.exchange_configs.okx_symbols.clone();
     let coinbase_symbols: Vec<String> = app_config.exchange_configs.coinbase_symbols.clone();
@@ -147,9 +151,10 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
     // Create TaskManager with restart configuration from AppConfig
     let task_config = app_config.get_task_manager_config();
     let mut task_manager = TaskManager::<()>::with_config(task_config);
-
+    
     // Spawn tasks
     if !binance_symbols.is_empty() {
+        tracing::info!("Spawn Binance stream with symbols: {:?}", binance_symbols);
         let tx = msg_tx.clone();
         let client = BinanceClient::builder()
             .add_symbols(binance_symbols)
@@ -161,7 +166,21 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
         });
     }
 
+    if !binance_futures_symbols.is_empty() {
+        tracing::info!("Spawn Binance futures stream with symbols: {:?}", binance_futures_symbols);
+        let tx = msg_tx.clone();
+        let client = BinanceFuturesClient::builder()
+            .add_symbols(binance_futures_symbols)
+            .build()?;
+        task_manager.spawn_task(TaskName::BinanceFuturesStream, move || {
+            let client = client.clone();
+            let tx = tx.clone();
+            Box::pin(async move { process_exchange_stream(client, tx).await.into_task_result() })
+        });
+    }
+
     if !bybit_symbols.is_empty() {
+        tracing::info!("Spawn Bybit stream");
         let tx = msg_tx.clone();
         let client = BybitClient::builder().add_symbols(bybit_symbols).build()?;
         task_manager.spawn_task(TaskName::BybitStream, move || {
@@ -172,6 +191,7 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
     }
 
     if !okx_symbols.is_empty() {
+        tracing::info!("Spawn OKX stream");
         let tx = msg_tx.clone();
         let client = OkxClient::builder().add_symbols(okx_symbols).build()?;
         task_manager.spawn_task(TaskName::OkxStream, move || {
@@ -182,6 +202,7 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
     }
 
     if !coinbase_symbols.is_empty() {
+        tracing::info!("Spawn Coinbase stream");
         let tx = msg_tx.clone();
         let client = CoinbaseClient::builder()
             .add_symbols(coinbase_symbols)
@@ -194,6 +215,7 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
     }
 
     if !kraken_symbols.is_empty() {
+        tracing::info!("Spawn Kraken stream");
         let tx = msg_tx.clone();
         let client = KrakenClient::builder()
             .add_symbols(kraken_symbols)
@@ -206,6 +228,7 @@ async fn run_stream(args: StreamArgs) -> eyre::Result<()> {
     }
 
     if !kucoin_symbols.is_empty() {
+        tracing::info!("Spawn Kucoin stream");
         let symbols = kucoin_symbols.clone();
         let tx = msg_tx.clone();
         let client = KucoinClient::builder().add_symbols(symbols).build().await?;

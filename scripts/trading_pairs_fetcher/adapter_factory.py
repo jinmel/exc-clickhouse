@@ -15,6 +15,7 @@ try:
     from .models import ExchangeResponse, TradingPair
     from .base_adapter import ExchangeAdapter
     from .binance_adapter import BinanceAdapter
+    from .binance_futures_adapter import BinanceFuturesAdapter
     from .bybit_adapter import BybitAdapter
     from .okx_adapter import OKXAdapter
     from .coinbase_adapter import CoinbaseAdapter
@@ -24,6 +25,7 @@ except ImportError:
     from models import ExchangeResponse, TradingPair
     from base_adapter import ExchangeAdapter
     from binance_adapter import BinanceAdapter
+    from binance_futures_adapter import BinanceFuturesAdapter
     from bybit_adapter import BybitAdapter
     from okx_adapter import OKXAdapter
     from coinbase_adapter import CoinbaseAdapter
@@ -41,6 +43,7 @@ class AdapterFactory:
     # Registry of available adapters
     ADAPTERS: Dict[str, Type[ExchangeAdapter]] = {
         'binance': BinanceAdapter,
+        'binance-futures': BinanceFuturesAdapter,
         'bybit': BybitAdapter,
         'okx': OKXAdapter,
         'coinbase': CoinbaseAdapter,

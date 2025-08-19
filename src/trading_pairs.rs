@@ -33,6 +33,7 @@ impl TradingPair {
         if self.exchange == "okx" {
             self.exchange = "okex".to_string();
         }
+        self.trading_type = self.trading_type.to_uppercase();
         self
     }
 }

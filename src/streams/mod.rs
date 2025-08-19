@@ -1,4 +1,5 @@
 pub mod binance;
+pub mod binancefutures;
 pub mod bybit;
 pub mod coinbase;
 pub mod exchange_stream;

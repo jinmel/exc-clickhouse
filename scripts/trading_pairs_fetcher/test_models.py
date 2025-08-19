@@ -63,10 +63,10 @@ class TestTradingPair:
     
     def test_trading_pair_invalid_trading_type(self):
         """Test that invalid trading_type raises ValueError."""
-        with pytest.raises(ValueError, match="trading_type must be 'SPOT'"):
+        with pytest.raises(ValueError, match="trading_type must be 'SPOT' or 'FUTURES'"):
             TradingPair(
                 exchange="binance",
-                trading_type="FUTURES",  # Invalid
+                trading_type="INVALID",  # Invalid
                 pair="BTCUSDT",
                 base_asset="BTC",
                 quote_asset="USDT"
@@ -121,10 +121,10 @@ class TestSymbolsConfigEntry:
     
     def test_symbols_config_entry_invalid_market(self):
         """Test that invalid market raises ValueError."""
-        with pytest.raises(ValueError, match="market must be 'SPOT'"):
+        with pytest.raises(ValueError, match="market must be 'SPOT' or 'FUTURES'"):
             SymbolsConfigEntry(
-                exchange="Binance",
-                market="FUTURES",  # Invalid
+                exchange="binance",
+                market="INVALID",  # Invalid
                 symbols=["BTCUSDT"]
             )
     
@@ -145,23 +145,23 @@ class TestSymbolsConfig:
     def test_symbols_config_from_trading_pairs(self):
         """Test creating SymbolsConfig from TradingPair list."""
         trading_pairs = [
-            TradingPair(exchange="Binance", pair="BTCUSDT", base_asset="BTC", quote_asset="USDT"),
-            TradingPair(exchange="Binance", pair="ETHUSDT", base_asset="ETH", quote_asset="USDT"),
-            TradingPair(exchange="Bybit", pair="BTCUSDT", base_asset="BTC", quote_asset="USDT"),
+            TradingPair(exchange="binance", pair="BTCUSDT", base_asset="BTC", quote_asset="USDT"),
+            TradingPair(exchange="binance", pair="ETHUSDT", base_asset="ETH", quote_asset="USDT"),
+            TradingPair(exchange="bybit", pair="BTCUSDT", base_asset="BTC", quote_asset="USDT"),
         ]
         
         config = SymbolsConfig.from_trading_pairs(trading_pairs)
         
         assert len(config.entries) == 2  # Binance and Bybit
         
-        # Check Binance entry
-        binance_entry = next(e for e in config.entries if e.exchange == "Binance")
+        # Check binance entry
+        binance_entry = next(e for e in config.entries if e.exchange == "binance")
         assert binance_entry.market == "SPOT"
         assert "BTCUSDT" in binance_entry.symbols
         assert "ETHUSDT" in binance_entry.symbols
         
-        # Check Bybit entry
-        bybit_entry = next(e for e in config.entries if e.exchange == "Bybit")
+        # Check bybit entry
+        bybit_entry = next(e for e in config.entries if e.exchange == "bybit")
         assert bybit_entry.market == "SPOT"
         assert "BTCUSDT" in bybit_entry.symbols
     
@@ -198,13 +198,14 @@ class TestYAMLExporter:
     def test_export_trading_pairs_to_yaml(self):
         """Test exporting trading pairs to YAML format."""
         trading_pairs = [
-            TradingPair(exchange="Binance", pair="BTCUSDT", base_asset="BTC", quote_asset="USDT"),
-            TradingPair(exchange="Binance", pair="ETHUSDT", base_asset="ETH", quote_asset="USDT"),
-            TradingPair(exchange="Bybit", pair="BTCUSDT", base_asset="BTC", quote_asset="USDT"),
+            TradingPair(exchange="binance", pair="BTCUSDT", base_asset="BTC", quote_asset="USDT"),
+            TradingPair(exchange="binance", pair="ETHUSDT", base_asset="ETH", quote_asset="USDT"),
+            TradingPair(exchange="bybit", pair="BTCUSDT", base_asset="BTC", quote_asset="USDT"),
         ]
         
         exporter = YAMLExporter()
-        yaml_content = exporter.export_trading_pairs(trading_pairs)
+        trading_pairs_list = exporter.create_trading_pairs_list(trading_pairs)
+        yaml_content = exporter.to_yaml_string(trading_pairs_list)
         
         # Parse the YAML to verify structure
         data = yaml.safe_load(yaml_content)
@@ -223,7 +224,8 @@ class TestYAMLExporter:
     def test_export_empty_trading_pairs(self):
         """Test exporting empty trading pairs list."""
         exporter = YAMLExporter()
-        yaml_content = exporter.export_trading_pairs([])
+        trading_pairs_list = exporter.create_trading_pairs_list([])
+        yaml_content = exporter.to_yaml_string(trading_pairs_list)
         
         assert yaml_content == "[]"
     
@@ -265,14 +267,15 @@ symbols:
     def test_round_trip_yaml_conversion(self):
         """Test that we can export to YAML and load it back correctly."""
         trading_pairs = [
-            TradingPair(exchange="Binance", pair="BTCUSDT", base_asset="BTC", quote_asset="USDT"),
-            TradingPair(exchange="Bybit", pair="ETHUSDT", base_asset="ETH", quote_asset="USDT"),
+            TradingPair(exchange="binance", pair="BTCUSDT", base_asset="BTC", quote_asset="USDT"),
+            TradingPair(exchange="bybit", pair="ETHUSDT", base_asset="ETH", quote_asset="USDT"),
         ]
         
         exporter = YAMLExporter()
         
         # Export to YAML
-        yaml_content = exporter.export_trading_pairs(trading_pairs)
+        trading_pairs_list = exporter.create_trading_pairs_list(trading_pairs)
+        yaml_content = exporter.to_yaml_string(trading_pairs_list)
         
         # Load back from YAML
         loaded_config = exporter.load_from_file_content(yaml_content)
@@ -282,29 +285,25 @@ symbols:
         assert "BTCUSDT" in loaded_config.get_exchange_symbols("Binance")
         assert "ETHUSDT" in loaded_config.get_exchange_symbols("Bybit")
     
-    def test_get_exchange_statistics(self):
-        """Test getting statistics from trading pairs."""
+    def test_yaml_exporter_basic_functionality(self):
+        """Test basic YAMLExporter functionality."""
         trading_pairs = [
-            TradingPair(exchange="Binance", pair="BTCUSDT", base_asset="BTC", quote_asset="USDT"),
-            TradingPair(exchange="Binance", pair="ETHUSDT", base_asset="ETH", quote_asset="USDT"),
-            TradingPair(exchange="Bybit", pair="BTCUSDT", base_asset="BTC", quote_asset="USDT"),
+            TradingPair(exchange="binance", pair="BTCUSDT", base_asset="BTC", quote_asset="USDT"),
+            TradingPair(exchange="binance", pair="ETHUSDT", base_asset="ETH", quote_asset="USDT"),
+            TradingPair(exchange="bybit", pair="BTCUSDT", base_asset="BTC", quote_asset="USDT"),
         ]
         
         exporter = YAMLExporter()
-        stats = exporter.get_exchange_statistics(trading_pairs)
+        trading_pairs_list = exporter.create_trading_pairs_list(trading_pairs)
+        yaml_content = exporter.to_yaml_string(trading_pairs_list)
         
-        assert stats['total_pairs'] == 3
-        assert stats['total_exchanges'] == 2
+        # Should be valid YAML
+        assert exporter.validate_yaml_format(yaml_content)
         
-        # Check exchange-specific stats
-        assert 'Binance' in stats['exchanges']
-        assert 'Bybit' in stats['exchanges']
-        
-        binance_stats = stats['exchanges']['Binance']
-        assert binance_stats['pair_count'] == 2
-        assert 'BTC' in binance_stats['base_assets']
-        assert 'ETH' in binance_stats['base_assets']
-        assert 'USDT' in binance_stats['quote_assets']
+        # Should contain the trading pairs
+        assert "binance" in yaml_content
+        assert "bybit" in yaml_content
+        assert "BTCUSDT" in yaml_content
 
 
 class TestExchangeResponse:
@@ -313,15 +312,15 @@ class TestExchangeResponse:
     def test_exchange_response_creation(self):
         """Test creating an ExchangeResponse."""
         trading_pairs = [
-            TradingPair(exchange="Binance", pair="BTCUSDT", base_asset="BTC", quote_asset="USDT")
+            TradingPair(exchange="binance", pair="BTCUSDT", base_asset="BTC", quote_asset="USDT")
         ]
         
         response = ExchangeResponse(
             trading_pairs=trading_pairs,
-            exchange_name="Binance"
+            exchange_name="binance"
         )
         
-        assert response.exchange_name == "Binance"
+        assert response.exchange_name == "binance"
         assert response.total_pairs_count == 1  # Auto-calculated
         assert response.success == True  # Default
         assert response.error_message is None
@@ -329,13 +328,13 @@ class TestExchangeResponse:
     def test_exchange_response_auto_count(self):
         """Test that total_pairs_count is automatically calculated."""
         trading_pairs = [
-            TradingPair(exchange="Binance", pair="BTCUSDT", base_asset="BTC", quote_asset="USDT"),
-            TradingPair(exchange="Binance", pair="ETHUSDT", base_asset="ETH", quote_asset="USDT")
+            TradingPair(exchange="binance", pair="BTCUSDT", base_asset="BTC", quote_asset="USDT"),
+            TradingPair(exchange="binance", pair="ETHUSDT", base_asset="ETH", quote_asset="USDT")
         ]
         
         response = ExchangeResponse(
             trading_pairs=trading_pairs,
-            exchange_name="Binance",
+            exchange_name="binance",
             total_pairs_count=999  # This should be overridden
         )
         
@@ -356,9 +355,9 @@ class TestCreateSampleYAML:
         
         # Should contain expected exchanges
         exchange_names = [entry['exchange'] for entry in data]
-        assert 'Binance' in exchange_names
-        assert 'Bybit' in exchange_names
-        assert 'OKX' in exchange_names
+        assert 'binance' in exchange_names
+        assert 'bybit' in exchange_names
+        assert 'okx' in exchange_names
 
 
 # Helper method for YAMLExporter to load from YAML content string
